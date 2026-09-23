@@ -14,6 +14,8 @@ npm test           # tests unitarios (Vitest)
 npm run e2e        # pruebas E2E en Chromium real (levanta su propio servidor; o GAME_URL=...)
 ```
 
+Versión de un solo archivo (para publicar sin servidor, p. ej. en móvil): `node scripts/build-artifact.mjs` → `artifact/the-last-heir.html`.
+
 Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game` para pruebas).
 
 ## Qué hay en el vertical slice
@@ -32,7 +34,9 @@ Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game`
 
 ## Controles
 
-WASD mover · Shift correr · Ctrl agacharse · Espacio saltar · E usar/coger · R agarrar/soltar · Clic ataque (mantener: fuerte / tensar arco) · Clic der. bloquear · C esquivar · F patada · T antorcha · 1–4 armas · Tab inventario · J diario · M mapa · Esc pausa · F3 rendimiento.
+**Móvil/tableta**: joystick con el pulgar izquierdo, arrastrar a la derecha para mirar y botones en pantalla (se activan solos en pantallas táctiles).
+
+**Teclado y ratón**: WASD mover · Shift correr · Ctrl agacharse · Espacio saltar · E usar/coger · R agarrar/soltar · Clic ataque (mantener: fuerte / tensar arco) · Clic der. bloquear · C esquivar · F patada · T antorcha · 1–4 armas · Tab inventario · J diario · M mapa · Esc pausa · F3 rendimiento.
 
 ## Documentación
 

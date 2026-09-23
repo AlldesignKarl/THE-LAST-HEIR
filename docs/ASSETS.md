@@ -4,16 +4,20 @@ El proyecto **no incluye arte ni audio externos**. Todo lo visible y audible es 
 
 | Tipo | Placeholder actual | Punto único de sustitución | Sustituto previsto |
 |---|---|---|---|
-| Texturas | Pintadas en canvas con ruido periódico + normales por Sobel (`engine/placeholder/Textures.ts`) | `TextureLibrary.get(id)` | Texturas PBR (albedo, normal, roughness, AO) 1–2K |
+| Texturas | Pintadas **en GPU** con shaders de ruido periódico/Voronoi (albedo + altura → normales por Sobel), 512–1024 px según calidad (`engine/placeholder/TextureGen.ts`); respaldo en CPU (`Textures.ts`) | `TextureLibrary.get(id)` | Texturas PBR (albedo, normal, roughness, AO) 1–2K |
+| Follaje | Atlas con alfa dibujados en Canvas 2D: racimos de roble, ramas de pino, arbusto, helecho, matas de hierba (`FoliageTextures.ts`, `Grass.ts`) | `oakFoliage()`… / `foliageMaterial()` | Atlas fotográficos de hojas |
 | Materiales | `MeshStandardMaterial` por id (`Materials.ts`) | `MaterialLibrary.get(id)` | Mismos ids con mapas PBR |
 | Objetos y mobiliario | Geometría primitiva fusionada (`Models.ts`) + forma física simplificada | `ModelLibrary.create(id)` → `{object, shape, mass}` | glTF por id; la forma física se mantiene en datos |
 | Edificios | Constructor procedural (`world/Buildings.ts`) | `BuildingInstance` | Kits modulares glTF (muros, tejados, puertas) |
-| Árboles | Cilindros + icosaedros desplazados, 2 LOD (`world/Vegetation.ts`) | `speciesGeometry()` | Modelos de árbol con LOD e impostores |
-| Humanos | Rig jerárquico de primitivas con poses (`actors/HumanoidModel.ts`) | `HumanoidModel` (`setState`, `update`, `hitboxes`, manos) | `SkinnedMesh` + `AnimationMixer` con clips de mocap |
+| Árboles | Tronco y ramas por curvas + copa de ~100 tarjetas de hojas con alphaTest, normales volumétricas y AO por vértice; LOD lejana con tarjetas grandes (`world/TreeModels.ts`) | `speciesGeometry()` / `speciesMaterials()` | Modelos de árbol (SpeedTree o similar) con LOD e impostores |
+| Detalle de suelo | Rocas, arbustos, helechos, ramas caídas instanciados (`world/GroundScatter.ts`) | `GroundScatter` | Mallas escaneadas |
+| Humanos | Rig jerárquico de primitivas (torso torneado, cara con nariz/orejas/ojos/cejas, pelo, tocas, capacete, calzado) con detalle de tejido/piel/cuero en shader (`actors/HumanoidModel.ts`, `engine/RigidSkin.ts`) | `HumanoidModel` (`setState`, `update`, `hitboxes`, manos) | `SkinnedMesh` + `AnimationMixer` con clips de mocap |
 | Animales | Cuadrúpedo procedural (`actors/AnimalModel.ts`) | `AnimalModel` | Modelos rigueados de ciervo/lobo |
 | Brazos 1.ª persona | Cilindros + esferas (`player/Viewmodel.ts`) | `Viewmodel` | Brazos rigueados con animaciones de ataque |
 | Sonido | Síntesis WebAudio por id lógico (`audio/AudioEngine.ts`) | `AudioEngine.samples.set(id, buffer)` | Grabaciones (Foley, ambientes, campanas) |
-| Fuentes | IM Fell English + EB Garamond (OFL, vía npm `@fontsource`) | CSS | — (definitivas) |
+| Fuentes | IM Fell English + EB Garamond (OFL, vía npm `@fontsource`; Google Fonts en la versión de un solo archivo) | CSS | — (definitivas) |
+
+> Se intentó descargar texturas CC0 (Poly Haven) para sustituir los placeholders, pero la red de este entorno no permite acceder a esos servidores. La sustitución queda preparada por id.
 
 ## Reglas
 

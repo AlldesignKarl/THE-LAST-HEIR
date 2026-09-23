@@ -23,6 +23,11 @@ Una zona completamente jugable alrededor de Robledo:
 | Defensa | Ataque de bandidos que viajan desde su campamento, alarma, guardias a sus puestos, aldeanos a casa, retirada por moral, consecuencias persistentes |
 | Audio | Ambiente día/noche, pasos, combate, alarma (procedural) |
 
+## Fase 1.5 · Móvil y calidad visual ✅
+- Controles táctiles completos y calidad baja automática en pantallas táctiles.
+- Versión de un solo archivo publicable (`scripts/build-artifact.mjs`).
+- Texturas procedurales en GPU (512–1024 px), terreno por capas con normales, árboles con follaje de tarjetas, hierba y detalle de suelo, edificios con entramado y carpintería, personas con rostro y vestuario, armas con perfiles propios, IBL del cielo.
+
 ## Fase 2 · Profundidad de sistemas
 - Cocina completa, fogatas colocables, odres, temperatura por ropa.
 - Armaduras y escudos con durabilidad; lanza, maza, daga.
