@@ -1,0 +1,29 @@
+{
+  "name": "the-last-heir",
+  "private": true,
+  "version": "0.1.0",
+  "description": "The Last Heir - juego medieval de supervivencia, exploración, combate y defensa de aldeas en primera persona",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --port 4173 --strictPort",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "e2e": "node e2e/run-e2e.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "0.20.0",
+    "@fontsource/eb-garamond": "5.3.0",
+    "@fontsource/im-fell-english": "5.3.0",
+    "three": "0.186.0"
+  },
+  "devDependencies": {
+    "@types/three": "0.186.0",
+    "playwright-core": "1.56.1",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vitest": "3.2.7"
+  }
+}
