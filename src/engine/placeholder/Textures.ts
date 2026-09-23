@@ -6,6 +6,7 @@
  */
 import * as THREE from 'three';
 import { hash2 } from '../../core/rng';
+import { TextureGen, type PainterName } from './TextureGen';
 
 /** Ruido de valor periódico (tileable) en [0,1]. */
 function pnoise(x: number, y: number, period: number, seed: number): number {
@@ -276,9 +277,11 @@ const metal = (size: number) => paint(size, (u, v) => {
 
 export type TexId =
   | 'grass' | 'dirt' | 'mud' | 'field' | 'rock' | 'planks' | 'stoneWall' | 'plaster'
-  | 'wattle' | 'thatch' | 'tiles' | 'bark' | 'leaves' | 'pine' | 'cloth' | 'metal';
+  | 'wattle' | 'thatch' | 'tiles' | 'bark' | 'leaves' | 'pine' | 'cloth' | 'metal'
+  | 'forestFloor' | 'cobble' | 'waterNormal' | 'pineBark' | 'leather' | 'roughWood';
 
-const PAINTERS: Record<TexId, { fn: (s: number) => Painted; size: number; normal: number }> = {
+/** Pintores CPU (respaldo si no hay renderer, p. ej. en tests). */
+const PAINTERS: Partial<Record<TexId, { fn: (s: number) => Painted; size: number; normal: number }>> = {
   grass: { fn: grass, size: 256, normal: 1.2 },
   dirt: { fn: dirt, size: 256, normal: 2 },
   mud: { fn: mud, size: 256, normal: 1.5 },
@@ -297,20 +300,62 @@ const PAINTERS: Record<TexId, { fn: (s: number) => Painted; size: number; normal
   metal: { fn: metal, size: 128, normal: 0.5 },
 };
 
+/** Pintores GPU: tamaño relativo (1 = tamaño base de la calidad) y relieve. */
+const GPU: Partial<Record<TexId, { painter: PainterName; scale: number; normal: number }>> = {
+  grass: { painter: 'grass', scale: 1, normal: 1.4 },
+  dirt: { painter: 'dirt', scale: 1, normal: 2.6 },
+  mud: { painter: 'mud', scale: 0.5, normal: 1.6 },
+  field: { painter: 'field', scale: 0.5, normal: 2.4 },
+  rock: { painter: 'rock', scale: 1, normal: 3.2 },
+  forestFloor: { painter: 'forestFloor', scale: 1, normal: 2.2 },
+  cobble: { painter: 'cobble', scale: 0.5, normal: 3.5 },
+  planks: { painter: 'planks', scale: 1, normal: 2.5 },
+  roughWood: { painter: 'roughWood', scale: 0.5, normal: 2.5 },
+  stoneWall: { painter: 'stoneWall', scale: 1, normal: 4 },
+  plaster: { painter: 'plaster', scale: 1, normal: 1.6 },
+  wattle: { painter: 'wattle', scale: 1, normal: 3 },
+  thatch: { painter: 'thatch', scale: 1, normal: 3.2 },
+  tiles: { painter: 'tiles', scale: 1, normal: 4 },
+  bark: { painter: 'bark', scale: 0.5, normal: 4 },
+  pineBark: { painter: 'pineBark', scale: 0.5, normal: 4 },
+  cloth: { painter: 'cloth', scale: 0.5, normal: 1 },
+  leather: { painter: 'leather', scale: 0.25, normal: 1.5 },
+  metal: { painter: 'metal', scale: 0.25, normal: 0.6 },
+  waterNormal: { painter: 'waterNormal', scale: 0.5, normal: 2 },
+};
+
 export class TextureLibrary {
   private cache = new Map<TexId, TextureSet>();
+  private gen: TextureGen | null = null;
+  private baseSize = 512;
+
+  /** Activa la generación en GPU. `baseSize`: 512 (baja) o 1024. */
+  init(renderer: THREE.WebGLRenderer, baseSize: number): void {
+    try {
+      this.gen = new TextureGen(renderer);
+      this.baseSize = baseSize;
+    } catch (e) {
+      console.warn('Texturas GPU no disponibles; se usan las de CPU.', e);
+      this.gen = null;
+    }
+  }
 
   get(id: TexId): TextureSet {
     let t = this.cache.get(id);
-    if (!t) {
-      const p = PAINTERS[id];
+    if (t) return t;
+    const g = GPU[id];
+    if (this.gen && g) {
+      const size = Math.max(128, Math.round(this.baseSize * g.scale));
+      t = this.gen.paint(g.painter, size, g.normal);
+    } else {
+      const p = PAINTERS[id] ?? PAINTERS[id === 'forestFloor' ? 'dirt' : id === 'pineBark' ? 'bark' : id === 'roughWood' ? 'planks' : id === 'leather' ? 'cloth' : id === 'waterNormal' ? 'mud' : 'dirt']!;
       t = build(p.fn(p.size), p.normal);
-      this.cache.set(id, t);
     }
+    this.cache.set(id, t);
     return t;
   }
 
   preloadAll(): void {
-    for (const id of Object.keys(PAINTERS) as TexId[]) this.get(id);
+    for (const id of new Set([...Object.keys(PAINTERS), ...Object.keys(GPU)]) as Set<TexId>) this.get(id);
   }
 }

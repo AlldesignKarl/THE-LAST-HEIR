@@ -6,12 +6,16 @@ export interface QualitySettings {
   shadowMapSize: number;
   viewChunks: number;
   grass: boolean;
+  /** Tamaño base de las texturas procedurales (GPU). */
+  textureSize: number;
+  /** Distancia de los árboles de detalle completo (m). */
+  treeNear: number;
 }
 
 export const QUALITY_PRESETS: Record<'low' | 'medium' | 'high', QualitySettings> = {
-  low: { pixelRatio: 0.75, shadows: false, shadowMapSize: 1024, viewChunks: 2, grass: false },
-  medium: { pixelRatio: 1, shadows: true, shadowMapSize: 2048, viewChunks: 3, grass: true },
-  high: { pixelRatio: 1.5, shadows: true, shadowMapSize: 4096, viewChunks: 4, grass: true },
+  low: { pixelRatio: 1, shadows: false, shadowMapSize: 1024, viewChunks: 2, grass: false, textureSize: 512, treeNear: 60 },
+  medium: { pixelRatio: 1, shadows: true, shadowMapSize: 2048, viewChunks: 3, grass: true, textureSize: 1024, treeNear: 100 },
+  high: { pixelRatio: 1.5, shadows: true, shadowMapSize: 4096, viewChunks: 4, grass: true, textureSize: 1024, treeNear: 140 },
 };
 
 /** Envoltura del WebGLRenderer: tonemapping cinematográfico, sombras, resize. */

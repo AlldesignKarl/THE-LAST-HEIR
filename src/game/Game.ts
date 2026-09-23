@@ -52,6 +52,7 @@ import { QUESTS, LOGS_REQUIRED } from '../data/quests';
 import { Economy } from '../economy/Economy';
 import { AudioEngine } from '../audio/AudioEngine';
 import { UIManager } from '../ui/UIManager';
+import { TouchControls } from '../ui/TouchControls';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -106,6 +107,8 @@ export class Game {
   readonly dialogue: DialogueSystem;
   readonly audio = new AudioEngine();
   readonly ui: UIManager;
+  /** Controles en pantalla (solo en dispositivos táctiles). */
+  readonly touch: TouchControls | null;
   readonly save: SaveSystem;
   readonly loop: GameLoop;
   readonly discovered = new Set<string>();
@@ -130,6 +133,8 @@ export class Game {
     if (settings.sensitivity) this.input.sensitivity = settings.sensitivity;
     if (settings.volume !== undefined) this.audio.volume = settings.volume;
     this.renderer = new Renderer(canvas, this.quality);
+    // Texturas procedurales en GPU (la resolución no cambia en caliente).
+    this.textures.init(this.renderer.renderer, this.quality.textureSize);
     this.physics = new Physics();
     this.materials = new MaterialLibrary(this.textures);
     this.models = new ModelLibrary(this.materials);
@@ -138,8 +143,9 @@ export class Game {
     this.weather = new Weather(this.bus);
     this.weather.onThunder = (delay) => setTimeout(() => this.bus.emit('sfx', { id: 'thunder' }), delay * 1000);
     this.env = new EnvironmentLighting(scene, this.renderer.renderer, this.quality.shadowMapSize, this.quality.shadows);
-    this.terrain = new Terrain(this.hf, this.physics, scene, this.textures, this.quality.viewChunks);
-    this.vegetation = new Vegetation(this.hf, this.physics, scene, this.materials);
+    this.terrain = new Terrain(this.hf, this.physics, scene, this.textures, this.quality.viewChunks, this.qualityName === 'low');
+    this.vegetation = new Vegetation(this.hf, this.physics, scene, this.materials,
+      this.qualityName === 'low' ? 0.35 : this.qualityName === 'medium' ? 0.7 : 1, this.quality.treeNear);
     this.water = new Water(this.hf, scene, this.textures);
     this.particles = new Particles(scene);
     this.lights = new LightPool(scene, 8);
@@ -181,6 +187,8 @@ export class Game {
     this.economy = new Economy(this.bus, this.reputation, this.skills, this.inventory);
     this.dialogue = new DialogueSystem(this);
     this.ui = new UIManager(this);
+    this.input.touchMode = TouchControls.isTouchDevice();
+    this.touch = this.input.touchMode ? new TouchControls(this) : null;
     this.save = new SaveSystem(this.bus);
     this.registerSaveables();
     this.wireEvents();
@@ -528,6 +536,7 @@ export class Game {
     this.audio.setListener(cam);
     this.audio.updateAmbience(frameDt, this.ambienceState());
     this.ui.updateHUD(frameDt);
+    this.touch?.update();
     this.updatePerf();
     this.renderer.render();
     if (this.started) this.viewmodel.render(this.renderer.renderer);

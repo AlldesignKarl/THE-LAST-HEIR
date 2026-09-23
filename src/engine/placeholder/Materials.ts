@@ -14,7 +14,7 @@ export const GlobalUniforms = {
 
 export type MatId =
   | 'stoneWall' | 'plaster' | 'wattle' | 'planks' | 'darkWood' | 'beam' | 'thatch' | 'tiles'
-  | 'rock' | 'caveRock' | 'bark' | 'leaves' | 'pine' | 'cloth' | 'clothRed' | 'metal' | 'iron' | 'gold'
+  | 'rock' | 'caveRock' | 'bark' | 'pineBark' | 'roughWood' | 'cobble' | 'leaves' | 'pine' | 'cloth' | 'clothRed' | 'metal' | 'iron' | 'gold'
   | 'straw' | 'dirt' | 'bread' | 'meat' | 'meatCooked' | 'apple' | 'leather' | 'paper' | 'ash' | 'charred';
 
 interface MatSpec {
@@ -37,7 +37,10 @@ const SPECS: Record<MatId, MatSpec> = {
   tiles: { tex: 'tiles', roughness: 0.8 },
   rock: { tex: 'rock', roughness: 0.95 },
   caveRock: { tex: 'rock', color: 0x9a948c, roughness: 0.9 },
-  bark: { tex: 'bark', roughness: 0.95 },
+  bark: { tex: 'bark', roughness: 0.95, normalScale: 1.2 },
+  pineBark: { tex: 'pineBark', roughness: 0.95, normalScale: 1.2 },
+  roughWood: { tex: 'roughWood', roughness: 0.9 },
+  cobble: { tex: 'cobble', roughness: 0.9, normalScale: 1 },
   leaves: { tex: 'leaves', roughness: 0.9, wind: true },
   pine: { tex: 'pine', roughness: 0.9, wind: true },
   cloth: { tex: 'cloth', roughness: 0.95 },
@@ -51,35 +54,39 @@ const SPECS: Record<MatId, MatSpec> = {
   meat: { color: 0x8a2f2a, roughness: 0.6 },
   meatCooked: { color: 0x5a3320, roughness: 0.7 },
   apple: { color: 0x9a2a1a, roughness: 0.5 },
-  leather: { tex: 'cloth', color: 0x6a4a30, roughness: 0.8 },
+  leather: { tex: 'leather', roughness: 0.75 },
   paper: { color: 0xd8cfb4, roughness: 1 },
   ash: { color: 0x2a2826, roughness: 1 },
   charred: { tex: 'planks', color: 0x2a2420, roughness: 1 },
 };
 
+/** Código de balanceo por viento (vertex shader); requiere uTime/uWind. */
+export function injectWind(shader: { uniforms: Record<string, THREE.IUniform>; vertexShader: string }, strength = 1): void {
+  shader.uniforms.uTime = GlobalUniforms.uTime;
+  shader.uniforms.uWind = GlobalUniforms.uWind;
+  shader.vertexShader = shader.vertexShader
+    .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;')
+    .replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+      {
+        vec4 wp = vec4(transformed, 1.0);
+        #ifdef USE_INSTANCING
+          wp = instanceMatrix * wp;
+        #endif
+        wp = modelMatrix * wp;
+        float sway = sin(uTime * 1.3 + wp.x * 0.07 + wp.z * 0.05) * 0.5 + sin(uTime * 2.7 + wp.x * 0.3) * 0.2;
+        float flutter = sin(uTime * 7.0 + wp.x * 1.7 + wp.y * 2.3 + wp.z * 1.3) * 0.04;
+        float hfac = clamp(transformed.y * 0.12, 0.0, 1.0);
+        transformed.x += (sway * 0.35 + flutter) * uWind * hfac * ${strength.toFixed(2)};
+        transformed.z += (sway * 0.2 + flutter) * uWind * hfac * ${strength.toFixed(2)};
+      }`,
+    );
+}
+
 /** Inyecta balanceo por viento en el vertex shader (follaje). */
 function applyWind(mat: THREE.Material): void {
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = GlobalUniforms.uTime;
-    shader.uniforms.uWind = GlobalUniforms.uWind;
-    shader.vertexShader = shader.vertexShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;')
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
-        {
-          vec4 wp = vec4(transformed, 1.0);
-          #ifdef USE_INSTANCING
-            wp = instanceMatrix * wp;
-          #endif
-          wp = modelMatrix * wp;
-          float sway = sin(uTime * 1.3 + wp.x * 0.07 + wp.z * 0.05) * 0.5 + sin(uTime * 2.7 + wp.x * 0.3) * 0.2;
-          float hfac = clamp(transformed.y * 0.12, 0.0, 1.0);
-          transformed.x += sway * uWind * 0.35 * hfac;
-          transformed.z += sway * uWind * 0.2 * hfac;
-        }`,
-      );
-  };
+  mat.onBeforeCompile = (shader) => injectWind(shader);
   mat.customProgramCacheKey = () => 'wind';
 }
 

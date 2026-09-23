@@ -140,7 +140,10 @@ export class UIManager {
       this.prompt.innerHTML = `<div class="t">${f.text}</div><div class="s">${f.sub ?? ''}</div>`;
       this.prompt.classList.add('show');
     } else if (inGame && g.interaction.carried) {
-      this.prompt.innerHTML = `<div class="s">[R] Soltar · [Clic] Lanzar${g.interaction.carried.item && !ITEMS[g.interaction.carried.item.itemId]?.heavy ? ' · [E] Guardar' : ''}</div>`;
+      const canStore = g.interaction.carried.item && !ITEMS[g.interaction.carried.item.itemId]?.heavy;
+      this.prompt.innerHTML = g.input.touchMode
+        ? `<div class="s">Agarrar: soltar · Atacar: lanzar${canStore ? ' · Usar: guardar' : ''}</div>`
+        : `<div class="s">[R] Soltar · [Clic] Lanzar${canStore ? ' · [E] Guardar' : ''}</div>`;
       this.prompt.classList.add('show');
     } else this.prompt.classList.remove('show');
     // Barras: solo visibles al cambiar o si no están llenas.
@@ -201,6 +204,13 @@ export class UIManager {
     const el = this.screens.get(id)!;
     el.innerHTML = '';
     build(el);
+    // Botón de cierre visible (imprescindible en pantallas táctiles, sin teclado).
+    if (id === 'inventory' || id === 'journal' || id === 'map') {
+      const x = h('button', 'close-x', '✕');
+      x.title = 'Cerrar';
+      x.onclick = () => this.close();
+      el.append(x);
+    }
     this.current = id;
     this.g.onUIChanged();
   }
@@ -314,6 +324,10 @@ export class UIManager {
         <div><b>Clic der.</b> Bloquear · <b>C</b> Esquivar · <b>F</b> Patada</div>
         <div><b>T</b> Antorcha en la mano izquierda · <b>1–4</b> Armas rápidas</div>
         <div><b>Tab / I</b> Inventario · <b>J</b> Diario · <b>M</b> Mapa · <b>Esc</b> Pausa · <b>F3</b> Rendimiento</div>
+        <h3>Pantalla táctil</h3>
+        <div><b>Pulgar izq.</b> Joystick (aparece donde tocas) · <b>Arrastrar a la derecha</b> Mirar</div>
+        <div><b>Atacar</b> tocar: ligero · mantener: fuerte / tensar arco (arrastra para apuntar)</div>
+        <div><b>Correr / Agachar</b> se quedan activos hasta volver a tocarlos · <b>Arma</b> cambia de arma</div>
       </div>`);
       const back = h('button', 'btn', 'Volver');
       back.onclick = () => (fromMenu ? this.openMainMenu(this.g.save.hasAny()) : this.openPause());
@@ -369,7 +383,7 @@ export class UIManager {
     const g = this.g;
     this.show('inventory', (el) => {
       const panel = h('div', 'panel');
-      panel.style.minWidth = '760px';
+      panel.style.minWidth = 'min(760px, 94vw)';
       const inv = g.inventory;
       const cont = this.openContainerId ? g.containers.get(this.openContainerId) : null;
       panel.append(h('h2', '', cont ? cont.name : 'Inventario'));
@@ -640,7 +654,7 @@ export class UIManager {
     const g = this.g;
     this.show('journal', (el) => {
       const p = h('div', 'panel');
-      p.style.minWidth = '680px';
+      p.style.minWidth = 'min(680px, 94vw)';
       p.append(h('h2', '', 'Diario'));
       const tabs = h('div', 'tabs');
       const tab = (id: typeof this.journalTab, t: string) => {
@@ -694,7 +708,7 @@ export class UIManager {
     const g = this.g;
     this.show('map', (el) => {
       const p = h('div', 'panel', '<h2>Mapa del valle</h2>');
-      const size = Math.min(620, window.innerHeight - 180);
+      const size = Math.max(180, Math.min(620, window.innerHeight - (window.innerHeight < 520 ? 90 : 180), window.innerWidth - 60));
       const c = h('canvas', 'map') as HTMLCanvasElement;
       c.width = c.height = size;
       const ctx = c.getContext('2d')!;

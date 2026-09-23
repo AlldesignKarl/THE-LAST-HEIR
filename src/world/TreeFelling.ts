@@ -39,8 +39,9 @@ export class TreeFelling {
     const g = this.g;
     const geo = g.vegetation.speciesGeometry(t.species);
     const mesh = new THREE.Group();
-    const trunk = new THREE.Mesh(geo.trunk, g.materials.get('bark'));
-    const canopy = new THREE.Mesh(geo.canopy, g.materials.get(t.species === 'oak' ? 'leaves' : 'pine'));
+    const sm = g.vegetation.speciesMaterials(t.species);
+    const trunk = new THREE.Mesh(geo.trunk, sm.trunk);
+    const canopy = new THREE.Mesh(geo.canopy, sm.canopy);
     trunk.castShadow = canopy.castShadow = true;
     mesh.add(trunk, canopy);
     mesh.scale.setScalar(t.scale);

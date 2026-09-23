@@ -7,6 +7,7 @@ import { Physics } from './engine/Physics';
 import { Game } from './game/Game';
 import { SaveSystem } from './save/SaveSystem';
 import { installDebugAPI } from './debug/DebugAPI';
+import { TouchControls } from './ui/TouchControls';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -18,7 +19,9 @@ async function boot(): Promise<void> {
   await new Promise((r) => setTimeout(r, 30));
   await Physics.init();
   const params = new URLSearchParams(location.search);
-  const game = new Game(canvas, (params.get('quality') as 'low' | 'medium' | 'high') ?? 'medium');
+  // En móviles la calidad baja por defecto (se puede cambiar en Opciones).
+  const defQuality = TouchControls.isTouchDevice() ? 'low' : 'medium';
+  const game = new Game(canvas, (params.get('quality') as 'low' | 'medium' | 'high') ?? defQuality);
   if (params.has('debug')) installDebugAPI(game);
   loading.remove();
 
@@ -37,7 +40,7 @@ async function boot(): Promise<void> {
     game.started = true;
     game.ui.showToast('Partida cargada', game.save.info(pending) ?? '');
     // Requiere un gesto del usuario para el ratón y el audio.
-    game.ui.setHint('Haz clic para continuar');
+    game.ui.setHint(game.input.touchMode ? 'Toca la pantalla para continuar' : 'Haz clic para continuar');
     const go = () => { game.ui.setHint(''); startPlaying(); canvas.removeEventListener('click', go); };
     canvas.addEventListener('click', go);
     ui.addEventListener('click', go, { once: true });

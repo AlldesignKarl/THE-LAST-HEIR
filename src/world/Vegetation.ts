@@ -5,11 +5,12 @@
  * Los árboles talados se recuerdan (persistencia) y rebrotan tras días.
  */
 import * as THREE from 'three';
-import { mergeGeometries, mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { Heightfield } from './Heightfield';
 import { Physics, RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 import type { MaterialLibrary } from '../engine/placeholder/Materials';
 import { Rng, hash2 } from '../core/rng';
+import { buildOak, buildPine, foliageMaterial, type SpeciesGeo } from './TreeModels';
+import { oakFoliage, pineFoliage } from '../engine/placeholder/FoliageTextures';
 import { CHUNK } from './Terrain';
 import { WORLD_HALF } from './WorldLayout';
 
@@ -29,100 +30,18 @@ export interface Tree {
   radius: number;
 }
 
-const NEAR_DIST = 110;
 const FAR_DIST = 360;
 const COLLIDER_CHUNKS = 1;
 const REGROW_DAYS = 6;
 
-function displace(g0: THREE.BufferGeometry, amount: number, seed: number): THREE.BufferGeometry {
-  // Soldar vértices para sombreado suave del follaje.
-  g0.deleteAttribute('normal');
-  g0.deleteAttribute('uv');
-  const g = mergeVertices(g0);
-  const p = g.attributes.position as THREE.BufferAttribute;
-  // Desplazamiento coherente por posición (los vértices duplicados coinciden).
-  for (let i = 0; i < p.count; i++) {
-    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
-    const k = hash2(Math.round(x * 50), Math.round(y * 50) * 7 + Math.round(z * 50), seed);
-    const s = 1 + (k - 0.5) * amount;
-    p.setXYZ(i, x * s, y * s, z * s);
-  }
-  g.computeVertexNormals();
-  // UV esféricas simples para la textura de hojas.
-  const uv = new Float32Array(p.count * 2);
-  for (let i = 0; i < p.count; i++) {
-    uv[i * 2] = Math.atan2(p.getZ(i), p.getX(i)) * 0.8;
-    uv[i * 2 + 1] = p.getY(i) * 0.5;
-  }
-  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
-  return g;
-}
-
-function colorize(g: THREE.BufferGeometry, r: number, gg: number, b: number): THREE.BufferGeometry {
-  const n = g.attributes.position.count;
-  const c = new Float32Array(n * 3);
-  for (let i = 0; i < n; i++) { c[i * 3] = r; c[i * 3 + 1] = gg; c[i * 3 + 2] = b; }
-  g.setAttribute('color', new THREE.BufferAttribute(c, 3));
-  return g;
-}
-
-function stripToPosNormUv(g: THREE.BufferGeometry): THREE.BufferGeometry {
-  const ng = g.index ? g.toNonIndexed() : g;
-  for (const k of Object.keys(ng.attributes)) if (!['position', 'normal', 'uv'].includes(k)) ng.deleteAttribute(k);
-  return ng;
-}
-
-interface SpeciesGeo {
-  trunk: THREE.BufferGeometry;
-  canopy: THREE.BufferGeometry;
-  far: THREE.BufferGeometry;
-  trunkHeight: number;
-}
-
-function buildOak(): SpeciesGeo {
-  const trunk = new THREE.CylinderGeometry(0.22, 0.42, 5, 8, 3);
-  trunk.translate(0, 2.5, 0);
-  const b1 = new THREE.CylinderGeometry(0.08, 0.16, 2.6, 5);
-  b1.rotateZ(0.9); b1.translate(0.9, 4.2, 0);
-  const b2 = new THREE.CylinderGeometry(0.08, 0.15, 2.4, 5);
-  b2.rotateX(-0.8); b2.translate(0, 4.4, -0.8);
-  const trunkAll = mergeGeometries([stripToPosNormUv(trunk), stripToPosNormUv(b1), stripToPosNormUv(b2)])!;
-  const blobs: THREE.BufferGeometry[] = [];
-  const spots: [number, number, number, number][] = [[0, 6.4, 0, 2.6], [1.5, 5.6, 0.6, 1.9], [-1.3, 5.8, -0.5, 2.0], [0.3, 7.6, -0.9, 1.7], [-0.4, 5.5, 1.5, 1.7]];
-  spots.forEach(([x, y, z, r], i) => {
-    const g = displace(new THREE.IcosahedronGeometry(r, 1), 0.35, 100 + i);
-    g.translate(x, y, z);
-    blobs.push(stripToPosNormUv(g));
-  });
-  const canopy = mergeGeometries(blobs)!;
-  const farT = colorize(stripToPosNormUv(new THREE.CylinderGeometry(0.25, 0.4, 5, 5).translate(0, 2.5, 0)), 0.25, 0.19, 0.13);
-  const farC = colorize(stripToPosNormUv(displace(new THREE.IcosahedronGeometry(2.9, 0), 0.25, 7).translate(0, 6.4, 0)), 0.16, 0.22, 0.08);
-  return { trunk: trunkAll, canopy, far: mergeGeometries([farT, farC])!, trunkHeight: 5 };
-}
-
-function buildPine(): SpeciesGeo {
-  const trunk = stripToPosNormUv(new THREE.CylinderGeometry(0.13, 0.32, 10, 7, 3).translate(0, 5, 0));
-  const cones: THREE.BufferGeometry[] = [];
-  const layers = 5;
-  for (let i = 0; i < layers; i++) {
-    const t = i / (layers - 1);
-    const r = 2.4 - t * 1.7;
-    const h = 3.2 - t * 0.9;
-    const g = displace(new THREE.ConeGeometry(r, h, 9, 2, true), 0.18, 200 + i);
-    g.translate(0, 3 + i * 1.65 + h / 2, 0);
-    cones.push(stripToPosNormUv(g));
-  }
-  const canopy = mergeGeometries(cones)!;
-  const farT = colorize(stripToPosNormUv(new THREE.CylinderGeometry(0.15, 0.3, 10, 4).translate(0, 5, 0)), 0.22, 0.16, 0.11);
-  const farC = colorize(stripToPosNormUv(new THREE.ConeGeometry(2.4, 8.5, 6).translate(0, 7.2, 0)), 0.07, 0.13, 0.07);
-  return { trunk, canopy, far: mergeGeometries([farT, farC])!, trunkHeight: 10 };
-}
-
 interface SpeciesRender {
   geo: SpeciesGeo;
+  trunkMat: THREE.Material;
+  canopyMat: THREE.Material;
   nearTrunk: THREE.InstancedMesh;
   nearCanopy: THREE.InstancedMesh;
-  far: THREE.InstancedMesh;
+  farTrunk: THREE.InstancedMesh;
+  farCanopy: THREE.InstancedMesh;
 }
 
 const MAX_NEAR = 1600;
@@ -150,13 +69,21 @@ export class Vegetation {
     private readonly physics: Physics,
     scene: THREE.Scene,
     mats: MaterialLibrary,
+    /** Detalle del follaje 0..1 y distancia de árboles completos (calidad). */
+    detail = 0.7,
+    private readonly nearDist = 100,
   ) {
-    const farMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-    const mk = (geo: SpeciesGeo, canopyMat: THREE.Material): SpeciesRender => {
-      const nearTrunk = new THREE.InstancedMesh(geo.trunk, mats.get('bark'), MAX_NEAR);
+    const barkMat = (id: 'bark' | 'pineBark') => {
+      const m = mats.get(id).clone();
+      m.vertexColors = true; // oclusión en la base del tronco
+      return m;
+    };
+    const mk = (geo: SpeciesGeo, trunkMat: THREE.Material, canopyMat: THREE.Material): SpeciesRender => {
+      const nearTrunk = new THREE.InstancedMesh(geo.trunk, trunkMat, MAX_NEAR);
       const nearCanopy = new THREE.InstancedMesh(geo.canopy, canopyMat, MAX_NEAR);
-      const far = new THREE.InstancedMesh(geo.far, farMat, MAX_FAR);
-      for (const m of [nearTrunk, nearCanopy, far]) {
+      const farTrunk = new THREE.InstancedMesh(geo.farTrunk, trunkMat, MAX_FAR);
+      const farCanopy = new THREE.InstancedMesh(geo.farCanopy, canopyMat, MAX_FAR);
+      for (const m of [nearTrunk, nearCanopy, farTrunk, farCanopy]) {
         m.frustumCulled = false;
         m.count = 0;
         m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -164,13 +91,17 @@ export class Vegetation {
       }
       nearTrunk.castShadow = nearCanopy.castShadow = true;
       nearTrunk.receiveShadow = nearCanopy.receiveShadow = true;
-      far.receiveShadow = true;
+      farCanopy.receiveShadow = farTrunk.receiveShadow = true;
       // Color por instancia (variación de follaje).
       nearCanopy.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_NEAR * 3), 3);
-      far.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_FAR * 3), 3);
-      return { geo, nearTrunk, nearCanopy, far };
+      farCanopy.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX_FAR * 3), 3);
+      return { geo, trunkMat, canopyMat, nearTrunk, nearCanopy, farTrunk, farCanopy };
     };
-    this.species = { oak: mk(buildOak(), mats.get('leaves')), pine: mk(buildPine(), mats.get('pine')) };
+    const texSize = detail > 0.5 ? 512 : 256;
+    this.species = {
+      oak: mk(buildOak(detail), barkMat('bark'), foliageMaterial(oakFoliage(texSize), 1)),
+      pine: mk(buildPine(detail), barkMat('pineBark'), foliageMaterial(pineFoliage(texSize, texSize / 2), 0.6)),
+    };
   }
 
   private chunkKey(cx: number, cz: number): string {
@@ -344,14 +275,15 @@ export class Vegetation {
           this.tmpP.set(t.x, t.y, t.z);
           this.tmpM.compose(this.tmpP, this.tmpQ, this.tmpS);
           this.tmpC.setRGB(t.tint, t.tint * (0.95 + (t.tint - 0.75) * 0.2), t.tint * 0.9);
-          if (d < NEAR_DIST && c.near < MAX_NEAR) {
+          if (d < this.nearDist && c.near < MAX_NEAR) {
             sp.nearTrunk.setMatrixAt(c.near, this.tmpM);
             sp.nearCanopy.setMatrixAt(c.near, this.tmpM);
             sp.nearCanopy.setColorAt(c.near, this.tmpC);
             c.near++;
           } else if (c.far < MAX_FAR) {
-            sp.far.setMatrixAt(c.far, this.tmpM);
-            sp.far.setColorAt(c.far, this.tmpC);
+            sp.farTrunk.setMatrixAt(c.far, this.tmpM);
+            sp.farCanopy.setMatrixAt(c.far, this.tmpM);
+            sp.farCanopy.setColorAt(c.far, this.tmpC);
             c.far++;
           }
         }
@@ -361,12 +293,10 @@ export class Vegetation {
     for (const s of ['oak', 'pine'] as TreeSpecies[]) {
       const sp = this.species[s];
       sp.nearTrunk.count = sp.nearCanopy.count = counts[s].near;
-      sp.far.count = counts[s].far;
-      sp.nearTrunk.instanceMatrix.needsUpdate = true;
-      sp.nearCanopy.instanceMatrix.needsUpdate = true;
-      sp.far.instanceMatrix.needsUpdate = true;
+      sp.farTrunk.count = sp.farCanopy.count = counts[s].far;
+      for (const m of [sp.nearTrunk, sp.nearCanopy, sp.farTrunk, sp.farCanopy]) m.instanceMatrix.needsUpdate = true;
       if (sp.nearCanopy.instanceColor) sp.nearCanopy.instanceColor.needsUpdate = true;
-      if (sp.far.instanceColor) sp.far.instanceColor.needsUpdate = true;
+      if (sp.farCanopy.instanceColor) sp.farCanopy.instanceColor.needsUpdate = true;
       near += counts[s].near;
       far += counts[s].far;
     }
@@ -377,6 +307,11 @@ export class Vegetation {
   /** Geometrías de la especie (para el árbol que cae). */
   speciesGeometry(s: TreeSpecies): SpeciesGeo {
     return this.species[s].geo;
+  }
+
+  /** Materiales de la especie (para el árbol que cae). */
+  speciesMaterials(s: TreeSpecies): { trunk: THREE.Material; canopy: THREE.Material } {
+    return { trunk: this.species[s].trunkMat, canopy: this.species[s].canopyMat };
   }
 
   serialize(): object {

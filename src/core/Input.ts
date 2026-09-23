@@ -34,6 +34,11 @@ export class Input {
   mouseDY = 0;
   sensitivity = 0.0022;
   pointerLocked = false;
+  /** Movimiento analógico (joystick táctil): x derecha, y adelante, magnitud ≤ 1. */
+  private analogX = 0;
+  private analogY = 0;
+  /** Hay controles táctiles activos (sin pointer lock). */
+  touchMode = false;
   /** Si la UI tiene el foco, la entrada de juego se ignora. */
   gameplayEnabled = false;
 
@@ -56,6 +61,7 @@ export class Input {
   }
 
   requestPointerLock(): void {
+    if (this.touchMode) return;
     if (document.pointerLockElement !== this.element) {
       // En navegadores headless puede no estar disponible.
       try {
@@ -134,6 +140,19 @@ export class Input {
     this.released.clear();
   }
 
+  setAnalogMove(x: number, y: number): void {
+    const len = Math.hypot(x, y);
+    const k = len > 1 ? 1 / len : 1;
+    this.analogX = x * k;
+    this.analogY = y * k;
+  }
+
+  /** Movimiento analógico actual (cero si la UI tiene el foco). */
+  analogMove(): { x: number; y: number } {
+    if (!this.gameplayEnabled) return { x: 0, y: 0 };
+    return { x: this.analogX, y: this.analogY };
+  }
+
   takeMouseDelta(): { dx: number; dy: number } {
     const r = { dx: this.mouseDX, dy: this.mouseDY };
     this.mouseDX = 0;
@@ -146,6 +165,7 @@ export class Input {
     this.pressed.clear();
     this.released.clear();
     this.virtualDown.clear();
+    this.analogX = this.analogY = 0;
     this.mouseDX = this.mouseDY = 0;
   }
 }

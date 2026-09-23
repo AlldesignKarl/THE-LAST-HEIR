@@ -45,8 +45,8 @@ export class Water {
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.setIndex(idx);
     g.computeVertexNormals();
-    this.normal = textures.get('mud').normalMap!.clone();
-    this.normal.wrapS = this.normal.wrapT = THREE.RepeatWrapping;
+    // Textura propia del agua (nadie más la usa: se puede desplazar su offset).
+    this.normal = textures.get('waterNormal').normalMap!;
     this.normal.repeat.set(1, 1);
     const mat = new THREE.MeshStandardMaterial({
       color: 0x1d2f2c,

@@ -111,15 +111,22 @@ export class PlayerController {
       if (inp.isDown('left')) mx -= 1;
       if (inp.isDown('right')) mx += 1;
     }
-    const len = Math.hypot(mx, mz);
+    let len = Math.hypot(mx, mz);
     if (len > 0) { mx /= len; mz /= len; }
+    else if (!this.frozen) {
+      // Joystick táctil: conserva la magnitud (inclinación parcial = andar despacio).
+      const a = inp.analogMove();
+      mx = a.x;
+      mz = -a.y;
+      len = Math.hypot(mx, mz);
+    }
     // A espacio mundo según yaw.
     const sin = Math.sin(this.yaw), cos = Math.cos(this.yaw);
     const wx = mx * cos + mz * sin;
     const wz = -mx * sin + mz * cos;
 
     this.crouching = !this.frozen && inp.isDown('crouch');
-    const wantsSprint = !this.frozen && inp.isDown('sprint') && mz < 0 && !this.crouching && !this.combatBusy;
+    const wantsSprint = !this.frozen && inp.isDown('sprint') && mz < -0.5 && !this.crouching && !this.combatBusy;
     this.sprinting = false;
     let speed = 3.3;
     if (this.crouching) speed = 1.6;
@@ -136,7 +143,7 @@ export class PlayerController {
     if (!this.frozen && inp.wasPressed('dodge') && this.grounded && this.dodgeTime <= 0 && v.useStamina(18)) {
       this.dodgeTime = 0.28;
       this.iFrames = 0.22;
-      if (len > 0) this.dodgeDir.set(wx, 0, wz);
+      if (len > 0.05) this.dodgeDir.set(wx, 0, wz).normalize();
       else this.dodgeDir.set(sin, 0, cos); // hacia atrás
       this.bus.emit('sfx', { id: 'dodge' });
     }
