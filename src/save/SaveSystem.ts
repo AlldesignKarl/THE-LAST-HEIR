@@ -42,12 +42,28 @@ export function migrate(doc: SaveDoc): SaveDoc {
   return d;
 }
 
+/**
+ * localStorage protegido: en marcos restringidos, modo privado o con datos
+ * bloqueados el acceso puede lanzar excepciones. Si falla, se usa memoria
+ * (la partida funciona, pero el guardado no sobrevive a la recarga).
+ */
+export function safeStorage(): StorageBackend {
+  const mem = new Map<string, string>();
+  let ls: Storage | null = null;
+  try { ls = window.localStorage; ls.getItem('tlh_probe'); } catch { ls = null; }
+  return {
+    getItem: (k) => { try { return ls ? ls.getItem(k) : mem.get(k) ?? null; } catch { return mem.get(k) ?? null; } },
+    setItem: (k, v) => { try { if (ls) ls.setItem(k, v); else mem.set(k, v); } catch { mem.set(k, v); } },
+    removeItem: (k) => { try { ls?.removeItem(k); } catch { /* nada */ } mem.delete(k); },
+  } as StorageBackend;
+}
+
 export class SaveSystem {
   private saveables: Saveable[] = [];
   playTime = 0;
   summary: () => string = () => '';
 
-  constructor(private readonly bus: EventBus | null, private readonly storage: StorageBackend = localStorage) {}
+  constructor(private readonly bus: EventBus | null, private readonly storage: StorageBackend = safeStorage()) {}
 
   register(s: Saveable): void {
     this.saveables.push(s);

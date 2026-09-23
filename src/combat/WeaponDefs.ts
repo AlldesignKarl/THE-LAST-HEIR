@@ -63,13 +63,13 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     id: 'club', name: 'Maza', kind: 'melee', type: 'blunt', twoHanded: false, reach: 1.85,
     light: { windup: 0.36, active: 0.16, recovery: 0.4, damage: 21, stamina: 15 },
     heavy: { windup: 0.7, active: 0.2, recovery: 0.58, damage: 40, stamina: 30 },
-    blockEff: 0.45, blockCost: 1.0, chop: 0.2, model: 'axe', stagger: 0.9,
+    blockEff: 0.45, blockCost: 1.0, chop: 0.2, model: 'club', stagger: 0.9,
   },
   spear: {
     id: 'spear', name: 'Lanza', kind: 'melee', type: 'pierce', twoHanded: true, reach: 2.8,
     light: { windup: 0.3, active: 0.14, recovery: 0.38, damage: 22, stamina: 13 },
     heavy: { windup: 0.6, active: 0.18, recovery: 0.55, damage: 40, stamina: 26 },
-    blockEff: 0.55, blockCost: 0.9, chop: 0.1, model: 'sword', stagger: 0.45,
+    blockEff: 0.55, blockCost: 0.9, chop: 0.1, model: 'spear', stagger: 0.45,
   },
   bow: {
     id: 'bow', name: 'Arco', kind: 'bow', type: 'pierce', twoHanded: true, reach: 1.2,

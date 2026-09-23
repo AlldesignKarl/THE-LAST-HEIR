@@ -115,7 +115,6 @@ export class Viewmodel {
         const m = models.create(d.model).object;
         m.rotation.set(-Math.PI / 2 + 0.25, 0, 0);
         m.position.set(0, 0.02, -0.12);
-        if (d.weapon === 'spear') m.scale.set(1, 2.2, 1);
         this.rightHand.add(m);
         this.weaponObj = m;
       }

@@ -145,20 +145,57 @@ export class BuildingInstance {
     addWall(def.d - WALL_T * 2, sideOpen, (px, py, pw, ph) => solid(WALL_T, ph, pw, -hw + WALL_T / 2, py, px, wallMat));
     addWall(def.d - WALL_T * 2, style === 'shed' ? [] : sideOpen, (px, py, pw, ph) => solid(WALL_T, ph, pw, hw - WALL_T / 2, py, px, wallMat));
 
-    // Postes y vigas (entramado/cobertizo/zarzo).
+    // Colocación en coordenadas de fachada: u a lo largo del muro, `out` hacia fuera.
+    type Side = 'front' | 'back' | 'left' | 'right';
+    const fbox = (side: Side, u: number, y: number, out: number, w: number, h: number, d: number, mat: MatId, rotZ = 0) => {
+      if (side === 'front') box(w, h, d, u, y, hd + out, mat, 0, rotZ, 0);
+      else if (side === 'back') box(w, h, d, u, y, -hd - out, mat, 0, rotZ, Math.PI);
+      else if (side === 'left') box(w, h, d, -hw - out, y, u, mat, 0, rotZ, -Math.PI / 2);
+      else box(w, h, d, hw + out, y, u, mat, 0, rotZ, Math.PI / 2);
+    };
+    /** Tramos de [-L/2, L/2] a la altura y que no cruzan huecos. */
+    const spans = (L: number, openings: Opening[], y: number): [number, number][] => {
+      const cuts = openings.filter((o) => y > o.y0 - 0.05 && y < o.y1 + 0.05).map((o) => [o.x - o.w / 2 - 0.1, o.x + o.w / 2 + 0.1] as [number, number]).sort((a, b) => a[0] - b[0]);
+      const out: [number, number][] = [];
+      let c = -L / 2;
+      for (const [a, b] of cuts) { if (a > c + 0.05) out.push([c, a]); c = Math.max(c, b); }
+      if (c < L / 2 - 0.05) out.push([c, L / 2]);
+      return out;
+    };
+    const inOpening = (u: number, openings: Opening[], pad = 0.15) => openings.some((o) => Math.abs(u - o.x) < o.w / 2 + pad);
+    const facades: { side: Side; L: number; open: Opening[] }[] = [
+      ...(def.openFront ? [] : [{ side: 'front' as Side, L: def.w, open: frontOpen }]),
+      { side: 'back', L: def.w, open: backOpen },
+      { side: 'left', L: def.d, open: sideOpen },
+      { side: 'right', L: def.d, open: style === 'shed' ? [] : sideOpen },
+    ];
+    const BT = 0.1; // grosor de las vigas vistas
     if (style !== 'stone') {
-      const post = 0.22;
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) solid(post, H, post, sx * (hw - post / 2 + 0.03), H / 2, sz * (hd - post / 2 + 0.03), 'beam');
-      if (style === 'timber') {
-        // Vigas horizontales y riostras.
-        for (const sz of [-1, 1]) {
-          box(def.w, 0.18, 0.08, 0, H - 0.09, sz * (hd + 0.02), 'beam');
-          box(def.w, 0.16, 0.08, 0, 1.0, sz * (hd + 0.02), 'beam');
-          for (let i = -1; i <= 1; i += 2) box(0.14, 1.4, 0.08, i * def.w * 0.36, 1.75, sz * (hd + 0.02), 'beam', 0, i * 0.55);
-        }
-        for (const sx of [-1, 1]) {
-          box(0.08, 0.18, def.d, sx * (hw + 0.02), H - 0.09, 0, 'beam');
-          box(0.08, 0.16, def.d, sx * (hw + 0.02), 1.0, 0, 'beam');
+      const post = 0.24;
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) solid(post, H, post, sx * (hw - post / 2 + 0.04), H / 2, sz * (hd - post / 2 + 0.04), 'beam');
+      if (style === 'timber' || style === 'wattle') {
+        for (const f of facades) {
+          const out = 0.015 + BT / 2;
+          // Solera, carrera superior y (entramado) travesaño intermedio.
+          for (const [a, b] of spans(f.L, f.open, 0.12)) fbox(f.side, (a + b) / 2, 0.12, out, b - a, 0.2, BT, 'beam');
+          fbox(f.side, 0, H - 0.1, out, f.L, 0.2, BT, 'beam');
+          if (style === 'timber') {
+            for (const [a, b] of spans(f.L, f.open, 1.0)) fbox(f.side, (a + b) / 2, 1.0, out, b - a, 0.16, BT, 'beam');
+            // Pies derechos cada ~1,3 m.
+            const n = Math.max(1, Math.round(f.L / 1.3));
+            for (let i = 1; i < n; i++) {
+              const u = -f.L / 2 + (i * f.L) / n;
+              if (!inOpening(u, f.open)) fbox(f.side, u, H / 2, out, 0.14, H - 0.2, BT, 'beam');
+            }
+            // Tornapuntas en los extremos (entre travesaño y carrera).
+            for (const e of [-1, 1]) {
+              const u = e * (f.L / 2 - 0.55);
+              if (!inOpening(u, f.open, 0.4)) fbox(f.side, u, (1.0 + H - 0.1) / 2, out, 0.13, Math.hypot(0.8, H - 1.1), BT, 'beam', e * Math.atan2(0.8, H - 1.1));
+            }
+          } else if (f.L > 4.5) {
+            // Zarzo: un poste intermedio.
+            if (!inOpening(0, f.open)) fbox(f.side, 0, H / 2, out, 0.16, H - 0.2, BT, 'beam');
+          }
         }
       }
       if (def.openFront) {
@@ -166,8 +203,26 @@ export class BuildingInstance {
         box(def.w, 0.25, 0.25, 0, H - 0.12, hd - 0.1, 'beam');
       }
     } else {
-      // Sillares en esquinas.
-      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.4, H, 0.4, sx * (hw - 0.15), H / 2, sz * (hd - 0.15), 'stoneWall');
+      // Sillares en esquinas e imposta.
+      for (const sx of [-1, 1]) for (const sz of [-1, 1]) box(0.46, H, 0.46, sx * (hw - 0.17), H / 2, sz * (hd - 0.17), 'stoneWall');
+      for (const f of facades) fbox(f.side, 0, H - 0.08, 0.04, f.L + 0.1, 0.18, 0.12, 'stoneWall');
+    }
+    // Marcos de puertas y ventanas.
+    for (const f of facades) {
+      for (const o of f.open) {
+        const out = 0.02;
+        const hgt = o.y1 - o.y0;
+        for (const e of [-1, 1]) fbox(f.side, o.x + e * (o.w / 2 + 0.06), (o.y0 + o.y1) / 2, out, 0.12, hgt + 0.12, 0.12, 'darkWood');
+        fbox(f.side, o.x, o.y1 + 0.08, out + 0.01, o.w + 0.36, 0.16, 0.14, 'darkWood');
+        if (o.y0 > 0) {
+          fbox(f.side, o.x, o.y0 - 0.05, out + 0.04, o.w + 0.3, 0.08, 0.2, 'darkWood'); // alféizar
+          // Parteluz y travesaño (dentro del grosor del muro).
+          fbox(f.side, o.x, (o.y0 + o.y1) / 2, -WALL_T / 2, 0.05, hgt, 0.05, 'darkWood');
+          fbox(f.side, o.x, o.y0 + hgt * 0.55, -WALL_T / 2, o.w, 0.05, 0.05, 'darkWood');
+          // Contraventanas abiertas contra el muro.
+          for (const e of [-1, 1]) fbox(f.side, o.x + e * (o.w / 2 + 0.14 + o.w / 4), (o.y0 + o.y1) / 2, 0.05, o.w / 2, hgt, 0.04, 'darkWood');
+        }
+      }
     }
 
     // Tejado a dos aguas con cumbrera paralela a la fachada (eje X).
@@ -190,21 +245,51 @@ export class BuildingInstance {
       roofBox(def.w + over * 2, roofT, slabLen, 0, eaveY + rise / 2 + roofT / 2, (s * run) / 2, s * pitch);
     }
     // Hastiales (triángulos) en los lados.
-    const gable = new THREE.BufferGeometry();
+    // Hastial: dos triángulos (uno por cara) con normales propias (±X).
     const gy0 = H, gy1 = ridgeY - 0.05, gz = hd;
-    const gv = new Float32Array([0, gy0, -gz, 0, gy0, gz, 0, gy1, 0]);
-    gable.setAttribute('position', new THREE.BufferAttribute(gv, 3));
-    gable.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, gz, 0, gz / 2, (gy1 - gy0) / 2]), 2));
-    gable.setIndex([0, 1, 2, 0, 2, 1]);
-    gable.computeVertexNormals();
+    const gable = new THREE.BufferGeometry();
+    gable.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+      0, gy0, -gz, 0, gy1, 0, 0, gy0, gz,
+      0, gy0, -gz, 0, gy0, gz, 0, gy1, 0,
+    ]), 3));
+    gable.setAttribute('normal', new THREE.BufferAttribute(new Float32Array([1, 0, 0, 1, 0, 0, 1, 0, 0, -1, 0, 0, -1, 0, 0, -1, 0, 0]), 3));
+    const gu = (z: number, y: number) => [(z + gz) / 2, (y - gy0) / 2];
+    gable.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([
+      ...gu(-gz, gy0), ...gu(0, gy1), ...gu(gz, gy0), ...gu(-gz, gy0), ...gu(gz, gy0), ...gu(0, gy1),
+    ]), 2));
     for (const s of [-1, 1]) {
       const m = new THREE.Matrix4().makeTranslation(s * (hw - WALL_T / 2), 0, 0);
       const g = gable.clone();
       parts.push({ geo: g, mat: wallMat, m });
       // Cerramiento de hastial también para colisión no hace falta (inalcanzable).
     }
-    if (def.openFront) {
-      // Frontón sobre la fachada abierta: nada; el tejado cubre.
+    // Cumbrera, alero y tablas de remate.
+    {
+      const L = def.w + over * 2;
+      if (def.roof === 'thatch') {
+        const ridge = new THREE.CylinderGeometry(0.32, 0.32, L + 0.1, 10).rotateZ(Math.PI / 2);
+        roofParts.push({ geo: ridge, mat: roofMat, m: new THREE.Matrix4().makeTranslation(0, ridgeY + roofT * 0.55, 0) });
+        for (const s of [-1, 1]) {
+          const eave = new THREE.CylinderGeometry(0.2, 0.2, L, 8).rotateZ(Math.PI / 2);
+          roofParts.push({ geo: eave, mat: roofMat, m: new THREE.Matrix4().makeTranslation(0, eaveY + roofT * 0.3 - over * Math.tan(pitch) * 0.5, s * (run - 0.12)) });
+        }
+      } else {
+        const ridge = def.roof === 'tile'
+          ? new THREE.CylinderGeometry(0.15, 0.15, L + 0.05, 8, 1, false, 0, Math.PI).rotateZ(Math.PI / 2).rotateX(-Math.PI / 2)
+          : worldBox(L + 0.05, 0.14, 0.34, 1);
+        roofParts.push({ geo: ridge, mat: roofMat, m: new THREE.Matrix4().makeTranslation(0, ridgeY + roofT * 0.9, 0) });
+        // Tablas de remate en los hastiales.
+        for (const sx of [-1, 1]) for (const s of [-1, 1]) {
+          box(0.06, 0.28, slabLen + 0.05, sx * (hw + over - 0.03), eaveY + rise / 2 + roofT / 2 - 0.06, (s * run) / 2, 'darkWood', s * pitch);
+        }
+      }
+      // Entramado del hastial (pendolón y tirante) en casas de madera.
+      if (style === 'timber' || style === 'wattle') {
+        for (const sx of [-1, 1]) {
+          box(0.1, ridgeY - H - 0.1, 0.16, sx * (hw + 0.03), (H + ridgeY) / 2 - 0.05, 0, 'beam');
+          for (const s of [-1, 1]) box(0.1, 0.16, run * 0.95 / Math.cos(pitch), sx * (hw + 0.03), H + rise * 0.47, (s * hd) / 2, 'beam', s * pitch);
+        }
+      }
     }
 
     // Chimenea.
@@ -212,6 +297,7 @@ export class BuildingInstance {
       const cx = hw * 0.55, cz = -hd * 0.3;
       const ch = ridgeY + 0.9;
       box(0.7, ch, 0.7, cx, ch / 2, cz, 'stoneWall');
+      box(0.9, 0.14, 0.9, cx, ch - 0.1, cz, 'stoneWall');
       (this as { chimneyTop: THREE.Vector3 | null }).chimneyTop = new THREE.Vector3(cx, ch + 0.2, cz);
     }
 
@@ -231,51 +317,61 @@ export class BuildingInstance {
       (this as { bellPos: THREE.Vector3 | null }).bellPos = new THREE.Vector3(tx, th + 1.6, tz);
     }
 
-    // Contraventanas y alféizares (visual).
-    const addWindowDeco = (x: number, z: number, rot: number, w: number, y0: number, y1: number) => {
-      box(w + 0.2, 0.08, 0.2, x, y0 - 0.04, z, 'darkWood', 0, 0, rot);
-      box(w + 0.2, 0.08, 0.12, x, y1 + 0.04, z, 'darkWood', 0, 0, rot);
-    };
     const glowGeos: THREE.BufferGeometry[] = [];
     const addGlow = (x: number, z: number, rot: number, w: number, y0: number, y1: number) => {
       const g = new THREE.PlaneGeometry(w, y1 - y0);
       g.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(x, (y0 + y1) / 2, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, rot, 0)), new THREE.Vector3(1, 1, 1)));
       glowGeos.push(g);
     };
-    for (const o of frontOpen) if (o.y0 > 0) { addWindowDeco(o.x, hd, 0, o.w, o.y0, o.y1); addGlow(o.x, hd - WALL_T / 2, 0, o.w, o.y0, o.y1); }
-    for (const o of backOpen) { addWindowDeco(o.x, -hd, Math.PI, o.w, o.y0, o.y1); addGlow(o.x, -hd + WALL_T / 2, Math.PI, o.w, o.y0, o.y1); }
+    for (const o of frontOpen) if (o.y0 > 0) addGlow(o.x, hd - WALL_T / 2, 0, o.w, o.y0, o.y1);
+    for (const o of backOpen) addGlow(o.x, -hd + WALL_T / 2, Math.PI, o.w, o.y0, o.y1);
     for (const o of sideOpen) {
-      addWindowDeco(-hw, o.x, -Math.PI / 2, o.w, o.y0, o.y1); addGlow(-hw + WALL_T / 2, o.x, -Math.PI / 2, o.w, o.y0, o.y1);
-      if (style !== 'shed') { addWindowDeco(hw, o.x, Math.PI / 2, o.w, o.y0, o.y1); addGlow(hw - WALL_T / 2, o.x, Math.PI / 2, o.w, o.y0, o.y1); }
+      addGlow(-hw + WALL_T / 2, o.x, -Math.PI / 2, o.w, o.y0, o.y1);
+      if (style !== 'shed') addGlow(hw - WALL_T / 2, o.x, Math.PI / 2, o.w, o.y0, o.y1);
     }
 
+    // Oclusión ambiental horneada por vértice: base de muros (contacto con el
+    // suelo), zona bajo el alero y caras que miran hacia abajo, más oscuras.
+    const bake = (p: Part): THREE.BufferGeometry => {
+      const g = (p.geo.index ? p.geo.toNonIndexed() : p.geo.clone()).applyMatrix4(p.m);
+      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+      if (!g.attributes.normal) g.computeVertexNormals();
+      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+      const P = g.attributes.position, N = g.attributes.normal;
+      const col = new Float32Array(P.count * 3);
+      for (let i = 0; i < P.count; i++) {
+        const y = P.getY(i);
+        let ao = 0.55 + 0.45 * Math.min(1, Math.max(0, (y + 0.3) / 1.4));
+        if (y < H && y > H - 0.6 && Math.abs(N.getY(i)) < 0.5) ao *= 0.8 + 0.2 * (H - y) / 0.6;
+        if (N.getY(i) < -0.5) ao *= 0.55;
+        col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = ao;
+      }
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return g;
+    };
     // Fusionar por material.
     const byMat = new Map<MatId, THREE.BufferGeometry[]>();
     for (const p of parts) {
-      const g = (p.geo.index ? p.geo.toNonIndexed() : p.geo).applyMatrix4(p.m);
-      for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
-      if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
       if (!byMat.has(p.mat)) byMat.set(p.mat, []);
-      byMat.get(p.mat)!.push(g);
+      byMat.get(p.mat)!.push(bake(p));
     }
     for (const [mid, geos] of byMat) {
       const merged = mergeGeometries(geos);
       if (!merged) continue;
-      const mesh = new THREE.Mesh(merged, mats.get(mid));
+      const mesh = new THREE.Mesh(merged, mats.vc(mid));
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       this.group.add(mesh);
       this.healthyMeshes.push(mesh);
     }
     {
-      const geos = roofParts.map((p) => p.geo.toNonIndexed().applyMatrix4(p.m));
-      const merged = mergeGeometries(geos)!;
-      this.roofMesh = new THREE.Mesh(merged, mats.get(roofMat));
+      const merged = mergeGeometries(roofParts.map(bake))!;
+      this.roofMesh = new THREE.Mesh(merged, mats.vc(roofMat));
       this.roofMesh.castShadow = true;
       this.roofMesh.receiveShadow = true;
       this.group.add(this.roofMesh);
       // Versión quemada (se muestra al estar dañado).
-      this.charredMesh = new THREE.Mesh(merged, mats.get('charred'));
+      this.charredMesh = new THREE.Mesh(merged, mats.vc('charred'));
       this.charredMesh.visible = false;
       this.charredMesh.scale.set(0.7, 0.9, 0.6);
       this.group.add(this.charredMesh);

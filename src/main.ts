@@ -17,7 +17,12 @@ async function boot(): Promise<void> {
   loading.innerHTML = '<div>The Last Heir</div><div style="font-size:18px;margin-top:10px">Preparando el valle…</div>';
   ui.append(loading);
   await new Promise((r) => setTimeout(r, 30));
-  await Physics.init();
+  try {
+    await Physics.init();
+  } catch (e) {
+    loading.innerHTML = '<div>The Last Heir</div><div style="font-size:17px;margin-top:12px;max-width:80vw;text-align:center">No se pudo iniciar el motor de física (WebAssembly). Actualiza el navegador o prueba con Chrome, Firefox o Safari recientes.</div>';
+    throw e;
+  }
   const params = new URLSearchParams(location.search);
   // En móviles la calidad baja por defecto (se puede cambiar en Opciones).
   const defQuality = TouchControls.isTouchDevice() ? 'low' : 'medium';

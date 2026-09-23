@@ -37,40 +37,113 @@ export class Builder {
   }
 }
 
+/** Perfil 2D (XY) extruido en Z con bisel: hojas, cabezas de hacha. */
+function blade(points: [number, number][], depth: number, bevel: number): THREE.BufferGeometry {
+  const sh = new THREE.Shape(points.map(([x, y]) => new THREE.Vector2(x, y)));
+  const g = new THREE.ExtrudeGeometry(sh, { depth, bevelEnabled: bevel > 0, bevelThickness: bevel, bevelSize: bevel * 0.9, bevelSegments: 1, steps: 1 });
+  g.translate(0, 0, -depth / 2);
+  // UV a escala métrica para el metal.
+  const uv = g.attributes.uv as THREE.BufferAttribute;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2, uv.getY(i) * 2);
+  return g;
+}
+
+/** Arco: tubo a lo largo de una curva con ligera recurva. */
+function bowGeometry(): THREE.BufferGeometry {
+  const pts: THREE.Vector3[] = [];
+  for (let i = 0; i <= 16; i++) {
+    const t = i / 16 * 2 - 1; // -1..1
+    const x = -0.16 * (1 - t * t) + 0.03 * Math.pow(Math.abs(t), 6);
+    pts.push(new THREE.Vector3(x, t * 0.72, 0));
+  }
+  return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.016, 6, false);
+}
+
 const D: Record<string, ModelDef> = {
   // ---------------- Armas y herramientas ----------------
   sword: {
     shape: { type: 'box', hx: 0.05, hy: 0.5, hz: 0.1, oy: 0 }, mass: 1.3,
-    build: (b) => b.box(0.05, 0.8, 0.012, 'metal', 0, 0.2, 0).box(0.22, 0.03, 0.04, 'iron', 0, -0.21, 0).cyl(0.018, 0.02, 0.2, 'leather', 0, -0.33, 0).add(new THREE.SphereGeometry(0.03, 8, 6), 'iron', 0, -0.44, 0),
+    build: (b) => {
+      // Hoja con punta y bisel (arista), vaceo central, cruz, puño forrado y pomo de disco.
+      b.add(blade([[-0.024, -0.19], [0.024, -0.19], [0.021, 0.45], [0.0, 0.6], [-0.021, 0.45]], 0.004, 0.0035), 'metal');
+      b.box(0.012, 0.5, 0.0095, 'iron', 0, 0.12, 0);
+      b.box(0.2, 0.024, 0.03, 'iron', 0, -0.2, 0);
+      for (const sx of [-1, 1]) b.add(new THREE.SphereGeometry(0.017, 8, 6), 'iron', sx * 0.1, -0.2, 0);
+      b.cyl(0.016, 0.018, 0.19, 'leather', 0, -0.32, 0, 0, 0, 0, 10);
+      for (const y of [-0.26, -0.32, -0.38]) b.add(new THREE.TorusGeometry(0.0175, 0.003, 4, 12), 'leather', 0, y, 0, Math.PI / 2);
+      b.cyl(0.035, 0.035, 0.022, 'iron', 0, -0.435, 0, Math.PI / 2, 0, 0, 16);
+    },
   },
   axe: {
     shape: { type: 'box', hx: 0.12, hy: 0.4, hz: 0.04 }, mass: 1.6,
-    build: (b) => b.cyl(0.02, 0.024, 0.8, 'darkWood', 0, 0, 0).box(0.2, 0.12, 0.025, 'iron', 0.08, 0.31, 0).box(0.05, 0.16, 0.03, 'metal', 0.18, 0.31, 0),
+    build: (b) => {
+      // Mango de fresno ligeramente curvo y cabeza barbuda con ojo.
+      b.cyl(0.02, 0.023, 0.42, 'roughWood', 0, 0.16, 0, 0, 0, 0.03, 8);
+      b.cyl(0.023, 0.026, 0.42, 'roughWood', 0.006, -0.23, 0, 0, 0, -0.04, 8);
+      b.add(blade([[0.02, 0.36], [0.07, 0.35], [0.2, 0.42], [0.22, 0.3], [0.19, 0.2], [0.14, 0.23], [0.07, 0.27], [0.02, 0.27]], 0.018, 0.006), 'iron');
+      b.box(0.06, 0.1, 0.045, 'iron', 0.0, 0.315, 0);
+      b.add(blade([[0.2, 0.42], [0.225, 0.3], [0.19, 0.2], [0.205, 0.2], [0.24, 0.3], [0.215, 0.43]], 0.006, 0.002), 'metal'); // filo afilado
+      b.cyl(0.024, 0.024, 0.03, 'leather', 0, -0.36, 0, 0, 0, 0, 8);
+    },
+  },
+  club: {
+    shape: { type: 'box', hx: 0.07, hy: 0.4, hz: 0.07 }, mass: 2.0,
+    build: (b) => {
+      b.cyl(0.055, 0.025, 0.72, 'roughWood', 0, 0.02, 0, 0, 0, 0, 9);
+      b.add(new THREE.SphereGeometry(0.06, 9, 7), 'roughWood', 0, 0.36, 0);
+      for (let i = 0; i < 10; i++) {
+        const a = i * 2.4, y = 0.22 + (i % 4) * 0.045;
+        b.add(new THREE.ConeGeometry(0.008, 0.045, 4), 'iron', Math.cos(a) * 0.052, y, Math.sin(a) * 0.052, Math.sin(a) * Math.PI / 2, 0, -Math.cos(a) * Math.PI / 2);
+      }
+      b.cyl(0.028, 0.028, 0.12, 'leather', 0, -0.28, 0, 0, 0, 0, 8);
+    },
+  },
+  spear: {
+    shape: { type: 'box', hx: 0.04, hy: 1.1, hz: 0.04 }, mass: 2.2,
+    build: (b) => {
+      b.cyl(0.018, 0.02, 2.05, 'roughWood', 0, -0.13, 0, 0, 0, 0, 8);
+      b.cyl(0.024, 0.02, 0.1, 'iron', 0, 0.93, 0, 0, 0, 0, 8); // cubo
+      b.add(blade([[-0.028, 0.97], [0.028, 0.97], [0.02, 1.12], [0.0, 1.24], [-0.02, 1.12]], 0.006, 0.004), 'metal');
+      b.cyl(0.021, 0.021, 0.02, 'iron', 0, -1.15, 0, 0, 0, 0, 8); // regatón
+    },
   },
   bow: {
     shape: { type: 'box', hx: 0.06, hy: 0.7, hz: 0.1 }, mass: 0.9,
     build: (b) => {
-      const curve = new THREE.TorusGeometry(0.75, 0.018, 5, 18, Math.PI * 0.75);
-      b.add(curve, 'darkWood', -0.62, 0, 0, 0, 0, -Math.PI * 0.375);
-      b.cyl(0.003, 0.003, 1.28, 'paper', 0.05, 0, 0);
-      b.cyl(0.025, 0.025, 0.14, 'leather', 0.1, 0, 0);
+      b.add(bowGeometry(), 'darkWood');
+      b.cyl(0.0022, 0.0022, 1.43, 'paper', 0.035, 0, 0, 0, 0, 0, 4);
+      b.cyl(0.021, 0.021, 0.13, 'leather', -0.16, 0, 0, 0, 0, 0, 8);
+      for (const y of [-0.7, 0.7]) b.cyl(0.012, 0.01, 0.03, 'iron', 0.02, y, 0, 0, 0, 0, 6);
     },
   },
   arrow: {
     shape: { type: 'box', hx: 0.02, hy: 0.38, hz: 0.02 }, mass: 0.05,
-    build: (b) => b.cyl(0.006, 0.006, 0.75, 'darkWood', 0, 0, 0).add(new THREE.ConeGeometry(0.014, 0.05, 4), 'iron', 0, 0.39, 0).box(0.002, 0.08, 0.03, 'paper', 0, -0.33, 0),
+    build: (b) => {
+      b.cyl(0.005, 0.005, 0.75, 'roughWood', 0, 0, 0, 0, 0, 0, 5);
+      b.add(blade([[-0.012, 0.37], [0.012, 0.37], [0.0, 0.43]], 0.002, 0.0015), 'iron');
+      for (let i = 0; i < 3; i++) b.box(0.0015, 0.09, 0.022, i === 0 ? 'clothRed' : 'paper', Math.cos(i * 2.09) * 0.008, -0.32, Math.sin(i * 2.09) * 0.008, 0, i * 2.09, 0);
+    },
   },
   arrow_bundle: {
     shape: { type: 'cyl', hh: 0.35, r: 0.05 }, mass: 0.6,
-    build: (b) => { for (let i = 0; i < 6; i++) b.cyl(0.006, 0.006, 0.75, 'darkWood', Math.cos(i) * 0.03, 0, Math.sin(i) * 0.03); b.cyl(0.04, 0.04, 0.06, 'leather', 0, 0, 0); },
+    build: (b) => { for (let i = 0; i < 6; i++) b.cyl(0.006, 0.006, 0.75, 'roughWood', Math.cos(i) * 0.03, 0, Math.sin(i) * 0.03, 0, 0, 0, 5); b.cyl(0.04, 0.04, 0.06, 'leather', 0, 0, 0); },
   },
   knife: {
     shape: { type: 'box', hx: 0.03, hy: 0.15, hz: 0.02 }, mass: 0.3,
-    build: (b) => b.box(0.03, 0.18, 0.006, 'metal', 0, 0.08, 0).cyl(0.014, 0.016, 0.1, 'darkWood', 0, -0.06, 0),
+    build: (b) => {
+      b.add(blade([[-0.012, 0.03], [0.014, 0.03], [0.014, 0.15], [0.004, 0.2], [-0.012, 0.16]], 0.003, 0.002), 'metal');
+      b.cyl(0.016, 0.016, 0.012, 'iron', 0, 0.025, 0, 0, 0, 0, 8);
+      b.cyl(0.013, 0.016, 0.1, 'darkWood', 0, -0.035, 0, 0, 0, 0, 8);
+      b.add(new THREE.SphereGeometry(0.016, 8, 6), 'iron', 0, -0.088, 0);
+    },
   },
   torch: {
     shape: { type: 'cyl', hh: 0.3, r: 0.04 }, mass: 0.5,
-    build: (b) => b.cyl(0.02, 0.028, 0.6, 'darkWood', 0, 0, 0).cyl(0.045, 0.035, 0.12, 'cloth', 0, 0.3, 0),
+    build: (b) => {
+      b.cyl(0.018, 0.026, 0.6, 'roughWood', 0, 0, 0, 0, 0, 0, 7);
+      b.add(new THREE.SphereGeometry(0.045, 8, 6).scale(1, 1.5, 1), 'ash', 0, 0.3, 0);
+      for (const y of [0.25, 0.33]) b.add(new THREE.TorusGeometry(0.044, 0.006, 4, 10), 'ash', 0, y, 0, Math.PI / 2);
+    },
   },
   bucket: {
     shape: { type: 'cyl', hh: 0.16, r: 0.16 }, mass: 1.2,
@@ -82,7 +155,12 @@ const D: Record<string, ModelDef> = {
   },
   shield: {
     shape: { type: 'cyl', hh: 0.04, r: 0.3 }, mass: 3.5,
-    build: (b) => b.cyl(0.3, 0.3, 0.04, 'planks', 0, 0, 0, Math.PI / 2).cyl(0.07, 0.07, 0.06, 'iron', 0, 0, 0.02, Math.PI / 2).add(new THREE.TorusGeometry(0.3, 0.015, 4, 20), 'iron', 0, 0, 0),
+    build: (b) => {
+      b.cyl(0.3, 0.3, 0.035, 'planks', 0, 0, 0, Math.PI / 2, 0, 0, 24);
+      b.add(new THREE.SphereGeometry(0.075, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 'iron', 0, 0, 0.018, Math.PI / 2);
+      b.add(new THREE.TorusGeometry(0.3, 0.012, 5, 28), 'leather', 0, 0, 0);
+      for (let i = 0; i < 8; i++) b.add(new THREE.SphereGeometry(0.009, 5, 4), 'iron', Math.cos(i * 0.785) * 0.1, Math.sin(i * 0.785) * 0.1, 0.02);
+    },
   },
   // ---------------- Comida ----------------
   bread: { shape: { type: 'box', hx: 0.1, hy: 0.05, hz: 0.06 }, mass: 0.4, build: (b) => b.add(new THREE.SphereGeometry(0.1, 10, 6), 'bread', 0, 0, 0, 0, 0, 0, 1).parts.get('bread')![0].scale(1, 0.5, 0.65) && undefined },

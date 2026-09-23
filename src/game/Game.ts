@@ -53,6 +53,7 @@ import { Economy } from '../economy/Economy';
 import { AudioEngine } from '../audio/AudioEngine';
 import { UIManager } from '../ui/UIManager';
 import { TouchControls } from '../ui/TouchControls';
+import { GroundScatter } from '../world/GroundScatter';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -107,6 +108,7 @@ export class Game {
   readonly dialogue: DialogueSystem;
   readonly audio = new AudioEngine();
   readonly ui: UIManager;
+  readonly scatter: GroundScatter;
   /** Controles en pantalla (solo en dispositivos táctiles). */
   readonly touch: TouchControls | null;
   readonly save: SaveSystem;
@@ -143,6 +145,7 @@ export class Game {
     this.weather = new Weather(this.bus);
     this.weather.onThunder = (delay) => setTimeout(() => this.bus.emit('sfx', { id: 'thunder' }), delay * 1000);
     this.env = new EnvironmentLighting(scene, this.renderer.renderer, this.quality.shadowMapSize, this.quality.shadows);
+    if (this.qualityName === 'low') this.env.envInterval = 8;
     this.terrain = new Terrain(this.hf, this.physics, scene, this.textures, this.quality.viewChunks, this.qualityName === 'low');
     this.vegetation = new Vegetation(this.hf, this.physics, scene, this.materials,
       this.qualityName === 'low' ? 0.35 : this.qualityName === 'medium' ? 0.7 : 1, this.quality.treeNear);
@@ -169,6 +172,10 @@ export class Game {
       return false;
     });
     this.grass.enabled = this.quality.grass;
+    this.scatter = new GroundScatter(this.hf, scene, this.materials, (x, z) => {
+      for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -1.5)) return true;
+      return false;
+    }, this.qualityName === 'low' ? 40 : this.qualityName === 'medium' ? 70 : 95);
     this.npcs = new NPCManager(this, buildWorldNav(this.settlement));
     this.animals = new AnimalManager(this);
     this.raids = new RaidSystem(this);
@@ -522,6 +529,7 @@ export class Game {
     this.terrain.update(this.camPos.x, this.camPos.z);
     this.vegetation.update(this.camPos.x, this.camPos.z);
     this.grass.update(this.camPos);
+    this.scatter.update(this.camPos);
     this.water.update(frameDt);
     this.env.update(frameDt, this.time, this.weather, this.camPos);
     this.settlement.updateWindows(this.time.hourFloat);

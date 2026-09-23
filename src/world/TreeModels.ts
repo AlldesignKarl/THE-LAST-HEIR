@@ -232,7 +232,7 @@ export function buildPine(detail: number, seed = 2): SpeciesGeo {
     const t = wI / (whorls - 1);
     const y = 2.6 + t * (H - 3.2);
     const len = 2.9 - t * 2.4 + rng.range(-0.2, 0.2);
-    const n = Math.max(4, Math.round((6 + detail * 3) * (1 - t * 0.4)));
+    const n = Math.max(5, Math.round((7 + detail * 4) * (1 - t * 0.35)));
     const off = rng.range(0, Math.PI * 2);
     for (let i = 0; i < n; i++) {
       const a = off + (i / n) * Math.PI * 2 + rng.range(-0.2, 0.2);
@@ -241,7 +241,7 @@ export function buildPine(detail: number, seed = 2): SpeciesGeo {
       // (girada `a` en planta y caída `droop`), plano casi horizontal.
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a, droop));
       q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2 + rng.range(-0.35, 0.35), 0, 0)));
-      cards.add(V(0, y, 0), len, len * 0.55, q, normalOf, aoOf, true, false);
+      cards.add(V(0, y, 0), len, len * 0.85, q, normalOf, aoOf, true, false);
     }
   }
   // Remate: dos tarjetas verticales cruzadas.
@@ -253,15 +253,15 @@ export function buildPine(detail: number, seed = 2): SpeciesGeo {
 
   const farTrunk = normalize(limb(V(0, -0.3, 0), V(0, H * 0.5, 0), V(0, H * 0.8, 0), 0.32, 0.1, 5, 2, rng));
   const far = new Cards();
-  for (let wI = 0; wI < 4; wI++) {
-    const t = wI / 3;
-    const y = 3 + t * (H - 4);
-    const len = 3.1 - t * 2.3;
-    for (let i = 0; i < 4; i++) {
-      const a = (i / 4) * Math.PI * 2 + wI * 0.7;
+  for (let wI = 0; wI < 6; wI++) {
+    const t = wI / 5;
+    const y = 2.8 + t * (H - 3.6);
+    const len = 3.0 - t * 2.4;
+    for (let i = 0; i < 5; i++) {
+      const a = (i / 5) * Math.PI * 2 + wI * 0.7;
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, -a, -0.3));
       q.multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(-Math.PI / 2 + 0.5, 0, 0)));
-      far.add(V(0, y, 0), len * 1.15, len * 0.9, q, normalOf, aoOf, true, false);
+      far.add(V(0, y, 0), len * 1.15, len * 1.1, q, normalOf, aoOf, true, false);
     }
   }
   return { trunk, canopy, farTrunk, farCanopy: far.geometry(), trunkHeight: 10 };

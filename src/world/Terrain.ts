@@ -279,7 +279,8 @@ export class Terrain {
 }
 
 function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): THREE.MeshStandardMaterial {
-  const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0 });
+  // envMapIntensity bajo: el suelo apenas refleja el cielo (evita el velo azulado en sombra).
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, envMapIntensity: 0.45 });
   const grass = textures.get('grass'), dirt = textures.get('dirt'), rock = textures.get('rock');
   const mud = textures.get('mud'), field = textures.get('field'), forest = textures.get('forestFloor');
   mat.onBeforeCompile = (shader) => {

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import type { Hitbox } from './HumanoidModel';
 import { damp } from '../core/math';
-import { RigidSkin, characterMaterial } from '../engine/RigidSkin';
+import { RigidSkin, characterMaterial, SURF } from '../engine/RigidSkin';
 
 export interface AnimalLook {
   body: number;
@@ -38,6 +38,7 @@ export class AnimalModel {
     const s = look.size;
     const b = look.body, belly = look.belly, dark = 0x1a1612, antler = 0x8a7a60;
     const sk = new RigidSkin();
+    sk.kind = SURF.hair; // pelaje
     this.body = sk.bone(null, 0, look.legLen + 0.25, 0);
     this.neck = sk.bone(this.body, 0, 0.12, 0.5);
     this.neck.rotation.x = look.wolf ? -0.9 : -0.5;

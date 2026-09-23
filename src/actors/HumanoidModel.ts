@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { MaterialLibrary } from '../engine/placeholder/Materials';
 import type { ModelLibrary } from '../engine/placeholder/Models';
 import { damp } from '../core/math';
-import { RigidSkin, characterMaterial } from '../engine/RigidSkin';
+import { RigidSkin, characterMaterial, SURF } from '../engine/RigidSkin';
 
 export interface Appearance {
   skin: number;
@@ -30,11 +30,37 @@ export type AnimState =
 
 export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number }
 
+/** Torso (torno): de la cintura (y=0) a los hombros (y≈0.6), radio unitario aprox. */
+function torsoGeometry(): THREE.BufferGeometry {
+  const prof: [number, number][] = [[0.0, -0.02], [0.8, -0.02], [0.84, 0.1], [0.9, 0.25], [1.0, 0.4], [0.98, 0.5], [0.72, 0.57], [0.3, 0.61], [0.0, 0.62]];
+  return new THREE.LatheGeometry(prof.map(([r, y]) => new THREE.Vector2(r, y)), 14);
+}
+
+/** Zapato: esfera deformada con puntera. */
+function shoeGeometry(): THREE.BufferGeometry {
+  const g = new THREE.SphereGeometry(1, 10, 6);
+  const p = g.attributes.position as THREE.BufferAttribute;
+  for (let i = 0; i < p.count; i++) {
+    const z = p.getZ(i);
+    const y = p.getY(i);
+    p.setY(i, Math.max(y, -0.55)); // suela plana
+    if (z > 0) p.setZ(i, z * 1.25);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
 const G = {
-  capsule: new THREE.CapsuleGeometry(1, 1, 4, 8),
-  sphere: new THREE.SphereGeometry(1, 12, 8),
+  capsule: new THREE.CapsuleGeometry(1, 1, 4, 10),
+  sphere: new THREE.SphereGeometry(1, 16, 12),
+  sphereLo: new THREE.SphereGeometry(1, 8, 6),
   box: new THREE.BoxGeometry(1, 1, 1),
-  cyl: new THREE.CylinderGeometry(1, 1, 1, 8),
+  cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
+  frustum: new THREE.CylinderGeometry(0.78, 1, 1, 14),
+  torso: torsoGeometry(),
+  shoe: shoeGeometry(),
+  halfSphere: new THREE.SphereGeometry(1, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2),
+  brim: new THREE.CylinderGeometry(1, 1, 1, 18),
 };
 
 export class HumanoidModel {
@@ -89,35 +115,125 @@ export class HumanoidModel {
     this.hipR = sk.bone(this.hips, 0.1 * b, -0.02, 0);
     this.knL = sk.bone(this.hipL, 0, -0.46, 0);
     this.knR = sk.bone(this.hipR, 0, -0.46, 0);
-    // Torso.
-    sk.part(this.spine, G.capsule, tunic, 0.2 * b, 0.2, 0.13 * b, 0, 0.28);
-    sk.part(this.spine, G.box, leather, 0.42 * b, 0.06, 0.28 * b, 0, 0.04);
-    if (app.robe || app.female) sk.part(this.hips, G.cyl, app.robe ? tunic : pants, 0.24 * b, 0.75, 0.18 * b, 0, -0.36);
-    if (app.apron) sk.part(this.spine, G.box, leather, 0.34, 0.7, 0.03, 0, -0.05, 0.14);
-    // Cabeza.
-    sk.part(this.neck, G.cyl, skin, 0.055, 0.12, 0.055, 0, 0.03);
-    sk.part(this.head, G.sphere, skin, 0.105, 0.125, 0.115, 0, 0.02);
-    sk.part(this.head, G.sphere, hair, 0.11, 0.07, 0.115, 0, 0.08, -0.01);
-    if (app.beard) sk.part(this.head, G.sphere, hair, 0.08, 0.07, 0.06, 0, -0.06, 0.06);
-    sk.part(this.head, G.sphere, dark, 0.015, 0.015, 0.01, -0.04, 0.03, 0.105);
-    sk.part(this.head, G.sphere, dark, 0.015, 0.015, 0.01, 0.04, 0.03, 0.105);
-    sk.part(this.head, G.sphere, skin, 0.018, 0.03, 0.025, 0, 0.0, 0.115);
-    if (app.hood) sk.part(this.head, G.sphere, tunic, 0.125, 0.13, 0.13, 0, 0.04, -0.02);
+    // Rasgos deterministas a partir de la apariencia (variedad sin datos extra).
+    const seed = (app.tunic * 7 + app.hair * 13 + app.skin * 3) >>> 0;
+    const pick = (n: number, salt: number) => ((seed >>> (salt % 16)) + salt * 7) % n;
+    const linen = 0xd8cfb8, lip = new THREE.Color(skin).multiplyScalar(0.78).getHex(), eyeW = 0xe6ded0, iris = pick(3, 1) === 0 ? 0x3a5a6a : 0x3a2a1a;
+    const female = !!app.female;
+    const sw = female ? 0.9 : 1; // anchura de hombros
+    // ----- Torso y ropa
+    sk.kind = SURF.cloth;
+    sk.part(this.spine, G.torso, tunic, 0.2 * b * sw, 1, 0.14 * b, 0, 0.0);
+    // Faldón de la túnica (hasta medio muslo) o falda larga.
+    if (app.robe || female) sk.part(this.hips, G.frustum, app.robe ? tunic : tunic, 0.19 * b, 0.82, 0.16 * b, 0, -0.36);
+    else sk.part(this.hips, G.frustum, tunic, 0.18 * b, 0.34, 0.14 * b, 0, -0.1);
+    // Cadera (se ve por debajo del faldón al andar).
+    sk.part(this.hips, G.sphereLo, pants, 0.16 * b, 0.1, 0.12 * b, 0, -0.02);
+    // Cuello de la túnica.
+    sk.part(this.spine, G.cyl, tunic, 0.075, 0.05, 0.07, 0, 0.6);
+    sk.kind = SURF.leather;
+    sk.part(this.spine, G.cyl, leather, 0.172 * b * (female ? 0.95 : 1), 0.055, 0.125 * b, 0, 0.04);
+    sk.kind = SURF.metal;
+    sk.part(this.spine, G.box, 0x8a7a50, 0.04, 0.04, 0.012, 0, 0.04, 0.128 * b);
+    sk.kind = SURF.leather;
+    sk.part(this.spine, G.box, leather, 0.08, 0.1, 0.04, 0.15 * b, -0.02, 0.06); // bolsa
+    if (app.apron) {
+      sk.part(this.spine, G.box, leather, 0.24, 0.42, 0.015, 0, 0.26, 0.128 * b);
+      sk.part(this.hips, G.box, leather, 0.28, 0.46, 0.015, 0, -0.24, 0.13 * b, 0.1);
+    }
+    if (female) {
+      // Corpiño con cordones.
+      sk.kind = SURF.cloth;
+      sk.part(this.spine, G.torso, 0x3a2e26, 0.205 * b * sw, 0.62, 0.145 * b, 0, 0.05);
+      sk.kind = SURF.linen;
+      sk.part(this.spine, G.cyl, linen, 0.085, 0.06, 0.075, 0, 0.58);
+    }
+    // ----- Cabeza
+    sk.kind = SURF.skin;
+    sk.part(this.neck, G.cyl, skin, 0.052, 0.13, 0.05, 0, 0.03);
+    sk.part(this.head, G.sphere, skin, 0.098, 0.118, 0.108, 0, 0.03);
+    sk.part(this.head, G.sphere, skin, 0.08, 0.065, 0.085, 0, -0.03, 0.018); // mandíbula
+    sk.part(this.head, G.box, skin, 0.022, 0.048, 0.03, 0, 0.012, 0.108, -0.25); // nariz
+    sk.part(this.head, G.sphereLo, skin, 0.016, 0.014, 0.014, 0, -0.012, 0.118); // punta
+    for (const e of [-1, 1]) {
+      sk.part(this.head, G.sphereLo, skin, 0.012, 0.028, 0.02, e * 0.097, 0.018, -0.005); // oreja
+      sk.part(this.head, G.sphereLo, eyeW, 0.017, 0.011, 0.008, e * 0.036, 0.027, 0.097);
+      sk.part(this.head, G.sphereLo, iris, 0.008, 0.008, 0.005, e * 0.036, 0.027, 0.104);
+      sk.kind = SURF.hair;
+      sk.part(this.head, G.box, hair, 0.038, 0.009, 0.012, e * 0.037, 0.047, 0.102, 0, 0, -e * 0.12); // ceja
+      sk.kind = SURF.skin;
+    }
+    sk.part(this.head, G.box, lip, 0.034, 0.008, 0.01, 0, -0.045, 0.1);
+    // ----- Pelo, barba y tocados
+    sk.kind = SURF.hair;
+    const covered = app.hood || app.helmet;
+    if (!covered) {
+      if (female) {
+        // Toca de lino sobre el pelo recogido.
+        sk.kind = SURF.linen;
+        sk.part(this.head, G.sphere, linen, 0.112, 0.105, 0.118, 0, 0.055, -0.012);
+        sk.part(this.head, G.box, linen, 0.2, 0.2, 0.03, 0, -0.06, -0.09, 0.15);
+        sk.kind = SURF.hair;
+        sk.part(this.head, G.box, hair, 0.16, 0.025, 0.02, 0, 0.075, 0.1);
+      } else {
+        const style = pick(3, 5);
+        sk.part(this.head, G.sphere, hair, 0.106, 0.075 + style * 0.01, 0.114, 0, 0.078, -0.012);
+        sk.part(this.head, G.sphereLo, hair, 0.1, 0.07, 0.06, 0, 0.02, -0.075); // nuca
+        if (style === 2) {
+          // Gorro de fieltro.
+          sk.kind = SURF.cloth;
+          sk.part(this.head, G.frustum, new THREE.Color(tunic).multiplyScalar(0.6).getHex(), 0.1, 0.09, 0.108, 0, 0.13, -0.01);
+          sk.part(this.head, G.brim, new THREE.Color(tunic).multiplyScalar(0.55).getHex(), 0.118, 0.018, 0.122, 0, 0.1, -0.01);
+        }
+      }
+    }
+    sk.kind = SURF.hair;
+    if (app.beard) {
+      sk.part(this.head, G.sphere, hair, 0.078, 0.068, 0.06, 0, -0.058, 0.058);
+      sk.part(this.head, G.box, hair, 0.05, 0.012, 0.015, 0, -0.03, 0.108); // bigote
+      for (const e of [-1, 1]) sk.part(this.head, G.box, hair, 0.018, 0.07, 0.05, e * 0.085, -0.01, 0.03);
+    }
+    if (app.hood) {
+      sk.kind = SURF.cloth;
+      const hoodC = new THREE.Color(tunic).multiplyScalar(0.8).getHex();
+      sk.part(this.head, G.sphere, hoodC, 0.128, 0.135, 0.132, 0, 0.045, -0.025);
+      // Capuz sobre los hombros.
+      sk.part(this.spine, G.frustum, hoodC, 0.14 * b, 0.16, 0.12 * b, 0, 0.56);
+    }
     if (app.helmet) {
-      sk.part(this.head, G.sphere, iron, 0.12, 0.09, 0.125, 0, 0.08);
-      sk.part(this.head, G.box, iron, 0.02, 0.09, 0.02, 0, 0.0, 0.125);
+      // Capacete de hierro con ala.
+      sk.kind = SURF.metal;
+      sk.part(this.head, G.halfSphere, iron, 0.118, 0.12, 0.124, 0, 0.06, -0.005);
+      sk.part(this.head, G.brim, iron, 0.17, 0.012, 0.17, 0, 0.065, -0.005);
+      sk.kind = SURF.linen;
+      sk.part(this.head, G.sphereLo, linen, 0.108, 0.07, 0.11, 0, 0.02, -0.03); // cofia
     }
-    // Brazos.
-    for (const [sh, el, hand] of [[this.shL, this.elL, this.handL], [this.shR, this.elR, this.handR]] as const) {
-      sk.part(sh, G.capsule, tunic, 0.055, 0.13, 0.055, 0, -0.14);
-      sk.part(el, G.capsule, app.apron ? skin : tunic, 0.045, 0.12, 0.045, 0, -0.13);
-      sk.part(hand, G.sphere, skin, 0.045, 0.05, 0.035);
+    // ----- Brazos
+    for (const [sh, el, hand, e] of [[this.shL, this.elL, this.handL, -1], [this.shR, this.elR, this.handR, 1]] as const) {
+      sk.kind = SURF.cloth;
+      sk.part(sh, G.sphereLo, tunic, 0.058, 0.06, 0.06, -0.02 * (sh === this.shL ? -1 : 1), -0.03); // hombro
+      sk.part(sh, G.capsule, tunic, 0.052, 0.14, 0.052, 0, -0.15);
+      if (app.apron) {
+        sk.kind = SURF.skin;
+        sk.part(el, G.capsule, skin, 0.04, 0.13, 0.04, 0, -0.13); // mangas remangadas
+        sk.kind = SURF.cloth;
+        sk.part(el, G.cyl, tunic, 0.05, 0.05, 0.05, 0, -0.01);
+      } else {
+        sk.part(el, G.capsule, tunic, 0.044, 0.13, 0.044, 0, -0.13);
+        sk.part(el, G.cyl, new THREE.Color(tunic).multiplyScalar(0.8).getHex(), 0.047, 0.03, 0.047, 0, -0.25); // puño
+      }
+      sk.kind = SURF.skin;
+      sk.part(hand, G.sphere, skin, 0.034, 0.052, 0.022, 0, -0.03);
+      sk.part(hand, G.capsule, skin, 0.011, 0.022, 0.011, e * -0.03, -0.015, 0.012, 0, 0, e * 0.6); // pulgar
     }
-    // Piernas.
+    // ----- Piernas y calzado
     for (const [hp, kn] of [[this.hipL, this.knL], [this.hipR, this.knR]] as const) {
-      sk.part(hp, G.capsule, pants, 0.075 * b, 0.2, 0.075 * b, 0, -0.22);
-      sk.part(kn, G.capsule, pants, 0.06, 0.18, 0.06, 0, -0.2);
-      sk.part(kn, G.box, leather, 0.1, 0.07, 0.2, 0, -0.44, 0.04);
+      sk.kind = SURF.cloth;
+      sk.part(hp, G.capsule, pants, 0.072 * b, 0.21, 0.075 * b, 0, -0.22);
+      sk.part(kn, G.capsule, pants, 0.056, 0.2, 0.058, 0, -0.2);
+      sk.kind = SURF.leather;
+      sk.part(kn, G.cyl, dark, 0.058, 0.12, 0.06, 0, -0.37); // caña del zapato
+      sk.part(kn, G.shoe, dark, 0.052, 0.045, 0.1, 0, -0.44, 0.035);
     }
     this.mesh = sk.build(this.hips, characterMaterial());
     this.root.add(this.mesh);
@@ -148,7 +264,6 @@ export class HumanoidModel {
     }
     m.rotation.set(Math.PI / 2, 0, 0);
     m.position.set(0, -0.02, kind === 'spear' ? 0.5 : 0.18);
-    if (kind === 'spear') m.scale.set(1, 2.2, 1);
     this.handR.add(m);
     this.weaponObj = m;
   }

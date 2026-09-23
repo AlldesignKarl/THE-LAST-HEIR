@@ -31,8 +31,8 @@ const SPECS: Record<MatId, MatSpec> = {
   plaster: { tex: 'plaster', roughness: 0.95 },
   wattle: { tex: 'wattle', roughness: 0.95 },
   planks: { tex: 'planks', roughness: 0.85 },
-  darkWood: { tex: 'planks', color: 0x6b5a4a, roughness: 0.8 },
-  beam: { tex: 'bark', color: 0x5a4a3c, roughness: 0.85 },
+  darkWood: { tex: 'planks', color: 0x8a7866, roughness: 0.8 },
+  beam: { tex: 'roughWood', color: 0xb09a80, roughness: 0.85 },
   thatch: { tex: 'thatch', roughness: 1 },
   tiles: { tex: 'tiles', roughness: 0.8 },
   rock: { tex: 'rock', roughness: 0.95 },
@@ -114,6 +114,19 @@ export class MaterialLibrary {
     if (s.wind) applyWind(m);
     m.name = id;
     this.cache.set(id, m);
+    return m;
+  }
+
+  /** Variante con color por vértice (oclusión ambiental horneada). */
+  private vcCache = new Map<MatId, THREE.MeshStandardMaterial>();
+  vc(id: MatId): THREE.MeshStandardMaterial {
+    let m = this.vcCache.get(id);
+    if (!m) {
+      m = this.get(id).clone();
+      m.vertexColors = true;
+      m.name = `${id}_vc`;
+      this.vcCache.set(id, m);
+    }
     return m;
   }
 

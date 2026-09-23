@@ -64,10 +64,14 @@ export class Heightfield {
     let h = 14 + this.n.fbm(x / 520, z / 520, 4) * 14 + this.n.fbm(x / 140 + 31, z / 140 - 17, 3) * 4.5;
     // Sierra del norte.
     const m = smoothstep(-330, -640, z);
-    if (m > 0) h += m * (35 + this.n.ridged(x / 260, z / 260, 5) * 190);
+    if (m > 0) {
+      // Crestas suaves (pocas octavas) + masa redondeada: sierra erosionada, no dientes de sierra.
+      const r = this.n.ridged(x / 300, z / 300, 3);
+      h += m * (35 + (r * 0.65 + this.n.fbm(x / 380 + 5, z / 380, 4) * 0.35) * 200);
+    }
     // Bordes del valle.
     const edge = smoothstep(760, 1010, Math.max(Math.abs(x), Math.abs(z)));
-    if (edge > 0) h += edge * (60 + this.n.ridged(x / 200 + 9, z / 200, 3) * 80);
+    if (edge > 0) h += edge * (60 + (this.n.ridged(x / 260 + 9, z / 260, 2) * 0.6 + this.n.fbm(x / 300, z / 300 + 3, 3) * 0.4) * 90);
     // Colina rocosa de la Cueva del Cuervo (acantilado marcado).
     const dh = Math.hypot(x - CAVE_HILL.x, z - CAVE_HILL.z);
     if (dh < CAVE_HILL.radius) {

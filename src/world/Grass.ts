@@ -10,47 +10,88 @@ import { GlobalUniforms } from '../engine/placeholder/Materials';
 
 const CELL = 8;
 const RADIUS = 42;
-const MAX = 9000;
+const MAX = 16000;
 
-function grassTexture(): THREE.Texture {
-  const W = 128, H = 128;
+/**
+ * Atlas 2×2 de matas: 0 hierba verde, 1 hierba con espigas, 2 hierba
+ * seca, 3 hierba con flores silvestres.
+ */
+function grassAtlas(): THREE.Texture {
+  const S = 256, W = S * 2;
   const c = document.createElement('canvas');
-  c.width = W; c.height = H;
+  c.width = c.height = W;
   const g = c.getContext('2d')!;
-  g.clearRect(0, 0, W, H);
-  for (let i = 0; i < 38; i++) {
-    const x = 6 + Math.random() * (W - 12);
-    const h = H * (0.45 + Math.random() * 0.55);
-    const lean = (Math.random() - 0.5) * 30;
-    const w = 2 + Math.random() * 3;
-    const grd = g.createLinearGradient(0, H, 0, H - h);
-    const tone = 0.7 + Math.random() * 0.5;
-    grd.addColorStop(0, `rgb(${40 * tone | 0},${52 * tone | 0},${18 * tone | 0})`);
-    grd.addColorStop(1, `rgb(${120 * tone | 0},${130 * tone | 0},${60 * tone | 0})`);
-    g.fillStyle = grd;
-    g.beginPath();
-    g.moveTo(x - w, H);
-    g.quadraticCurveTo(x + lean * 0.3, H - h * 0.5, x + lean, H - h);
-    g.quadraticCurveTo(x + lean * 0.3 + w * 0.5, H - h * 0.5, x + w, H);
-    g.closePath();
-    g.fill();
-  }
+  let seed = 1;
+  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const tuft = (ox: number, oy: number, kind: number) => {
+    const blades = 70;
+    for (let i = 0; i < blades; i++) {
+      const x = ox + 10 + rnd() * (S - 20);
+      const h = S * (0.35 + rnd() * 0.6) * (kind === 2 ? 0.8 : 1);
+      const lean = (rnd() - 0.5) * 60;
+      const w = 1.5 + rnd() * 2.2;
+      const tone = 0.65 + rnd() * 0.55;
+      const grd = g.createLinearGradient(0, oy + S, 0, oy + S - h);
+      if (kind === 2) {
+        grd.addColorStop(0, `rgb(${60 * tone | 0},${55 * tone | 0},${28 * tone | 0})`);
+        grd.addColorStop(1, `rgb(${170 * tone | 0},${150 * tone | 0},${90 * tone | 0})`);
+      } else {
+        grd.addColorStop(0, `rgb(${30 * tone | 0},${44 * tone | 0},${14 * tone | 0})`);
+        grd.addColorStop(0.6, `rgb(${70 * tone | 0},${92 * tone | 0},${32 * tone | 0})`);
+        grd.addColorStop(1, `rgb(${112 * tone | 0},${124 * tone | 0},${58 * tone | 0})`);
+      }
+      g.fillStyle = grd;
+      const bx = x, by = oy + S;
+      g.beginPath();
+      g.moveTo(bx - w, by);
+      g.quadraticCurveTo(bx + lean * 0.3, by - h * 0.55, bx + lean, by - h);
+      g.quadraticCurveTo(bx + lean * 0.3 + w * 0.4, by - h * 0.55, bx + w, by);
+      g.closePath();
+      g.fill();
+      if (kind === 1 && i % 6 === 0) {
+        // Espiga.
+        g.fillStyle = `rgb(${150 * tone | 0},${135 * tone | 0},${80 * tone | 0})`;
+        g.beginPath();
+        g.ellipse(bx + lean, by - h, 3, 11, lean * 0.01, 0, Math.PI * 2);
+        g.fill();
+      }
+    }
+    if (kind === 3) {
+      const cols = ['#e8e2d0', '#d9c24a', '#b04a6a', '#7a6ac8', '#e8e2d0'];
+      for (let i = 0; i < 14; i++) {
+        const fx = ox + 20 + rnd() * (S - 40), fy = oy + S * (0.25 + rnd() * 0.45);
+        g.strokeStyle = '#3d5a1c';
+        g.lineWidth = 1.5;
+        g.beginPath(); g.moveTo(fx, fy); g.lineTo(fx + (rnd() - 0.5) * 10, oy + S); g.stroke();
+        g.fillStyle = cols[i % cols.length];
+        for (let p = 0; p < 5; p++) {
+          const a = (p / 5) * Math.PI * 2;
+          g.beginPath(); g.ellipse(fx + Math.cos(a) * 4, fy + Math.sin(a) * 4, 3.5, 2.2, a, 0, Math.PI * 2); g.fill();
+        }
+        g.fillStyle = '#e0b030';
+        g.beginPath(); g.arc(fx, fy, 2.2, 0, Math.PI * 2); g.fill();
+      }
+    }
+  };
+  tuft(0, 0, 0); tuft(S, 0, 1); tuft(0, S, 2); tuft(S, S, 3);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
+  t.anisotropy = 4;
   return t;
 }
 
 export class Grass {
   readonly mesh: THREE.InstancedMesh;
   private last = new THREE.Vector3(1e9, 0, 1e9);
-  private cache = new Map<string, THREE.Matrix4[]>();
+  private cache = new Map<string, { m: THREE.Matrix4; v: number }[]>();
+  private variant: THREE.InstancedBufferAttribute;
   private tmpC = new THREE.Color();
   enabled = true;
   count = 0;
 
   constructor(private readonly hf: Heightfield, scene: THREE.Scene, private readonly blocked: (x: number, z: number) => boolean) {
     // Dos planos cruzados con pivote en la base.
-    const p1 = new THREE.PlaneGeometry(0.9, 0.55).translate(0, 0.275, 0);
+    const p1 = new THREE.PlaneGeometry(0.75, 0.5).translate(0, 0.25, 0);
     const p2 = p1.clone().rotateY(Math.PI / 2);
     const p3 = p1.clone().rotateY(Math.PI / 4);
     const geo = new THREE.BufferGeometry();
@@ -76,12 +117,15 @@ export class Grass {
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
-    const mat = new THREE.MeshStandardMaterial({ map: grassTexture(), alphaTest: 0.45, side: THREE.FrontSide, roughness: 1 });
+    const mat = new THREE.MeshStandardMaterial({ map: grassAtlas(), alphaTest: 0.45, side: THREE.FrontSide, roughness: 1, alphaToCoverage: true });
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = GlobalUniforms.uTime;
       shader.uniforms.uWind = GlobalUniforms.uWind;
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;\nattribute float aVariant;')
+        .replace('#include <uv_vertex>', `#include <uv_vertex>
+          // Celda del atlas (fila 0 del lienzo = mitad superior en UV).
+          vMapUv = vMapUv * 0.5 + vec2(mod(aVariant, 2.0), 1.0 - floor(aVariant / 2.0)) * 0.5;`)
         .replace('#include <begin_vertex>', `#include <begin_vertex>
           {
             vec4 wp = instanceMatrix * vec4(transformed, 1.0);
@@ -94,6 +138,8 @@ export class Grass {
     mat.customProgramCacheKey = () => 'grass';
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
+    this.variant = new THREE.InstancedBufferAttribute(new Float32Array(MAX), 1);
+    geo.setAttribute('aVariant', this.variant);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     // Sin sombras recibidas: los planos verticales producen "acné" (matas negras).
@@ -101,12 +147,12 @@ export class Grass {
     scene.add(this.mesh);
   }
 
-  private cell(cx: number, cz: number): THREE.Matrix4[] {
+  private cell(cx: number, cz: number): { m: THREE.Matrix4; v: number }[] {
     const key = `${cx},${cz}`;
     let list = this.cache.get(key);
     if (list) return list;
     list = [];
-    const n = 26;
+    const n = 44;
     for (let i = 0; i < n; i++) {
       const x = (cx + hash2(cx * 31 + i, cz, 5)) * CELL;
       const z = (cz + hash2(cx, cz * 17 + i, 9)) * CELL;
@@ -119,13 +165,16 @@ export class Grass {
       if (nrm.y < 0.8) continue;
       if (this.blocked(x, z)) continue;
       const y = this.hf.heightAt(x, z);
-      const s = 0.7 + hash2(i, cx * 7, cz) * 0.8;
+      const s = 0.65 + hash2(i, cx * 7, cz) * 0.75;
+      // Variante: más seca en zonas pisadas, flores en claros.
+      const r = hash2(cx * 13 + i, cz * 3, 21);
+      const v = vill > 0.2 && r < 0.5 ? 2 : r < 0.62 ? 0 : r < 0.82 ? 1 : r < 0.955 ? 2 : 3;
       const m = new THREE.Matrix4().compose(
         new THREE.Vector3(x, y - 0.03, z),
         new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash2(i, cz, cx) * 6.28),
         new THREE.Vector3(s, s * (0.8 + hash2(cz, i, 1) * 0.6), s),
       );
-      list.push(m);
+      list.push({ m, v });
     }
     this.cache.set(key, list);
     if (this.cache.size > 1200) {
@@ -147,9 +196,10 @@ export class Grass {
       for (let cx = c0x; cx <= c1x && n < MAX; cx++) {
         const ccx = (cx + 0.5) * CELL - cam.x, ccz = (cz + 0.5) * CELL - cam.z;
         if (ccx * ccx + ccz * ccz > RADIUS * RADIUS) continue;
-        for (const m of this.cell(cx, cz)) {
+        for (const { m, v } of this.cell(cx, cz)) {
           if (n >= MAX) break;
           this.mesh.setMatrixAt(n, m);
+          this.variant.setX(n, v);
           const t = 0.8 + hash2(n, cx, cz) * 0.35;
           this.tmpC.setRGB(t, t * (0.95 + hash2(cz, n, 2) * 0.1), t * 0.85);
           this.mesh.setColorAt(n, this.tmpC);
@@ -161,5 +211,6 @@ export class Grass {
     this.mesh.count = n;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    this.variant.needsUpdate = true;
   }
 }

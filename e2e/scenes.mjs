@@ -22,6 +22,11 @@ const scenes = {
   cave_torch: `__game.give('torch', 2); __game.game.equipment.equip('torch'); __game.teleport(-238, -122, 0, __game.game.settlement.cave.pointAt(0.55).y + 0.1); __game.lookAt(-250, __game.game.settlement.cave.pointAt(0.6).y + 1, -124); __game.setHour(12)`,
   camp: `__game.teleport(150, -270, 0); __game.lookAt(170, 14, -280); __game.setHour(22)`,
   rain: `__game.weather('rain'); __game.teleport(-18, 22, 0); __game.lookAt(0, 16, -10); __game.setHour(14)`,
+  pines: `__game.teleport(120, -235, 0); __game.lookAt(150, 16, -290); __game.setHour(15)`,
+  sierra: `__game.teleport(-40, -300, 0); __game.lookAt(-40, 60, -700); __game.setHour(13)`,
+  tavern: `__game.teleport(9, -5, 0); __game.lookAt(21, 16, -17); __game.setHour(10)`,
+  people: `__game.setHour(11); __game.lineup(-150, -40); __game.teleport(-150, -36.6, 0); __game.lookAt(-150, __game.game.hf.heightAt(-150, -40) + 1.1, -40)`,
+  hutext: `__game.teleport(-47, 26, 0); __game.lookAt(-58, 15, 18); __game.setHour(16)`,
   fog: `__game.weather('fog'); __game.teleport(-100, 12, 0); __game.lookAt(-150, 12, -20); __game.setHour(7)`,
 };
 for (const [name, script] of Object.entries(scenes)) {

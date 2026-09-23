@@ -235,20 +235,22 @@ void main() {
     vec3 rodC = mix(vec3(0.28, 0.2, 0.12), vec3(0.46, 0.34, 0.2), rod * weave);
     c = mix(rodC, mud, edge);
     h = edge * (0.65 + daub * 0.35) + (1.0 - edge) * rod * weave * 0.4;
-  } else if (uPainter == 9) { // paja (techumbre)
-    float rows = 7.0;
-    float ly = fract(uv.y * rows);
-    float li = floor(uv.y * rows);
-    float strands = gnoise(vec2(uv.x * 220.0, uv.y * 5.0 + li), vec2(220, 5.0 * rows), 101.0);
-    float strands2 = gnoise(vec2(uv.x * 90.0 + 3.0, uv.y * 3.0), vec2(90, 3), 102.0);
+  } else if (uPainter == 9) { // paja (techumbre): haces gruesos y desordenados
+    float rows = 3.0;
+    float warpY = (gnoise(uv * vec2(6, 3), vec2(6, 3), 106.0) - 0.5) * 0.12;
+    float ly = fract(uv.y * rows + warpY * rows);
+    float strands = gnoise(vec2(uv.x * 260.0, uv.y * 4.0), vec2(260, 4), 101.0);
+    float strands2 = gnoise(vec2(uv.x * 110.0 + 3.0, uv.y * 7.0), vec2(110, 7), 102.0);
+    float clumps = fbm(uv, vec2(12, 5), 3, 107.0);
     float n = fbm(uv, vec2(4), 4, 103.0);
-    c = mix(vec3(0.3, 0.23, 0.12), vec3(0.58, 0.47, 0.27), strands * 0.5 + strands2 * 0.2 + n * 0.3);
-    // Sombra bajo cada hilada (extremos de los haces).
-    c *= mix(1.0, 0.45, smoothstep(0.75, 1.0, ly));
+    c = mix(vec3(0.3, 0.25, 0.15), vec3(0.58, 0.49, 0.32), strands * 0.45 + strands2 * 0.25 + clumps * 0.3);
+    c *= 0.85 + 0.25 * n;
+    // Sombra suave bajo cada hilada.
+    c *= mix(1.0, 0.8, smoothstep(0.75, 1.0, ly));
     // Envejecimiento: gris y musgo.
-    c = mix(c, vec3(0.33, 0.32, 0.27), smoothstep(0.55, 0.75, fbm(uv, vec2(3), 3, 104.0)) * 0.6);
-    c = mix(c, vec3(0.2, 0.24, 0.1), smoothstep(0.7, 0.85, fbm(uv, vec2(5), 3, 105.0)) * 0.5);
-    h = strands * 0.4 + (1.0 - ly) * 0.5 + strands2 * 0.1;
+    c = mix(c, vec3(0.36, 0.34, 0.29), smoothstep(0.5, 0.75, fbm(uv, vec2(3), 3, 104.0)) * 0.55);
+    c = mix(c, vec3(0.22, 0.25, 0.12), smoothstep(0.68, 0.85, fbm(uv, vec2(5), 3, 105.0)) * 0.45);
+    h = strands * 0.35 + strands2 * 0.2 + clumps * 0.2 + (1.0 - ly) * 0.25;
   } else if (uPainter == 10) { // tejas árabes
     float rows = 8.0, cols = 6.0;
     float r = floor(uv.y * rows);
@@ -264,7 +266,7 @@ void main() {
     h = curve * 0.7 + (1.0 - fv) * 0.3;
   } else if (uPainter == 11 || uPainter == 17) { // corteza de roble (11) / pino (17)
     if (uPainter == 11) {
-      float ridge = ridged(vec2(uv.x, uv.y * 0.25), vec2(10, 2), 4, 121.0);
+      float ridge = ridged(uv, vec2(10, 1), 4, 121.0);
       float n = fbm(uv, vec2(6), 4, 122.0);
       c = mix(vec3(0.11, 0.09, 0.07), vec3(0.36, 0.31, 0.25), ridge * 0.7 + n * 0.3);
       c = mix(c, vec3(0.3, 0.34, 0.2), smoothstep(0.6, 0.75, fbm(uv, vec2(4), 3, 123.0)) * 0.5);
@@ -272,7 +274,7 @@ void main() {
     } else {
       vec3 v = voronoi(uv, vec2(6, 12), 125.0, 0.7);
       float plate = smoothstep(0.02, 0.12, v.y - v.x);
-      c = mix(vec3(0.16, 0.09, 0.06), mix(vec3(0.38, 0.22, 0.14), vec3(0.5, 0.33, 0.22), v.z), plate);
+      c = mix(vec3(0.13, 0.09, 0.07), mix(vec3(0.3, 0.21, 0.15), vec3(0.43, 0.32, 0.23), v.z), plate);
       c *= 0.85 + 0.3 * fbm(uv, vec2(24), 3, 126.0);
       h = plate * (0.6 + v.z * 0.3);
     }
@@ -293,18 +295,20 @@ void main() {
     h = scratches * 0.15 + hammer * 0.35;
   } else if (uPainter == 14) { // suelo de bosque: hojarasca, agujas, musgo
     float n = fbm(uv, vec2(4), 5, 171.0);
-    vec3 lv = voronoi(uv, vec2(22), 172.0, 1.0);
-    float leaf = smoothstep(0.42, 0.3, lv.x);
-    vec3 lv2 = voronoi(uv + 0.37, vec2(30), 173.0, 1.0);
-    float leaf2 = smoothstep(0.38, 0.26, lv2.x);
+    // Hojas: celdas pequeñas, alargadas y giradas, con bordes irregulares.
+    vec2 wuv = uv + (vec2(gnoise(uv * 12.0, vec2(12), 177.0), gnoise(uv * 12.0 + 5.0, vec2(12), 178.0)) - 0.5) * 0.02;
+    vec3 lv = voronoi(wuv, vec2(34, 46), 172.0, 1.0);
+    float leaf = smoothstep(0.36, 0.22, lv.x) * step(0.3, lv.z);
+    vec3 lv2 = voronoi(wuv + 0.37, vec2(48, 38), 173.0, 1.0);
+    float leaf2 = smoothstep(0.33, 0.2, lv2.x) * step(0.45, lv2.z);
     float needles = smoothstep(0.62, 0.75, gnoise(uv * vec2(160, 160), vec2(160), 174.0)) * smoothstep(0.5, 0.7, gnoise(uv * vec2(8), vec2(8), 175.0));
     float moss = smoothstep(0.55, 0.72, fbm(uv, vec2(3), 4, 176.0));
     c = mix(vec3(0.12, 0.095, 0.065), vec3(0.21, 0.17, 0.11), n);
-    c = mix(c, mix(vec3(0.27, 0.19, 0.11), vec3(0.37, 0.29, 0.16), lv.z), leaf * 0.75);
-    c = mix(c, mix(vec3(0.22, 0.16, 0.09), vec3(0.33, 0.26, 0.13), lv2.z), leaf2 * 0.65);
+    c = mix(c, mix(vec3(0.25, 0.18, 0.1), vec3(0.36, 0.27, 0.14), lv.z), leaf * 0.6);
+    c = mix(c, mix(vec3(0.2, 0.15, 0.08), vec3(0.31, 0.24, 0.12), lv2.z), leaf2 * 0.5);
     c = mix(c, vec3(0.26, 0.2, 0.12), needles * 0.5);
     c = mix(c, vec3(0.17, 0.23, 0.08), moss * 0.75);
-    h = n * 0.3 + leaf * 0.3 + leaf2 * 0.35 + moss * 0.15;
+    h = n * 0.45 + leaf * 0.18 + leaf2 * 0.2 + moss * 0.2;
   } else if (uPainter == 15) { // empedrado
     vec3 v = voronoi(uv, vec2(9), 181.0, 0.75);
     float edge = v.y - v.x;

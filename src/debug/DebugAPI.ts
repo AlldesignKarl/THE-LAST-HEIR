@@ -5,6 +5,8 @@
 import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import type { Action } from '../core/Input';
+import { HumanoidModel } from '../actors/HumanoidModel';
+import { NPCS } from '../data/npcs';
 
 export function installDebugAPI(g: Game): void {
   const api = {
@@ -32,6 +34,16 @@ export function installDebugAPI(g: Game): void {
       if (d < 0) d += 24;
       g.time.advanceHours(d);
       g.npcs.snapAll();
+    },
+    /** Coloca en fila un modelo de cada vecino (inspección visual de personajes). */
+    lineup(x: number, z: number, spacing = 1.1): void {
+      NPCS.forEach((d, i) => {
+        const m = new HumanoidModel(d.appearance, g.materials);
+        const px = x + (i - (NPCS.length - 1) / 2) * spacing;
+        m.root.position.set(px, g.hf.heightAt(px, z), z);
+        m.update(0.1, true);
+        g.renderer.scene.add(m.root);
+      });
     },
     give(id: string, n = 1): void {
       g.inventory.add(id, n);

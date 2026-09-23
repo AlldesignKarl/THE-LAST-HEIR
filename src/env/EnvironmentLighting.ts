@@ -17,6 +17,7 @@ export class EnvironmentLighting {
   readonly hemi: THREE.HemisphereLight;
   readonly sky: Sky;
   readonly fog: THREE.FogExp2;
+  private scene: THREE.Scene;
   private stars: THREE.Points;
   private moon: THREE.Mesh;
   private sunDir = new THREE.Vector3();
@@ -25,6 +26,14 @@ export class EnvironmentLighting {
   interiorTarget = 0;
   /** 0 sin techo, 1 bajo techo (casa): menos luz ambiente pero hay ventanas. */
   private shadowFollowStep = 4;
+  /** Iluminación basada en imagen: PMREM del cielo, regenerado al cambiar sol/nubes. */
+  private pmrem: THREE.PMREMGenerator;
+  private envScene = new THREE.Scene();
+  private envSky: Sky;
+  private envRT: THREE.WebGLRenderTarget | null = null;
+  private envKey = new THREE.Vector4(9, 9, 9, 9);
+  private envT = 0;
+  envInterval = 2;
 
   constructor(scene: THREE.Scene, private renderer: THREE.WebGLRenderer, shadowMapSize: number, shadows: boolean) {
     this.sky = new Sky();
@@ -39,6 +48,11 @@ export class EnvironmentLighting {
     u.cloudSpeed.value = 0.00003;
     scene.add(this.sky);
 
+    this.pmrem = new THREE.PMREMGenerator(renderer);
+    this.envSky = new Sky();
+    this.envSky.scale.setScalar(400);
+    this.envScene.add(this.envSky);
+
     this.sun = new THREE.DirectionalLight(0xfff1dc, 3);
     this.sun.castShadow = shadows;
     this.sun.shadow.mapSize.set(shadowMapSize, shadowMapSize);
@@ -52,6 +66,7 @@ export class EnvironmentLighting {
 
     this.hemi = new THREE.HemisphereLight(0xbfd4ff, 0x4a3f2c, 0.6);
     scene.add(this.hemi);
+    this.scene = scene;
 
     this.fog = new THREE.FogExp2(0x9fb0c0, 0.0025);
     scene.fog = this.fog;
@@ -138,12 +153,12 @@ export class EnvironmentLighting {
     this.sun.position.set(tx + lightDir.x * 200, camPos.y + Math.max(0.15, lightDir.y) * 200, tz + lightDir.z * 200);
 
     // Luz ambiental: noche muy oscura; interiores más aún.
-    const ambDay = lerp(0.9, 1.1, overcast);
+    const ambDay = lerp(0.45, 0.8, overcast);
     const ambNight = 0.075;
     const amb = lerp(ambDay, ambNight, night) * (1 - this.interior * 0.93);
     this.hemi.intensity = amb;
-    this.hemi.color.setRGB(lerp(0.75, 0.3, night), lerp(0.83, 0.38, night), lerp(1.0, 0.62, night));
-    this.hemi.groundColor.setRGB(lerp(0.32, 0.05, night), lerp(0.27, 0.05, night), lerp(0.2, 0.07, night));
+    this.hemi.color.setRGB(lerp(0.8, 0.3, night), lerp(0.85, 0.38, night), lerp(0.92, 0.62, night));
+    this.hemi.groundColor.setRGB(lerp(0.3, 0.05, night), lerp(0.3, 0.05, night), lerp(0.18, 0.07, night));
 
     // Niebla: color del horizonte según la hora.
     const dayFog = new THREE.Color(0xa9b8c6).lerp(new THREE.Color(0x9a9ea2), overcast);
@@ -156,6 +171,8 @@ export class EnvironmentLighting {
     const baseDensity = 0.0022 + overcast * 0.0015;
     this.fog.density = baseDensity + weather.fog * 0.028 + weather.rain * 0.006;
 
+    this.updateEnvironment(dt, cloud, dayAmt, golden);
+
     // Relámpago.
     if (weather.lightning > 0) {
       this.hemi.intensity += weather.lightning * 2.5 * (1 - this.interior);
@@ -166,6 +183,36 @@ export class EnvironmentLighting {
 
     GlobalUniforms.uWind.value = 0.15 + weather.wind * 0.9;
     GlobalUniforms.uWetness.value = weather.wetness;
+  }
+
+  /**
+   * Regenera el mapa de entorno a partir de una copia del cielo cuando el sol
+   * o las nubes cambian lo suficiente (como mucho cada `envInterval` s).
+   */
+  private updateEnvironment(dt: number, cloud: number, dayAmt: number, golden: number): void {
+    this.envT -= dt;
+    const u = this.sky.material.uniforms, e = this.envSky.material.uniforms;
+    const d = this.sunDir;
+    const changed = Math.abs(d.x - this.envKey.x) + Math.abs(d.y - this.envKey.y) + Math.abs(d.z - this.envKey.z) > 0.03 || Math.abs(cloud - this.envKey.w) > 0.05;
+    if ((changed && this.envT <= 0) || !this.envRT) {
+      this.envT = this.envInterval;
+      this.envKey.set(d.x, d.y, d.z, cloud);
+      for (const k of ['sunPosition', 'turbidity', 'rayleigh', 'mieCoefficient', 'mieDirectionalG', 'cloudCoverage', 'cloudDensity', 'cloudScale', 'time'] as const) {
+        const src = u[k]?.value, dst = e[k];
+        if (!dst || src === undefined) continue;
+        if (src instanceof THREE.Vector3) (dst.value as THREE.Vector3).copy(src);
+        else dst.value = src;
+      }
+      e.showSunDisc.value = 0; // el disco solar ya lo aporta la luz direccional
+      const rt = this.pmrem.fromScene(this.envScene, 0.02, 1, 1000);
+      this.envRT?.dispose();
+      this.envRT = rt;
+      this.scene.environment = rt.texture;
+    }
+    // El IBL no conoce la oclusión: casi nada de noche, al atardecer se atenúa
+    // (el cielo azul teñiría todo) y cae rápido en interiores y cuevas.
+    const open = Math.pow(1 - Math.min(1, this.interior), 3);
+    this.scene.environmentIntensity = (0.02 + 0.42 * dayAmt * (1 - golden * 0.5)) * open;
   }
 
   setShadowQuality(size: number, enabled: boolean): void {
