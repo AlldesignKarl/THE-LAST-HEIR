@@ -2,11 +2,11 @@
 
 Regla: cada fase termina con pruebas (unitarias + E2E), revisión de rendimiento y sin errores conocidos abiertos.
 
-## Fase 0 · Fundamentos ✅/⏳ (ver estado al final)
+## Fase 0 · Fundamentos ✅
 - Análisis, GDD, arquitectura, riesgos.
 - Scaffold: Vite + TS estricto + Vitest + E2E con Playwright.
 
-## Fase 1 · Vertical slice (objetivo actual)
+## Fase 1 · Vertical slice ✅ (ver `ESTADO.md`: 27 tests unitarios + 21 E2E)
 Una zona completamente jugable alrededor de Robledo:
 
 | Bloque | Contenido |

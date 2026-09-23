@@ -83,12 +83,13 @@ Input → TimeOfDay → Weather → PlayerController → Interaction/Carry
 
 | Recurso | Presupuesto |
 |---|---|
-| Draw calls | < 400 |
+| Draw calls | < 300 pase principal, < 500 con sombras (medido: ~270 + ~190 en la plaza) |
 | Luces puntuales activas | 8 (pool) |
 | Sombras | 1 direccional (2048², sigue al jugador) |
 | NPCs con IA completa | ≤ 12 simultáneos |
 | Cuerpos dinámicos activos | ≤ 150 (el resto duermen) |
-| Chunks de terreno cargados | radio 3 (7×7) |
+| Chunks de terreno cargados | radio 3 (7×7) en calidad media; más allá, malla lejana única |
+| Personajes | 1 draw call cada uno (SkinnedMesh rígido, `engine/RigidSkin.ts`) |
 
 ## Guardado
 

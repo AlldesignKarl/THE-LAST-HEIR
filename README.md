@@ -11,7 +11,7 @@ npm install
 npm run dev        # http://localhost:5173
 npm run build      # typecheck + build de producción en dist/
 npm test           # tests unitarios (Vitest)
-npm run e2e        # pruebas E2E en Chromium real (requiere el servidor de dev o preview)
+npm run e2e        # pruebas E2E en Chromium real (levanta su propio servidor; o GAME_URL=...)
 ```
 
 Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game` para pruebas).

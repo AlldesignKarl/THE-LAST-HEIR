@@ -23,6 +23,7 @@ import { Settlement } from '../world/Settlement';
 import { Interactables } from '../world/Interactables';
 import { TreeFelling } from '../world/TreeFelling';
 import { buildWorldNav } from '../world/WorldNav';
+import { Grass } from '../world/Grass';
 import { POIS, PLAYER_START, VILLAGES } from '../world/WorldLayout';
 import { TimeOfDay } from '../env/TimeOfDay';
 import { Weather } from '../env/Weather';
@@ -94,6 +95,7 @@ export class Game {
   readonly viewmodel: Viewmodel;
   readonly treeFelling: TreeFelling;
   readonly settlement: Settlement;
+  readonly grass: Grass;
   readonly npcs: NPCManager;
   readonly animals: AnimalManager;
   readonly raids: RaidSystem;
@@ -155,6 +157,12 @@ export class Game {
     this.viewmodel = new Viewmodel(this);
     this.treeFelling = new TreeFelling(this);
     this.settlement = new Settlement(this);
+    this.grass = new Grass(this.hf, scene, (x, z) => {
+      if (this.hf.isHole(x, z)) return true;
+      for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.6)) return true;
+      return false;
+    });
+    this.grass.enabled = this.quality.grass;
     this.npcs = new NPCManager(this, buildWorldNav(this.settlement));
     this.animals = new AnimalManager(this);
     this.raids = new RaidSystem(this);
@@ -207,6 +215,8 @@ export class Game {
     r.shadowMap.enabled = this.quality.shadows;
     this.env.setShadowQuality(this.quality.shadowMapSize, this.quality.shadows);
     this.terrain.viewChunks = this.quality.viewChunks;
+    this.grass.enabled = this.quality.grass;
+    this.grass.update(this.camPos, true);
     this.renderer.resize();
     this.saveSettings();
   }
@@ -503,6 +513,7 @@ export class Game {
     // Streaming y LOD.
     this.terrain.update(this.camPos.x, this.camPos.z);
     this.vegetation.update(this.camPos.x, this.camPos.z);
+    this.grass.update(this.camPos);
     this.water.update(frameDt);
     this.env.update(frameDt, this.time, this.weather, this.camPos);
     this.settlement.updateWindows(this.time.hourFloat);

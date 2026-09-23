@@ -6,8 +6,21 @@
  */
 import { launch } from './browser.mjs';
 import { mkdirSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 
-const BASE = process.env.GAME_URL ?? 'http://localhost:5173/';
+// Si no se indica GAME_URL, levantar un servidor de desarrollo propio.
+let server = null;
+let BASE = process.env.GAME_URL;
+if (!BASE) {
+  const port = 5199;
+  server = spawn('npx', ['vite', '--port', String(port), '--strictPort'], { stdio: 'ignore', detached: true });
+  BASE = `http://localhost:${port}/`;
+  for (let i = 0; i < 60; i++) {
+    try { const r = await fetch(BASE); if (r.ok) break; } catch { /* aún no */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+}
+const stopServer = () => { if (server) { try { process.kill(-server.pid); } catch { /* ya parado */ } } };
 const filter = process.argv[2] ?? '';
 const shots = 'e2e/screenshots';
 mkdirSync(shots, { recursive: true });
@@ -537,6 +550,69 @@ await test('comercio: comprar y vender con precios según la reputación', async
   assert(!r.canTrade, 'con reputación hostil no comercian contigo');
 });
 
+await test('casa: guardar y sacar del arcón, dormir hasta el alba con autoguardado', async () => {
+  const r = await ev(() => {
+    const g = __game.game;
+    // Evitar que el ataque programado caiga esta noche (no se puede dormir durante un ataque).
+    g.flags.set('first_raid_done');
+    g.director.lastRaidDay = g.time.day + 1;
+    for (const rd of g.raids.raiders) if (rd.c.alive) rd.c.die(null);
+    for (let i = 0; i < 100 && g.raids.active; i++) __game.step(2);
+    g.raids.alertActive = false;
+    const chest = g.containers.get('chest_player');
+    g.inventory.add('apple', 3);
+    g.ui.openContainer('chest_player');
+    const btn = [...document.querySelectorAll('.screen.show .col')[0].querySelectorAll('button')].find((b) => b.textContent.includes('Manzana'));
+    btn.click();
+    const inChest = chest.inv.count('apple');
+    g.ui.close();
+    __game.setHour(22);
+    const hut = g.settlement.buildings.get('player_hut');
+    __game.teleport(hut.def.x, hut.def.z, 0, hut.floorY + 0.1);
+    localStorage.removeItem('tlh_save_auto');
+    const day0 = g.time.day;
+    const ok = g.actions.rest(g.actions.hoursUntilDawn(), true);
+    return { inChest, ok, day0, day1: g.time.day, hour: g.time.hourFloat, autosave: !!localStorage.getItem('tlh_save_auto'), stamina: g.vitals.stamina };
+  });
+  assert(r.inChest >= 1, 'la manzana pasa al arcón');
+  assert(r.ok && r.day1 === r.day0 + 1 && Math.abs(r.hour - 6.5) < 0.2, `duerme hasta el alba (día ${r.day0}→${r.day1}, ${r.hour.toFixed(2)} h)`);
+  assert(r.autosave, 'dormir autoguarda');
+});
+
+await test('audio: todos los sonidos se sintetizan sin errores', async () => {
+  const r = await ev(() => {
+    const g = __game.game;
+    g.audio.unlock();
+    const ids = ['step_grass', 'step_dirt', 'step_mud', 'step_wood', 'step_rock', 'step_water', 'jump', 'land', 'dodge', 'swing', 'swing_heavy', 'hit_flesh', 'clash', 'block_wood', 'chop', 'kick',
+      'bow_draw', 'bow_release', 'arrow_fly', 'arrow_hit', 'pickup', 'grab', 'grab_heavy', 'throw', 'equip', 'coins', 'paper', 'chest_open', 'door_open', 'door_close', 'door_locked', 'gate',
+      'wood_creak', 'ladder', 'drink', 'eat', 'water_fill', 'fire_light', 'sizzle', 'hammer', 'bell', 'horn', 'thunder', 'tree_crack', 'tree_fall', 'splash', 'wolf_howl', 'wolf_growl', 'wolf_bite',
+      'deer_alarm', 'grunt', 'pain', 'shout', 'death'];
+    const errs = [];
+    const state = g.audio.ctx ? g.audio.ctx.state : 'none';
+    // Forzar el contexto a "running" si el navegador lo permite sin gesto.
+    for (const id of ids) {
+      try { g.audio.play(id, { x: g.player.pos.x + 2, y: g.player.pos.y, z: g.player.pos.z }); } catch (e) { errs.push(`${id}: ${e.message}`); }
+    }
+    try { g.audio.updateAmbience(0.5, { day: 0.2, wind: 0.8, rain: 0.8, inCave: 0, indoors: 0, waterDist: 5, fireDist: 3, forest: 0.8, village: 0.5, storm: true }); } catch (e) { errs.push(`ambience: ${e.message}`); }
+    return { errs, state, n: ids.length };
+  });
+  assert(r.errs.length === 0, r.errs.join('; '));
+});
+
+await test('muerte del jugador: pantalla de muerte y opción de cargar', async () => {
+  const r = await ev(() => {
+    const g = __game.game;
+    g.vitals.hurt(1000);
+    __game.step(0.2);
+    return { dead: g.vitals.dead };
+  });
+  assert(r.dead, 'el jugador muere');
+  await page.waitForSelector('.screen.show h1', { timeout: 10000 });
+  const title = await ev(() => document.querySelector('.screen.show h1').textContent);
+  assert(title.includes('Has muerto'), `pantalla: ${title}`);
+  await ev(() => { const g = __game.game; g.vitals.dead = false; g.vitals.health = 100; g.ui.close(); });
+});
+
 await test('guardado y carga persistente (recarga completa de la página)', async () => {
   const before = await ev(() => {
     const g = __game.game;
@@ -571,6 +647,7 @@ await test('sin errores de ejecución', async () => {
 
 // ---------------------------------------------------------------------------
 await browser.close();
+stopServer();
 const ok = results.filter((r) => r.ok).length;
 console.log(`\n${ok}/${results.length} pruebas superadas`);
 process.exit(ok === results.length ? 0 : 1);

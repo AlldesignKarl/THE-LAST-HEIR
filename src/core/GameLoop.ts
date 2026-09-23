@@ -53,6 +53,8 @@ export class GameLoop {
     this.last = now;
     // Evita la "espiral de la muerte" tras pestaña inactiva o carga.
     if (dt > 0.25) dt = 0.25;
+    // La marca de tiempo de rAF puede ser anterior a la tomada en start(): nunca dt negativo.
+    if (dt < 0) dt = 0;
     this.acc += dt * this.timeScale;
     let steps = 0;
     while (this.acc >= this.fixedDt && steps < 5) {

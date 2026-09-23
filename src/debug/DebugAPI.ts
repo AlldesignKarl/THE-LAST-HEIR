@@ -67,7 +67,10 @@ export function installDebugAPI(g: Game): void {
       }
     },
     errors: [] as string[],
+    /** Registro de daños al jugador (diagnóstico). */
+    damageLog: [] as { amount: number; attackerId: string | null; t: number; pos: number[] }[],
   };
+  g.bus.on('player:damaged', (e) => api.damageLog.push({ amount: e.amount, attackerId: e.attackerId, t: performance.now(), pos: g.player.pos.toArray() }));
   (window as unknown as { __game: typeof api }).__game = api;
   window.addEventListener('error', (e) => api.errors.push(String(e.message)));
 }
