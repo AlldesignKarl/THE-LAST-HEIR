@@ -318,16 +318,19 @@ export class BuildingInstance {
     const pivot = new THREE.Object3D();
     pivot.position.set(x - w / 2, 0, z);
     this.group.add(pivot);
-    const leaf = new THREE.Mesh(worldBox(w - 0.04, h - 0.03, 0.07, 1.2), mats.get('darkWood'));
-    leaf.position.set(w / 2, h / 2, 0);
+    // Hoja + herrajes en una sola malla (color por vértice: herrajes oscuros).
+    const parts: THREE.BufferGeometry[] = [];
+    const tintGeo = (g: THREE.BufferGeometry, c: number) => {
+      const n = g.attributes.position.count;
+      const col = new Float32Array(n * 3).fill(c);
+      g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+      return g;
+    };
+    parts.push(tintGeo(worldBox(w - 0.04, h - 0.03, 0.07, 1.2).translate(w / 2, h / 2, 0), 1));
+    for (const y of [0.4, h - 0.4]) parts.push(tintGeo(worldBox(w * 0.8, 0.06, 0.09, 1).translate(w * 0.42, y, 0), 0.25));
+    const leaf = new THREE.Mesh(mergeGeometries(parts)!, BuildingInstance.doorMaterial(mats));
     leaf.castShadow = true;
     pivot.add(leaf);
-    // Herrajes.
-    for (const y of [0.4, h - 0.4]) {
-      const band = new THREE.Mesh(worldBox(w * 0.8, 0.06, 0.09, 1), mats.get('iron'));
-      band.position.set(w * 0.42, y, 0);
-      pivot.add(band);
-    }
     this.group.updateMatrixWorld(true);
     const wp = new THREE.Vector3(), wq = new THREE.Quaternion();
     pivot.getWorldPosition(wp);
@@ -346,6 +349,15 @@ export class BuildingInstance {
     const outside = new THREE.Vector3(x, 0, z + 1.2).applyMatrix4(this.group.matrixWorld);
     const inside = new THREE.Vector3(x, 0, z - 1.3).applyMatrix4(this.group.matrixWorld);
     this.doors.push({ id, buildingId: this.def.id, pivot, body, open: false, angle: 0, locked, swing: -1, worldPos: center, outside, inside, width: w });
+  }
+
+  private static doorMat: THREE.MeshStandardMaterial | null = null;
+  static doorMaterial(mats: MaterialLibrary): THREE.MeshStandardMaterial {
+    if (!this.doorMat) {
+      this.doorMat = mats.get('darkWood').clone();
+      this.doorMat.vertexColors = true;
+    }
+    return this.doorMat;
   }
 
   /** Animación de puertas (llamar cada tick). */

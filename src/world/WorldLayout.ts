@@ -122,7 +122,7 @@ export const WATCHTOWER = { x: -9, z: -56, height: 8 };
 export const ROADS: RoadDef[] = [
   { id: 'north_road', width: 4.5, kind: 'road', points: [[0, -20], [0, -64], [2, -120], [-18, -220], [-12, -400], [10, -700]] },
   { id: 'south_road', width: 4.5, kind: 'road', points: [[0, 18], [0, 66], [10, 150], [60, 300], [120, 600]] },
-  { id: 'forest_path', width: 2.6, kind: 'path', points: [[-20, 8], [-42, 14], [-58, 22], [-78, 20], [-95, 15], [-120, 4], [-150, -20], [-180, -70], [-200, -118], [-186, -130]] },
+  { id: 'forest_path', width: 2.6, kind: 'path', points: [[-20, 8], [-42, 14], [-58, 22], [-78, 20], [-95, 15], [-120, 4], [-150, -20], [-176, -70], [-184, -112], [-188, -130]] },
   { id: 'bandit_trail', width: 1.8, kind: 'trail', points: [[170, -280], [128, -205], [70, -140], [26, -106], [3, -110]] },
   { id: 'field_path', width: 2.2, kind: 'path', points: [[4, 40], [30, 62], [52, 90]] },
 ];
@@ -145,10 +145,10 @@ export const CAVE_HILL = { x: -250, z: -130, radius: 58, height: 26, cliff: 14 }
 export const CAVE = {
   id: 'cave_crow',
   name: 'Cueva del Cuervo',
-  mouth: { x: -184, z: -130 },
+  mouth: { x: -190.5, z: -130 },
   path: [
-    { x: -184, z: -130, dy: 0, r: 2.8 },
-    { x: -194, z: -130.5, dy: -0.2, r: 2.6 },
+    { x: -190.5, z: -130, dy: 0, r: 2.9 },
+    { x: -197, z: -130.5, dy: -0.3, r: 2.6 },
     { x: -206, z: -131.5, dy: -1.0, r: 2.4 },
     { x: -218, z: -129, dy: -2.4, r: 2.3 },
     { x: -229, z: -125, dy: -3.6, r: 2.6 },
@@ -159,7 +159,7 @@ export const CAVE = {
     { x: -247, z: -148, dy: -5.4, r: 2.0 },
   ],
   /** Hueco del terreno sobre la boca (el túnel lo sustituye). */
-  hole: { x0: -202, x1: -182.5, z0: -133.4, z1: -127.1 },
+  hole: { x0: -203, x1: -189.8, z0: -133.4, z1: -127.1 },
 };
 
 export const BANDIT_CAMP = { id: 'bandit_camp', name: 'Campamento de Los Cuervos', x: 170, z: -280, radius: 22 };

@@ -79,7 +79,7 @@ export class Terrain {
     for (const w of wanted) {
       const k = this.key(w.cx, w.cz);
       keep.add(k);
-      const lod = w.d <= 1 ? 0 : w.d <= 3 ? 1 : 2;
+      const lod = w.d <= 1 ? 0 : w.d <= 2 ? 1 : 2;
       const needCollider = w.d <= 1;
       let c = this.chunks.get(k);
       if (!c) {
@@ -90,6 +90,8 @@ export class Terrain {
         this.buildMesh(c, lod);
         built++;
       }
+      // Solo los chunks cercanos proyectan sombra (el mapa de sombras cubre ~70 m).
+      if (c.mesh) c.mesh.castShadow = w.d <= 1;
       if (needCollider && !c.collider) this.buildCollider(c); // los colliders no esperan
       if (!needCollider && c.collider) {
         this.physics.removeCollider(c.collider);

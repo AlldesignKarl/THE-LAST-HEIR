@@ -101,20 +101,20 @@ export class UIManager {
   showBanner(text: string, sub: string, seconds: number): void {
     this.banner.innerHTML = `${text}<small>${sub}</small>`;
     this.banner.classList.add('show');
-    this.bannerT = seconds;
+    this.bannerT = performance.now() / 1000 + seconds;
   }
 
   showToast(head: string, text: string): void {
     this.toast.innerHTML = `<div class="h">${head}</div><div>${text}</div>`;
     this.toast.classList.add('show');
-    this.toastT = 5;
+    this.toastT = performance.now() / 1000 + 5;
   }
 
   /** Subtítulos (voces placeholder: los NPCs "hablan" en texto). */
   say(name: string, text: string, seconds = 4): void {
     this.subtitle.innerHTML = `<b>${name}:</b> ${text}`;
     this.subtitle.classList.add('show');
-    this.subtitleT = seconds;
+    this.subtitleT = performance.now() / 1000 + seconds;
   }
 
   fade(seconds: number, mid: () => void): void {
@@ -173,9 +173,11 @@ export class UIManager {
     this.crosshair.style.opacity = inGame ? '1' : '0';
     this.crosshair.classList.toggle('bow', !!g.combat?.aimingBow);
     // Temporizadores.
-    if (this.bannerT > 0) { this.bannerT -= dt; if (this.bannerT <= 0) this.banner.classList.remove('show'); }
-    if (this.toastT > 0) { this.toastT -= dt; if (this.toastT <= 0) this.toast.classList.remove('show'); }
-    if (this.subtitleT > 0) { this.subtitleT -= dt; if (this.subtitleT <= 0) this.subtitle.classList.remove('show'); }
+    // (Reloj real: independiente de la tasa de frames.)
+    const now = performance.now() / 1000;
+    if (this.bannerT > 0 && now > this.bannerT) { this.bannerT = 0; this.banner.classList.remove('show'); }
+    if (this.toastT > 0 && now > this.toastT) { this.toastT = 0; this.toast.classList.remove('show'); }
+    if (this.subtitleT > 0 && now > this.subtitleT) { this.subtitleT = 0; this.subtitle.classList.remove('show'); }
     this.damageT = Math.max(0, this.damageT - dt * 1.5);
     const lowHp = v.health < 25 ? 0.35 + Math.sin(performance.now() / 300) * 0.1 : 0;
     this.vignette.style.opacity = String(Math.max(this.damageT, lowHp));

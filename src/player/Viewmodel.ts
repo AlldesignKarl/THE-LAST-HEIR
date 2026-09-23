@@ -52,6 +52,7 @@ export class Viewmodel {
   private curL = { p: new THREE.Vector3(-0.3, -0.35, -0.45), r: new THREE.Vector3() };
   readonly torchTip = new THREE.Vector3();
   visible = true;
+  private flame: THREE.Sprite;
 
   constructor(private readonly g: Game) {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
@@ -71,6 +72,18 @@ export class Viewmodel {
     };
     mkArm(this.right, this.rightHand);
     mkArm(this.left, this.leftHand);
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const ctx = c.getContext('2d')!;
+    const grd = ctx.createRadialGradient(32, 40, 2, 32, 36, 30);
+    grd.addColorStop(0, 'rgba(255,245,200,1)');
+    grd.addColorStop(0.3, 'rgba(255,170,60,0.9)');
+    grd.addColorStop(0.7, 'rgba(200,60,10,0.35)');
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, 64, 64);
+    this.flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+    this.flame.scale.set(0.16, 0.24, 1);
   }
 
   /** Animación de "alcanzar" al recoger un objeto. */
@@ -109,7 +122,14 @@ export class Viewmodel {
     }
     if (off && !(main && itemDef(main).weapon === 'bow')) {
       const m = models.create(itemDef(off).model).object;
-      if (off === 'torch') { m.rotation.set(-0.5, 0, 0.2); m.position.set(0, 0.05, -0.05); }
+      if (off === 'torch') {
+        m.rotation.set(-0.35, 0, 0.15);
+        m.position.set(0, 0.02, -0.04);
+        m.scale.setScalar(0.7);
+        // Llama propia del viewmodel (se dibuja sobre la escena).
+        this.flame.position.set(0, 0.36, 0.02);
+        m.add(this.flame);
+      }
       else { m.rotation.set(0, Math.PI / 2, 0); m.position.set(0.05, 0.05, -0.1); }
       this.leftHand.add(m);
       this.offObj = m;
@@ -214,8 +234,11 @@ export class Viewmodel {
     const sd = env.sun.position.clone().sub(env.sun.target.position).normalize().transformDirection(mainCam.matrixWorldInverse);
     this.dir.position.copy(sd.multiplyScalar(5));
     const torchOn = g.equipment.torchLit && off === 'torch';
-    this.torchLight.intensity = torchOn ? 2.2 * (0.85 + Math.random() * 0.15) : 0;
-    this.torchLight.position.set(-0.3, 0.1, -0.5);
+    const fl = 0.85 + Math.random() * 0.15;
+    this.torchLight.intensity = torchOn ? 0.9 * fl : 0;
+    this.torchLight.position.set(-0.25, 0.25, -0.75);
+    this.flame.visible = torchOn;
+    this.flame.scale.set(0.15 * fl, 0.22 * (0.9 + Math.random() * 0.2), 1);
     // Dos fuegos más cercanos.
     const near = [...g.fires.fires.values()].filter((f) => f.lit && !f.hidden).map((f) => ({ f, d: f.pos.distanceTo(mainCam.position) })).sort((a, b) => a.d - b.d).slice(0, 2);
     this.fireLights.forEach((l, i) => {

@@ -31,10 +31,10 @@ export interface Fire {
 
 const LIGHT: Record<FireKind, { color: number; intensity: number; range: number; flicker: number; rate: number; size: number; spread: number }> = {
   torch: { color: 0xff8a3a, intensity: 55, range: 16, flicker: 0.5, rate: 14, size: 0.55, spread: 0.08 },
-  hearth: { color: 0xff7a30, intensity: 40, range: 11, flicker: 0.45, rate: 18, size: 0.8, spread: 0.35 },
+  hearth: { color: 0xff7a30, intensity: 16, range: 9, flicker: 0.45, rate: 18, size: 0.8, spread: 0.35 },
   campfire: { color: 0xff7a30, intensity: 90, range: 20, flicker: 0.5, rate: 28, size: 1.0, spread: 0.45 },
   forge: { color: 0xff5a20, intensity: 50, range: 12, flicker: 0.3, rate: 16, size: 0.7, spread: 0.4 },
-  candle: { color: 0xffb060, intensity: 6, range: 6, flicker: 0.25, rate: 3, size: 0.15, spread: 0.01 },
+  candle: { color: 0xffb060, intensity: 2.5, range: 5, flicker: 0.25, rate: 3, size: 0.15, spread: 0.01 },
   blaze: { color: 0xff6a20, intensity: 220, range: 30, flicker: 0.6, rate: 60, size: 2.2, spread: 2.2 },
 };
 

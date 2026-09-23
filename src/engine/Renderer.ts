@@ -9,9 +9,9 @@ export interface QualitySettings {
 }
 
 export const QUALITY_PRESETS: Record<'low' | 'medium' | 'high', QualitySettings> = {
-  low: { pixelRatio: 0.75, shadows: false, shadowMapSize: 1024, viewChunks: 4, grass: false },
-  medium: { pixelRatio: 1, shadows: true, shadowMapSize: 2048, viewChunks: 5, grass: true },
-  high: { pixelRatio: 1.5, shadows: true, shadowMapSize: 4096, viewChunks: 6, grass: true },
+  low: { pixelRatio: 0.75, shadows: false, shadowMapSize: 1024, viewChunks: 2, grass: false },
+  medium: { pixelRatio: 1, shadows: true, shadowMapSize: 2048, viewChunks: 3, grass: true },
+  high: { pixelRatio: 1.5, shadows: true, shadowMapSize: 4096, viewChunks: 4, grass: true },
 };
 
 /** Envoltura del WebGLRenderer: tonemapping cinematográfico, sombras, resize. */

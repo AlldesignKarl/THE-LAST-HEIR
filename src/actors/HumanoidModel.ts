@@ -8,6 +8,7 @@ import * as THREE from 'three';
 import type { MaterialLibrary } from '../engine/placeholder/Materials';
 import type { ModelLibrary } from '../engine/placeholder/Models';
 import { damp } from '../core/math';
+import { RigidSkin, characterMaterial } from '../engine/RigidSkin';
 
 export interface Appearance {
   skin: number;
@@ -29,17 +30,6 @@ export type AnimState =
 
 export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number }
 
-const skinMats = new Map<number, THREE.MeshStandardMaterial>();
-function colorMat(c: number, rough = 0.9, base?: THREE.MeshStandardMaterial): THREE.MeshStandardMaterial {
-  let m = skinMats.get(c);
-  if (!m) {
-    m = base ? base.clone() : new THREE.MeshStandardMaterial({ roughness: rough });
-    m.color.setHex(c);
-    skinMats.set(c, m);
-  }
-  return m;
-}
-
 const G = {
   capsule: new THREE.CapsuleGeometry(1, 1, 4, 8),
   sphere: new THREE.SphereGeometry(1, 12, 8),
@@ -47,30 +37,24 @@ const G = {
   cyl: new THREE.CylinderGeometry(1, 1, 1, 8),
 };
 
-function part(geo: THREE.BufferGeometry, mat: THREE.Material, sx: number, sy: number, sz: number, y = 0, x = 0, z = 0): THREE.Mesh {
-  const m = new THREE.Mesh(geo, mat);
-  m.scale.set(sx, sy, sz);
-  m.position.set(x, y, z);
-  m.castShadow = true;
-  return m;
-}
-
 export class HumanoidModel {
   readonly root = new THREE.Group();
-  private hips = new THREE.Group();
-  private spine = new THREE.Group();
-  private neck = new THREE.Group();
-  private head = new THREE.Group();
-  private shL = new THREE.Group();
-  private shR = new THREE.Group();
-  private elL = new THREE.Group();
-  private elR = new THREE.Group();
-  private hipL = new THREE.Group();
-  private hipR = new THREE.Group();
-  private knL = new THREE.Group();
-  private knR = new THREE.Group();
-  readonly handR = new THREE.Group();
-  readonly handL = new THREE.Group();
+  private hips!: THREE.Bone;
+  private spine!: THREE.Bone;
+  private neck!: THREE.Bone;
+  private head!: THREE.Bone;
+  private shL!: THREE.Bone;
+  private shR!: THREE.Bone;
+  private elL!: THREE.Bone;
+  private elR!: THREE.Bone;
+  private hipL!: THREE.Bone;
+  private hipR!: THREE.Bone;
+  private knL!: THREE.Bone;
+  private knR!: THREE.Bone;
+  handR!: THREE.Bone;
+  handL!: THREE.Bone;
+  /** Malla única (skinning rígido): 1 draw call por personaje. */
+  mesh!: THREE.SkinnedMesh;
   private weaponObj: THREE.Object3D | null = null;
   private offObj: THREE.Object3D | null = null;
   state: AnimState = 'idle';
@@ -88,62 +72,55 @@ export class HumanoidModel {
   weaponKind: string | null = null;
 
   constructor(readonly app: Appearance, mats: MaterialLibrary) {
-    const skin = colorMat(app.skin, 0.75);
-    const tunic = colorMat(app.tunic, 0.95, mats.get('cloth'));
-    const pants = colorMat(app.pants, 0.95, mats.get('cloth'));
-    const hair = colorMat(app.hair, 1);
-    const leather = mats.get('leather');
     const b = app.build;
-    this.root.add(this.hips);
-    this.hips.position.y = 0.94 * b;
+    const sk = new RigidSkin();
+    const skin = app.skin, tunic = app.tunic, pants = app.pants, hair = app.hair, leather = 0x4a3524, dark = 0x1a1410, iron = 0x6a6a6e;
+    this.hips = sk.bone(null, 0, 0.94 * b, 0);
+    this.spine = sk.bone(this.hips, 0, 0.08, 0);
+    this.neck = sk.bone(this.spine, 0, 0.6, 0);
+    this.head = sk.bone(this.neck, 0, 0.16, 0);
+    this.shL = sk.bone(this.spine, -0.23 * b, 0.5, 0);
+    this.shR = sk.bone(this.spine, 0.23 * b, 0.5, 0);
+    this.elL = sk.bone(this.shL, 0, -0.3, 0);
+    this.elR = sk.bone(this.shR, 0, -0.3, 0);
+    this.handL = sk.bone(this.elL, 0, -0.28, 0);
+    this.handR = sk.bone(this.elR, 0, -0.28, 0);
+    this.hipL = sk.bone(this.hips, -0.1 * b, -0.02, 0);
+    this.hipR = sk.bone(this.hips, 0.1 * b, -0.02, 0);
+    this.knL = sk.bone(this.hipL, 0, -0.46, 0);
+    this.knR = sk.bone(this.hipR, 0, -0.46, 0);
     // Torso.
-    this.hips.add(this.spine);
-    this.spine.position.y = 0.08;
-    const torso = part(G.capsule, tunic, 0.2 * b, 0.2, 0.13 * b, 0.28);
-    this.spine.add(torso);
-    this.spine.add(part(G.box, leather, 0.42 * b, 0.06, 0.28 * b, 0.04)); // cinturón
-    if (app.robe || app.female) this.hips.add(part(G.cyl, app.robe ? tunic : pants, 0.24 * b, 0.75, 0.18 * b, -0.36));
-    if (app.apron) this.spine.add(part(G.box, leather, 0.34, 0.7, 0.03, -0.05, 0, 0.14));
+    sk.part(this.spine, G.capsule, tunic, 0.2 * b, 0.2, 0.13 * b, 0, 0.28);
+    sk.part(this.spine, G.box, leather, 0.42 * b, 0.06, 0.28 * b, 0, 0.04);
+    if (app.robe || app.female) sk.part(this.hips, G.cyl, app.robe ? tunic : pants, 0.24 * b, 0.75, 0.18 * b, 0, -0.36);
+    if (app.apron) sk.part(this.spine, G.box, leather, 0.34, 0.7, 0.03, 0, -0.05, 0.14);
     // Cabeza.
-    this.spine.add(this.neck);
-    this.neck.position.y = 0.6;
-    this.neck.add(part(G.cyl, skin, 0.055, 0.12, 0.055, 0.03));
-    this.neck.add(this.head);
-    this.head.position.y = 0.16;
-    this.head.add(part(G.sphere, skin, 0.105, 0.125, 0.115, 0.02));
-    this.head.add(part(G.sphere, hair, 0.11, 0.07, 0.115, 0.08, 0, -0.01));
-    if (app.beard) this.head.add(part(G.sphere, hair, 0.08, 0.07, 0.06, -0.06, 0, 0.06));
-    this.head.add(part(G.sphere, colorMat(0x1a1410), 0.015, 0.015, 0.01, 0.03, -0.04, 0.105));
-    this.head.add(part(G.sphere, colorMat(0x1a1410), 0.015, 0.015, 0.01, 0.03, 0.04, 0.105));
-    this.head.add(part(G.sphere, skin, 0.018, 0.03, 0.025, 0.0, 0, 0.115));
-    if (app.hood) this.head.add(part(G.sphere, tunic, 0.125, 0.13, 0.13, 0.04, 0, -0.02));
+    sk.part(this.neck, G.cyl, skin, 0.055, 0.12, 0.055, 0, 0.03);
+    sk.part(this.head, G.sphere, skin, 0.105, 0.125, 0.115, 0, 0.02);
+    sk.part(this.head, G.sphere, hair, 0.11, 0.07, 0.115, 0, 0.08, -0.01);
+    if (app.beard) sk.part(this.head, G.sphere, hair, 0.08, 0.07, 0.06, 0, -0.06, 0.06);
+    sk.part(this.head, G.sphere, dark, 0.015, 0.015, 0.01, -0.04, 0.03, 0.105);
+    sk.part(this.head, G.sphere, dark, 0.015, 0.015, 0.01, 0.04, 0.03, 0.105);
+    sk.part(this.head, G.sphere, skin, 0.018, 0.03, 0.025, 0, 0.0, 0.115);
+    if (app.hood) sk.part(this.head, G.sphere, tunic, 0.125, 0.13, 0.13, 0, 0.04, -0.02);
     if (app.helmet) {
-      const iron = mats.get('iron');
-      this.head.add(part(G.sphere, iron, 0.12, 0.09, 0.125, 0.08));
-      this.head.add(part(G.box, iron, 0.02, 0.09, 0.02, 0.0, 0, 0.125));
+      sk.part(this.head, G.sphere, iron, 0.12, 0.09, 0.125, 0, 0.08);
+      sk.part(this.head, G.box, iron, 0.02, 0.09, 0.02, 0, 0.0, 0.125);
     }
     // Brazos.
-    for (const [sh, el, hand, side] of [[this.shL, this.elL, this.handL, -1], [this.shR, this.elR, this.handR, 1]] as const) {
-      this.spine.add(sh);
-      sh.position.set(side * 0.23 * b, 0.5, 0);
-      sh.add(part(G.capsule, tunic, 0.055, 0.13, 0.055, -0.14));
-      sh.add(el);
-      el.position.y = -0.3;
-      el.add(part(G.capsule, app.apron ? skin : tunic, 0.045, 0.12, 0.045, -0.13));
-      el.add(hand);
-      hand.position.y = -0.28;
-      hand.add(part(G.sphere, skin, 0.045, 0.05, 0.035));
+    for (const [sh, el, hand] of [[this.shL, this.elL, this.handL], [this.shR, this.elR, this.handR]] as const) {
+      sk.part(sh, G.capsule, tunic, 0.055, 0.13, 0.055, 0, -0.14);
+      sk.part(el, G.capsule, app.apron ? skin : tunic, 0.045, 0.12, 0.045, 0, -0.13);
+      sk.part(hand, G.sphere, skin, 0.045, 0.05, 0.035);
     }
     // Piernas.
-    for (const [hp, kn, side] of [[this.hipL, this.knL, -1], [this.hipR, this.knR, 1]] as const) {
-      this.hips.add(hp);
-      hp.position.set(side * 0.1 * b, -0.02, 0);
-      hp.add(part(G.capsule, pants, 0.075 * b, 0.2, 0.075 * b, -0.22));
-      hp.add(kn);
-      kn.position.y = -0.46;
-      kn.add(part(G.capsule, pants, 0.06, 0.18, 0.06, -0.2));
-      kn.add(part(G.box, leather, 0.1, 0.07, 0.2, -0.44, 0, 0.04));
+    for (const [hp, kn] of [[this.hipL, this.knL], [this.hipR, this.knR]] as const) {
+      sk.part(hp, G.capsule, pants, 0.075 * b, 0.2, 0.075 * b, 0, -0.22);
+      sk.part(kn, G.capsule, pants, 0.06, 0.18, 0.06, 0, -0.2);
+      sk.part(kn, G.box, leather, 0.1, 0.07, 0.2, 0, -0.44, 0.04);
     }
+    this.mesh = sk.build(this.hips, characterMaterial());
+    this.root.add(this.mesh);
     this.hitboxes = [
       { zone: 'head', pos: new THREE.Vector3(), r: 0.14 },
       { zone: 'torso', pos: new THREE.Vector3(), r: 0.24 },
@@ -154,7 +131,6 @@ export class HumanoidModel {
       { zone: 'leg', pos: new THREE.Vector3(), r: 0.12 },
     ];
     void mats;
-    void (null as unknown as ModelLibrary);
   }
 
   /** Coloca el arma en la mano derecha (modelo de ModelLibrary). */

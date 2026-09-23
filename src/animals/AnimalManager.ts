@@ -194,6 +194,9 @@ export class AnimalManager {
         this.moveTowards(a, dt);
       }
       a.model.speed = a.speed;
+      // Hitboxes en la posición lógica (la visual se interpola al renderizar).
+      a.model.root.position.copy(a.pos);
+      a.model.root.rotation.y = a.yaw;
       a.model.update(dt, near);
       a.hitboxesValid = near && a.alive;
       this.ensureCollider(a, near);

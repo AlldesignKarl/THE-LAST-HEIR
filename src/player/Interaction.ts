@@ -32,7 +32,7 @@ export interface FocusTarget {
   point?: THREE.Vector3;
 }
 
-const REACH = 2.7;
+const REACH = 3.0;
 const tmpF = new THREE.Vector3();
 const tmpE = new THREE.Vector3();
 

@@ -209,9 +209,10 @@ export class RaidSystem {
     const d = c.pos.distanceTo(g.player.pos);
     const lod = d < 60 ? 0 : d < 160 ? 1 : 2;
     c.lod = lod;
+    c.setShadow(d < 35);
     c.ensureCollider(g.physics, lod === 0 && c.alive);
     if (!c.alive) {
-      c.model.update(dt, false);
+      c.updateModel(dt, false);
       c.hitboxesValid = false;
       return;
     }
@@ -229,7 +230,7 @@ export class RaidSystem {
     if (r.task === 'burn' || r.task === 'loot' || r.task === 'bash') idle = 'work';
     if (r.role === 'archer' && r.task === 'fight') idle = 'aim';
     c.chooseAnim(speed, idle);
-    c.model.update(dt, lod === 0);
+    c.updateModel(dt, lod === 0);
     c.hitboxesValid = lod === 0;
     c.visible = lod < 2;
     this.updateTorch(c);

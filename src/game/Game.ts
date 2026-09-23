@@ -357,6 +357,9 @@ export class Game {
     this.player.frozen = this.vitals.dead;
     this.interaction.update(dt);
     this.combat.update(dt);
+    // Antes de mover: dentro de la cueva el jugador está legítimamente bajo el terreno.
+    const pp = this.player.pos;
+    this.player.underground = this.settlement.cave.depthAt(pp.x, pp.y, pp.z) > 0.001 || this.hf.isHole(pp.x, pp.z);
     this.player.update(dt);
     this.settlement.update(dt);
     this.npcs.update(dt);
@@ -527,7 +530,8 @@ export class Game {
     if (!l) this.lights.add({ id, pos: tip.clone(), color: new THREE.Color(0xff9a4a), intensity: 38, range: 16, flicker: 0.4, priority: 10, enabled: on });
     else { l.pos.copy(tip); l.enabled = on; }
     const em = this.particles.emitters.get(id);
-    if (!em) this.particles.addEmitter({ id, kind: 'fire', pos: tip.clone(), rate: 16, spread: 0.05, vel: new THREE.Vector3(0, 0.9, 0), sizeMul: 0.35, enabled: on });
+    // La llama se dibuja en el viewmodel; al mundo solo sale un hilo de humo.
+    if (!em) this.particles.addEmitter({ id, kind: 'smoke', pos: tip.clone(), rate: 2.5, spread: 0.05, vel: new THREE.Vector3(0, 0.8, 0), sizeMul: 0.35, enabled: on });
     else { em.pos.copy(tip); em.enabled = on; }
   }
 

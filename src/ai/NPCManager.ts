@@ -166,6 +166,7 @@ export class NPCManager {
       // LOD de simulación.
       const lod = d < 55 ? 0 : d < 150 ? 1 : 2;
       c.lod = lod;
+      c.setShadow(d < 35);
       const every = lod === 0 ? 1 : lod === 1 ? 6 : 30;
       const step = (this.tick + n.def.id.length) % every === 0;
       const prevHandle = c.collider?.handle;
@@ -175,7 +176,7 @@ export class NPCManager {
       if (c.collider && !g.interactables.forCollider(c.collider.handle)) this.registerTalk(n);
       if (!c.alive) {
         c.visible = lod < 2;
-        if (step) c.model.update(dt * every, false);
+        if (step) c.updateModel(dt * every, false);
         c.hitboxesValid = false;
         continue;
       }
@@ -188,7 +189,7 @@ export class NPCManager {
       if (c.arrived && n.state === 'routine' && !c.indoors) this.onArrive(n);
       c.chooseAnim(speed, n.talking ? 'talk' : n.state === 'shelter' ? 'cower' : n.idleAnim);
       c.visible = lod < 2;
-      c.model.update(sdt, lod === 0);
+      c.updateModel(sdt, lod === 0);
       c.hitboxesValid = lod === 0 && c.visible && !c.indoors;
       // Antorcha de noche al andar por fuera.
       c.setTorch(night && !c.indoors && (c.faction === 'guard' || speed > 0.3) && n.def.weapon !== 'bow');

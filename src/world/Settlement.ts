@@ -14,6 +14,7 @@ import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 import { colliderForShape } from '../items/WorldItems';
 import { worldBox } from '../engine/placeholder/Materials';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { Rng } from '../core/rng';
 import { toWorldXZ } from '../core/math';
 
@@ -80,6 +81,56 @@ export class Settlement {
     this.buildCaveContent();
     this.buildBanditCamp();
     this.buildPlaces();
+    this.batchStatics();
+  }
+
+  private staticObjs: THREE.Object3D[] = [];
+  /** Nº de lotes estáticos generados (métrica). */
+  staticBatches = 0;
+
+  /**
+   * Fusiona todo el mobiliario estático por material y celda de 48 m:
+   * cientos de objetos → unas pocas decenas de draw calls con culling.
+   */
+  private batchStatics(): void {
+    const CELL = 48;
+    const buckets = new Map<string, { mat: THREE.Material; geos: THREE.BufferGeometry[]; shadow: boolean }>();
+    for (const obj of this.staticObjs) {
+      obj.updateMatrixWorld(true);
+      obj.traverse((o) => {
+        const mesh = o as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        const mat = mesh.material as THREE.Material;
+        const wp = new THREE.Vector3().setFromMatrixPosition(mesh.matrixWorld);
+        const key = `${mat.uuid}:${Math.floor(wp.x / CELL)}:${Math.floor(wp.z / CELL)}`;
+        let b = buckets.get(key);
+        if (!b) { b = { mat, geos: [], shadow: false }; buckets.set(key, b); }
+        // Normalizar: no indexada y solo posición/normal/uv (requisito de mergeGeometries).
+        let g = mesh.geometry.index ? mesh.geometry.toNonIndexed() : mesh.geometry.clone();
+        g.applyMatrix4(mesh.matrixWorld);
+        for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+        if (!g.attributes.normal) g.computeVertexNormals();
+        if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+        g = g.index ? g.toNonIndexed() : g;
+        b.geos.push(g);
+        b.shadow ||= mesh.castShadow;
+      });
+    }
+    for (const b of buckets.values()) {
+      const merged = mergeGeometries(b.geos);
+      if (!merged) {
+        console.error('[Settlement] no se pudo fusionar un lote estático');
+        continue;
+      }
+      merged.computeBoundingSphere();
+      const mesh = new THREE.Mesh(merged, b.mat);
+      mesh.castShadow = b.shadow;
+      mesh.receiveShadow = true;
+      mesh.matrixAutoUpdate = false;
+      this.group.add(mesh);
+      this.staticBatches++;
+    }
+    this.staticObjs = [];
   }
 
   /** Hook para el sistema de NPCs: ¿hay alguien en casa? */
@@ -99,9 +150,9 @@ export class Settlement {
     const m = this.g.models.create(model);
     m.object.position.set(x, y, z);
     m.object.rotation.y = rotY;
-    m.object.matrixAutoUpdate = false;
-    m.object.updateMatrix();
-    this.group.add(m.object);
+    m.object.updateMatrixWorld(true);
+    // Se fusiona con el resto del mobiliario estático al final (batching).
+    this.staticObjs.push(m.object);
     const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY);
     const body = this.g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z).setRotation(q));
     const col = this.g.physics.world.createCollider(colliderForShape(m.shape).setCollisionGroups(groups(GROUP.STATIC, ALL)), body);
@@ -300,7 +351,7 @@ export class Settlement {
     const marker = new THREE.Mesh(new THREE.RingGeometry(this.woodDropZone.r - 0.15, this.woodDropZone.r, 32), new THREE.MeshStandardMaterial({ color: 0x5a4a30, roughness: 1 }));
     marker.rotation.x = -Math.PI / 2;
     marker.position.set(dz.x, this.woodDropZone.y + 0.03, dz.z);
-    this.group.add(marker);
+    this.staticObjs.push(marker);
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.4;
       const px = dz.x + Math.cos(a) * this.woodDropZone.r, pz = dz.z + Math.sin(a) * this.woodDropZone.r;
@@ -390,7 +441,7 @@ export class Settlement {
       const torch = g.models.create('wall_torch');
       torch.object.position.copy(p);
       torch.object.rotation.y = b.rotY;
-      this.group.add(torch.object);
+      this.staticObjs.push(torch.object);
       g.fires.add({ id: `walltorch_${id}`, kind: 'torch', pos: p.clone().add(new THREE.Vector3(0, 0.3, 0)).add(new THREE.Vector3(Math.sin(b.rotY), 0, Math.cos(b.rotY)).multiplyScalar(0.1)), policy: 'night', canCook: false, heat: 4 });
     }
   }
@@ -608,14 +659,14 @@ export class Settlement {
     roof.position.set(x, y + H + 2.9, z);
     roof.rotation.y = Math.PI / 4;
     roof.castShadow = true;
-    this.group.add(roof);
+    this.staticObjs.push(roof);
     // Escalera: interactuable (subir/bajar).
     const lx = x + 1.0, lz = z + 1.55;
     const ladder = g.models.create('ladder');
     ladder.object.position.set(lx, y + H / 2, lz);
     ladder.object.scale.set(1, H / 8, 1);
     ladder.object.rotation.x = -0.08;
-    this.group.add(ladder.object);
+    this.staticObjs.push(ladder.object);
     const body = g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(lx, y + H / 2, lz));
     const col = g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(0.3, H / 2, 0.06).setCollisionGroups(groups(GROUP.STATIC, ALL)), body);
     this.towerTop.set(lx - 0.4, y + H + 0.12, lz - 0.9);
@@ -635,7 +686,7 @@ export class Settlement {
     m.position.set(x, y, z);
     m.rotation.y = rotY;
     m.castShadow = m.receiveShadow = true;
-    this.group.add(m);
+    this.staticObjs.push(m);
     const col = this.g.physics.world.createCollider(
       RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setTranslation(x, y, z)
         .setRotation(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rotY))
@@ -676,7 +727,7 @@ export class Settlement {
           const x = f.x + w.x, z = f.z + w.z;
           const post = new THREE.Mesh(worldBox(0.12, 1.1, 0.12, 1), g.materials.get('beam'));
           post.position.set(x, this.ground(x, z) + 0.45, z);
-          this.group.add(post);
+          this.staticObjs.push(post);
         }
       }
     }
@@ -704,7 +755,7 @@ export class Settlement {
         deck.position.copy(mid).y -= 0.08;
         deck.quaternion.copy(q);
         deck.castShadow = deck.receiveShadow = true;
-        this.group.add(deck);
+        this.staticObjs.push(deck);
         const col = g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(b.width / 2, 0.08, len / 2 + 0.05).setTranslation(mid.x, mid.y - 0.08, mid.z).setRotation(q).setCollisionGroups(groups(GROUP.STATIC, ALL)));
         g.physics.tag(col, { kind: 'static', id: 'bridge' });
         for (const s of [-1, 1]) {
@@ -712,11 +763,11 @@ export class Settlement {
           const side = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot)).multiplyScalar(s * (b.width / 2 - 0.05));
           rail.position.copy(mid).add(side).y += 0.85;
           rail.quaternion.copy(q);
-          this.group.add(rail);
+          this.staticObjs.push(rail);
           for (const p of [p0, p1]) {
             const post = new THREE.Mesh(worldBox(0.12, 1.0, 0.12, 1), g.materials.get('beam'));
             post.position.copy(p).add(side).y += 0.4;
-            this.group.add(post);
+            this.staticObjs.push(post);
           }
         }
       }
@@ -727,7 +778,7 @@ export class Settlement {
           const side = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot)).multiplyScalar(s * (b.width / 2 - 0.2));
           const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 3, 7), g.materials.get('bark'));
           pile.position.copy(p).add(side).setY(top - 1.6);
-          this.group.add(pile);
+          this.staticObjs.push(pile);
         }
       }
     }
@@ -749,7 +800,7 @@ export class Settlement {
       b.object.position.set(x, y, z);
       b.object.scale.set(s, s * 0.8, s);
       b.object.rotation.set(rng.range(0, 3), rng.range(0, 3), 0);
-      this.group.add(b.object);
+      this.staticObjs.push(b.object);
       if (dx > -8) {
         const col = g.physics.world.createCollider(RAPIER.ColliderDesc.ball(s * 0.8).setTranslation(x, y, z).setCollisionGroups(groups(GROUP.STATIC, ALL)));
         g.physics.tag(col, { kind: 'static', id: 'boulder' });
@@ -782,7 +833,7 @@ export class Settlement {
       const bone = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.5, 5), g.materials.get('paper'));
       bone.position.set(x, this.ground(x, z) + 0.03, z);
       bone.rotation.set(Math.PI / 2, rng.range(0, 6), 0);
-      this.group.add(bone);
+      this.staticObjs.push(bone);
     }
   }
 
@@ -820,7 +871,7 @@ export class Settlement {
       const s = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 2.4, 6), g.materials.get('bark'));
       s.position.set(x, this.ground(x, z) + 1, z);
       s.rotation.z = (rng.next() - 0.5) * 0.2;
-      this.group.add(s);
+      this.staticObjs.push(s);
     }
   }
 

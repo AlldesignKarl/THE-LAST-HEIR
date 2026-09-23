@@ -121,6 +121,14 @@ export class Character implements Actor {
     this.model.setWeapon(this.models, modelId, w);
   }
 
+  private shadowOn = true;
+  /** Sombras solo de cerca (LOD de sombras). */
+  setShadow(on: boolean): void {
+    if (on === this.shadowOn) return;
+    this.shadowOn = on;
+    this.model.root.traverse((o) => { if ((o as THREE.Mesh).isMesh) (o as THREE.Mesh).castShadow = on; });
+  }
+
   setTorch(on: boolean): void {
     if (on === this.hasTorch) return;
     this.hasTorch = on;
@@ -380,6 +388,17 @@ export class Character implements Actor {
     if (this.model.state === 'hit' && this.lastHitT < 0.3 && s !== 'windup') s = 'hit';
     this.model.speed = speed;
     this.model.setState(s);
+  }
+
+  /**
+   * Anima el modelo en la posición LÓGICA (no la interpolada) para que las
+   * hitboxes coincidan con la simulación de paso fijo.
+   */
+  updateModel(dt: number, full: boolean): void {
+    const r = this.model.root;
+    r.position.copy(this.pos);
+    r.rotation.y = this.yaw;
+    this.model.update(dt, full);
   }
 
   /** Sincroniza la malla (interpolada) y el collider. */

@@ -1,9 +1,11 @@
 /**
- * PLACEHOLDER · Cuadrúpedo procedural (ciervo, lobo) con marcha animada.
+ * PLACEHOLDER · Cuadrúpedo procedural (ciervo, lobo) con esqueleto rígido
+ * (1 draw call) y marcha animada.
  */
 import * as THREE from 'three';
 import type { Hitbox } from './HumanoidModel';
 import { damp } from '../core/math';
+import { RigidSkin, characterMaterial } from '../engine/RigidSkin';
 
 export interface AnimalLook {
   body: number;
@@ -16,80 +18,61 @@ export interface AnimalLook {
 }
 
 const G = { sphere: new THREE.SphereGeometry(1, 12, 8), cyl: new THREE.CylinderGeometry(1, 1, 1, 7), cone: new THREE.ConeGeometry(1, 1, 6) };
-const mats = new Map<number, THREE.MeshStandardMaterial>();
-const mat = (c: number) => { let m = mats.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.95 }); mats.set(c, m); } return m; };
-
-function mesh(g: THREE.BufferGeometry, m: THREE.Material, sx: number, sy: number, sz: number, x = 0, y = 0, z = 0): THREE.Mesh {
-  const o = new THREE.Mesh(g, m);
-  o.scale.set(sx, sy, sz);
-  o.position.set(x, y, z);
-  o.castShadow = true;
-  return o;
-}
 
 export class AnimalModel {
   readonly root = new THREE.Group();
-  private body = new THREE.Group();
-  private neck = new THREE.Group();
-  private head = new THREE.Group();
-  private legs: { hip: THREE.Group; knee: THREE.Group; front: boolean; side: number }[] = [];
-  private tail = new THREE.Group();
+  private body: THREE.Bone;
+  private neck: THREE.Bone;
+  private head: THREE.Bone;
+  private legs: { hip: THREE.Bone; knee: THREE.Bone; front: boolean; side: number }[] = [];
+  private tail: THREE.Bone;
   private phase = Math.random() * 6;
   speed = 0;
   state: 'idle' | 'graze' | 'alert' | 'walk' | 'run' | 'attack' | 'dead' | 'howl' = 'idle';
   private deadT = 0;
   private stT = 0;
   readonly hitboxes: Hitbox[];
+  readonly mesh: THREE.SkinnedMesh;
 
   constructor(readonly look: AnimalLook) {
     const s = look.size;
-    const b = mat(look.body), belly = mat(look.belly), dark = mat(0x1a1612);
-    this.root.scale.setScalar(s);
-    this.root.add(this.body);
-    this.body.position.y = look.legLen + 0.25;
-    this.body.add(mesh(G.sphere, b, 0.28, 0.27, 0.62));
-    this.body.add(mesh(G.sphere, belly, 0.22, 0.18, 0.5, 0, -0.1, 0));
-    // Cuello y cabeza.
-    this.body.add(this.neck);
-    this.neck.position.set(0, 0.12, 0.5);
+    const b = look.body, belly = look.belly, dark = 0x1a1612, antler = 0x8a7a60;
+    const sk = new RigidSkin();
+    this.body = sk.bone(null, 0, look.legLen + 0.25, 0);
+    this.neck = sk.bone(this.body, 0, 0.12, 0.5);
     this.neck.rotation.x = look.wolf ? -0.9 : -0.5;
-    this.neck.add(mesh(G.cyl, b, 0.1, look.neckLen, 0.12, 0, look.neckLen / 2, 0));
-    this.neck.add(this.head);
-    this.head.position.y = look.neckLen;
+    this.head = sk.bone(this.neck, 0, look.neckLen, 0);
     this.head.rotation.x = look.wolf ? 0.9 : 0.6;
-    this.head.add(mesh(G.sphere, b, 0.12, 0.12, 0.16, 0, 0, 0.03));
-    this.head.add(mesh(G.cone, b, 0.08, 0.26, 0.08, 0, -0.02, 0.2).rotateX(Math.PI / 2));
-    this.head.add(mesh(G.sphere, dark, 0.025, 0.025, 0.025, 0, 0.0, 0.33));
+    this.tail = sk.bone(this.body, 0, 0.1, -0.6);
+    this.tail.rotation.x = look.wolf ? 2.3 : -0.4;
+    sk.part(this.body, G.sphere, b, 0.28, 0.27, 0.62);
+    sk.part(this.body, G.sphere, belly, 0.22, 0.18, 0.5, 0, -0.1, 0);
+    sk.part(this.neck, G.cyl, b, 0.1, look.neckLen, 0.12, 0, look.neckLen / 2, 0);
+    sk.part(this.head, G.sphere, b, 0.12, 0.12, 0.16, 0, 0, 0.03);
+    sk.part(this.head, G.cone, b, 0.08, 0.26, 0.08, 0, -0.02, 0.2, Math.PI / 2);
+    sk.part(this.head, G.sphere, dark, 0.025, 0.025, 0.025, 0, 0, 0.33);
     for (const sx of [-1, 1]) {
-      this.head.add(mesh(G.cone, b, 0.04, 0.12, 0.02, sx * 0.07, 0.13, -0.02));
-      this.head.add(mesh(G.sphere, dark, 0.018, 0.018, 0.018, sx * 0.065, 0.04, 0.12));
+      sk.part(this.head, G.cone, b, 0.04, 0.12, 0.02, sx * 0.07, 0.13, -0.02);
+      sk.part(this.head, G.sphere, dark, 0.018, 0.018, 0.018, sx * 0.065, 0.04, 0.12);
       if (look.antlers) {
-        const a = mesh(G.cyl, mat(0x8a7a60), 0.015, 0.35, 0.015, sx * 0.08, 0.28, -0.04);
-        a.rotation.z = -sx * 0.4;
-        this.head.add(a);
-        const t = mesh(G.cyl, mat(0x8a7a60), 0.012, 0.18, 0.012, sx * 0.18, 0.38, 0.04);
-        t.rotation.set(0.6, 0, -sx * 0.9);
-        this.head.add(t);
+        sk.part(this.head, G.cyl, antler, 0.015, 0.35, 0.015, sx * 0.08, 0.28, -0.04, 0, 0, -sx * 0.4);
+        sk.part(this.head, G.cyl, antler, 0.012, 0.18, 0.012, sx * 0.18, 0.38, 0.04, 0.6, 0, -sx * 0.9);
       }
     }
-    // Patas.
     for (const [front, side] of [[true, -1], [true, 1], [false, -1], [false, 1]] as const) {
-      const hip = new THREE.Group();
-      hip.position.set(side * 0.14, -0.05, front ? 0.38 : -0.4);
       const up = look.legLen * 0.55, lo = look.legLen * 0.55;
-      hip.add(mesh(G.cyl, b, 0.06, up, 0.07, 0, -up / 2, 0));
-      const knee = new THREE.Group();
-      knee.position.y = -up;
-      knee.add(mesh(G.cyl, look.wolf ? b : belly, 0.035, lo, 0.035, 0, -lo / 2, 0));
-      knee.add(mesh(G.sphere, dark, 0.04, 0.03, 0.05, 0, -lo, 0.02));
-      hip.add(knee);
-      this.body.add(hip);
+      const hip = sk.bone(this.body, side * 0.14, -0.05, front ? 0.38 : -0.4);
+      const knee = sk.bone(hip, 0, -up, 0);
+      sk.part(hip, G.cyl, b, 0.06, up, 0.07, 0, -up / 2, 0);
+      sk.part(knee, G.cyl, look.wolf ? b : belly, 0.035, lo, 0.035, 0, -lo / 2, 0);
+      sk.part(knee, G.sphere, dark, 0.04, 0.03, 0.05, 0, -lo, 0.02);
       this.legs.push({ hip, knee, front, side });
     }
-    this.body.add(this.tail);
-    this.tail.position.set(0, 0.1, -0.6);
-    this.tail.add(mesh(look.wolf ? G.cone : G.sphere, look.wolf ? b : mat(0xe8e0d0), look.wolf ? 0.07 : 0.06, look.wolf ? 0.4 : 0.08, look.wolf ? 0.07 : 0.05, 0, look.wolf ? -0.18 : 0, 0));
-    this.tail.rotation.x = look.wolf ? 2.3 : -0.4;
+    if (look.wolf) sk.part(this.tail, G.cone, b, 0.07, 0.4, 0.07, 0, -0.18, 0);
+    else sk.part(this.tail, G.sphere, 0xe8e0d0, 0.06, 0.08, 0.05);
+    this.mesh = sk.build(this.body, characterMaterial());
+    this.root.add(this.mesh);
+    this.root.scale.setScalar(s);
     this.hitboxes = [
       { zone: 'head', pos: new THREE.Vector3(), r: 0.16 * s },
       { zone: 'torso', pos: new THREE.Vector3(), r: 0.3 * s },
