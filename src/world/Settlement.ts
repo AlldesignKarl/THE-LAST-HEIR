@@ -206,7 +206,7 @@ export class Settlement {
     const bedCol = this.placeStatic('bed', bedP.x, fy + 0.3, bedP.z, r, 'hut');
     g.interactables.register(bedCol.handle, {
       id: 'bed_player', kind: 'bed', pos: bedP,
-      label: () => 'Dormir (hasta el alba) · Mantén E: descansar 1 h',
+      label: () => 'Cama · dormir o descansar',
       interact: (game) => game.actions.sleep(),
     });
     const chestP = this.inB(hut, 1.95, 0.3, -1.65);

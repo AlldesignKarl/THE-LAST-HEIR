@@ -217,6 +217,8 @@ export class UIManager {
   handleKeys(): void {
     const inp = this.g.input;
     if (inp.consume('pause')) {
+      // Esc también suelta el pointer lock (que abre la pausa): no cerrarla en el mismo gesto.
+      if (this.current === 'pause' && performance.now() - this.pauseOpenedAt < 400) return;
       if (this.dialogueOpen) this.closeDialogue();
       else if (this.current === 'menu' || this.current === 'death') { /* nada */ }
       else if (this.current) this.close();
@@ -263,7 +265,10 @@ export class UIManager {
 
   // ------------------------------------------------------------ pausa, guardar, cargar
 
+  private pauseOpenedAt = 0;
+
   openPause(): void {
+    this.pauseOpenedAt = performance.now();
     this.show('pause', (el) => {
       const p = h('div', 'panel', '<h2>Pausa</h2>');
       const mk = (t: string, fn: () => void) => { const b = h('button', 'btn', t); b.onclick = fn; p.append(b); };
