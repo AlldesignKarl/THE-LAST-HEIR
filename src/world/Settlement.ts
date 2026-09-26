@@ -79,6 +79,7 @@ export class Settlement {
     this.buildBridges();
     this.buildHarbor();
     this.buildPlotStart();
+    this.buildIslands();
     this.cave = new Cave(g.hf, g.physics, g.renderer.scene, g.materials);
     this.buildCaveContent();
     this.buildBanditCamp();
@@ -937,6 +938,140 @@ export class Settlement {
     hull.position.set(bx, this.ground(bx, -2) + 0.62, -2);
     hull.rotation.set(Math.PI, 0.6, 0);
     this.staticObjs.push(hull);
+  }
+
+  // ------------------------------------------------------------ islas
+
+  /** Punto de una isla, en la ladera que mira al pueblo, a la altura dada. */
+  private islandSpot(isl: { x: number; z: number; r: number }, minH: number, angle: number): { x: number; z: number; y: number } {
+    let best = { x: isl.x, z: isl.z, y: this.ground(isl.x, isl.z) };
+    for (let r = 0; r < isl.r; r += 1) {
+      const x = isl.x + Math.cos(angle) * r, z = isl.z + Math.sin(angle) * r;
+      const y = this.ground(x, z);
+      if (y < minH) break;
+      best = { x, z, y };
+    }
+    return best;
+  }
+
+  private buildIslands(): void {
+    const g = this.g;
+    const [gav, pen, nau] = SEA.islands;
+    const L = SEA.level;
+    const box = (w: number, h: number, d: number, x: number, y: number, z: number, ry: number, mat: 'stoneWall' | 'roughWood' | 'planks', collide = true) => {
+      const m = new THREE.Mesh(worldBox(w, h, d, 2), g.materials.get(mat));
+      m.position.set(x, y, z);
+      m.rotation.y = ry;
+      m.castShadow = m.receiveShadow = true;
+      this.staticObjs.push(m);
+      if (collide) {
+        const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+        const body = g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x, y, z).setRotation(q));
+        const col = g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(w / 2, h / 2, d / 2).setCollisionGroups(groups(GROUP.STATIC, ALL)), body);
+        g.physics.tag(col, { kind: 'static', id: 'ruin' });
+        return col;
+      }
+      return null;
+    };
+    const rng = new Rng(909);
+    // ---- Ermita en ruinas (Isla de las Gaviotas), en la ladera oeste.
+    {
+      const s = this.islandSpot(gav, L + 5, Math.PI);
+      const ry = 0.2;
+      const W = 6, D = 9;
+      const loc = (lx: number, lz: number) => { const w = toWorldXZ(lx, lz, ry); return { x: s.x + w.x, z: s.z + w.z }; };
+      const base = s.y - 0.2;
+      // Muros desmochados: tramos de altura irregular.
+      const seg = (lx0: number, lz0: number, lx1: number, lz1: number) => {
+        const n = Math.round(Math.hypot(lx1 - lx0, lz1 - lz0) / 1.5);
+        for (let i = 0; i < n; i++) {
+          if (rng.next() < 0.18) continue; // hueco derrumbado
+          const t = (i + 0.5) / n;
+          const p = loc(lx0 + (lx1 - lx0) * t, lz0 + (lz1 - lz0) * t);
+          const h = rng.range(0.8, 3.6);
+          const along = Math.abs(lx1 - lx0) > Math.abs(lz1 - lz0);
+          box(along ? 1.52 : 0.6, h, along ? 0.6 : 1.52, p.x, base + h / 2, p.z, ry, 'stoneWall');
+        }
+      };
+      seg(-W / 2, -D / 2, W / 2, -D / 2); seg(-W / 2, D / 2, -0.8, D / 2); seg(0.8, D / 2, W / 2, D / 2);
+      seg(-W / 2, -D / 2, -W / 2, D / 2); seg(W / 2, -D / 2, W / 2, D / 2);
+      for (let i = 0; i < 6; i++) { const p = loc(rng.range(-W, W), rng.range(-D, D)); box(0.6, 0.45, 0.7, p.x, this.ground(p.x, p.z) + 0.2, p.z, rng.range(0, 3), 'stoneWall', false); }
+      const alt = loc(0, -D / 2 + 1.2);
+      const altCol = box(1.6, 1.0, 0.8, alt.x, base + 0.5, alt.z, ry, 'stoneWall')!;
+      g.interactables.register(altCol.handle, {
+        id: 'chapel_slab', kind: 'read', pos: new THREE.Vector3(alt.x, base + 1, alt.z),
+        label: () => 'Examinar la losa del altar',
+        interact: (game) => { game.flags.set('found_chapel'); game.actions.read('chapel_slab'); },
+      });
+      const ch = loc(2, -D / 2 + 1.2);
+      const chest = this.placeStatic('chest', ch.x, base + 0.3, ch.z, ry, 'isle');
+      g.containers.create('chapel_chest', 'Arca de la ermita', null, [{ id: 'candle_item', count: 0 }, { id: 'herbs', count: 3 }, { id: 'silver_coin', count: 1 }].filter((x) => x.count > 0), 12);
+      g.interactables.register(chest.handle, { id: 'chapel_chest', kind: 'container', pos: new THREE.Vector3(ch.x, base + 0.5, ch.z), label: () => 'Abrir el arca', interact: (game) => game.ui.openContainer('chapel_chest') });
+      const c = loc(0, 1);
+      this.places.set('chapel_isle', { id: 'chapel_isle', x: c.x, y: base, z: c.z, yaw: 0 });
+    }
+    // ---- Restos de la coca (Islote del Náufrago).
+    {
+      const s = this.islandSpot(nau, L + 0.6, Math.PI * 0.8);
+      const hull = g.models.create('rowboat').object;
+      hull.scale.set(3.2, 2.6, 2.8);
+      hull.position.set(s.x, s.y - 0.4, s.z);
+      hull.rotation.set(0.35, 1.1, 0.25);
+      this.staticObjs.push(hull);
+      const hq = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 1.1 - Math.PI / 2, 0));
+      const hb = g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(s.x, s.y + 0.4, s.z).setRotation(hq));
+      g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(1.8, 0.9, 6).setCollisionGroups(groups(GROUP.STATIC, ALL)), hb);
+      const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.22, 7, 8), g.materials.get('roughWood'));
+      mast.position.set(s.x + 3, s.y + 1.2, s.z - 2);
+      mast.rotation.set(1.2, 0, 0.4);
+      mast.castShadow = true;
+      this.staticObjs.push(mast);
+      for (let i = 0; i < 5; i++) {
+        const x = s.x + rng.range(-6, 6), z = s.z + rng.range(-6, 6);
+        const k = rng.pick(['crate', 'barrel']);
+        this.placeStatic(k, x, this.ground(x, z) + (k === 'crate' ? 0.3 : 0.45), z, rng.range(0, 6), 'wreck');
+      }
+      const cx = s.x - 2.5, cz = s.z + 2;
+      const chest = this.placeStatic('chest', cx, this.ground(cx, cz) + 0.3, cz, 0.7, 'wreck');
+      g.containers.create('wreck_chest', 'Caja del maestre', null, [{ id: 'silver_coin', count: 3 }, { id: 'wine', count: 2 }, { id: 'rope_item', count: 0 }].filter((x) => x.count > 0), 35);
+      g.interactables.register(chest.handle, {
+        id: 'wreck_chest', kind: 'container', pos: new THREE.Vector3(cx, this.ground(cx, cz) + 0.5, cz), label: () => 'Registrar la caja del maestre',
+        interact: (game) => { game.flags.set('found_wreck'); if (!game.flags.has('read_wreck_log')) { game.flags.set('read_wreck_log'); game.actions.read('wreck_log'); } else game.ui.openContainer('wreck_chest'); },
+      });
+      this.places.set('wreck_isle', { id: 'wreck_isle', x: cx, y: this.ground(cx, cz), z: cz, yaw: 0 });
+    }
+    // ---- Cueva del Peñón: un abrigo entre peñascos en la cara oeste.
+    {
+      const s = this.islandSpot(pen, L + 2.5, Math.PI * 1.05);
+      const ang = Math.PI * 1.05;
+      const ry = -ang + Math.PI / 2;
+      const loc = (lx: number, lz: number) => { const w = toWorldXZ(lx, lz, ry); return { x: s.x + w.x, z: s.z + w.z }; };
+      const base = s.y;
+      // Arco de roca y paredes del abrigo.
+      for (const [lx, lz, w, h, d] of [[-2.2, 0, 1.4, 3.6, 5], [2.2, 0, 1.4, 3.6, 5], [0, -2.4, 5.8, 3.6, 1.2], [0, 0.2, 5.8, 1.2, 5.6]] as const) {
+        const p = loc(lx, lz);
+        const y = lz === 0.2 ? base + 3.6 : base + h / 2 - 0.3;
+        const m = new THREE.Mesh(new THREE.DodecahedronGeometry(1, 1), g.materials.get('rock'));
+        m.scale.set(w / 1.6, h / 1.6, d / 1.6);
+        m.position.set(p.x, y, p.z);
+        m.rotation.y = ry;
+        m.castShadow = m.receiveShadow = true;
+        this.staticObjs.push(m);
+        const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), ry);
+        const body = g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(p.x, y, p.z).setRotation(q));
+        g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(w * 0.42, h * 0.45, d * 0.42).setCollisionGroups(groups(GROUP.STATIC, ALL)), body);
+      }
+      const cpos = loc(0, -1.2);
+      const chest = this.placeStatic('chest', cpos.x, this.ground(cpos.x, cpos.z) + 0.3, cpos.z, ry, 'penon');
+      g.containers.create('penon_chest', 'Cofre envuelto en hule', null, [{ id: 'olmedo_key', count: 1 }, { id: 'silver_coin', count: 2 }], 0);
+      g.interactables.register(chest.handle, {
+        id: 'penon_chest', kind: 'container', pos: new THREE.Vector3(cpos.x, base + 0.5, cpos.z), label: () => 'Abrir el cofre envuelto en hule',
+        interact: (game) => { game.flags.set('found_penon'); if (!game.flags.has('read_penon_note')) { game.flags.set('read_penon_note'); game.actions.read('penon_note'); } else game.ui.openContainer('penon_chest'); },
+      });
+      const torch = loc(1.4, -1.8);
+      g.fires.add({ id: 'penon_candle', kind: 'candle', pos: new THREE.Vector3(torch.x, base + 0.9, torch.z), policy: 'night', canCook: false, heat: 0 });
+      this.places.set('penon_cave', { id: 'penon_cave', x: cpos.x, y: base, z: cpos.z, yaw: 0 });
+    }
   }
 
   // ------------------------------------------------------------ parcela del jugador

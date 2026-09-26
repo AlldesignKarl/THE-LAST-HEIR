@@ -187,7 +187,7 @@ export class Actions {
       g.equipment.validate();
       return;
     }
-    if (d.weapon || d.offhand || d.armor) {
+    if (d.weapon || d.offhand || d.armor || d.handTool) {
       g.equipment.equip(id);
       g.bus.emit('sfx', { id: 'equip' });
       return;

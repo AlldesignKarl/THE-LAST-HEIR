@@ -59,4 +59,35 @@ export const DOCUMENTS: Record<string, DocumentDef> = {
     ],
     signature: 'Por mandado del conde, su mayordomo — sello de cera negra',
   },
+  chapel_slab: {
+    id: 'chapel_slab',
+    title: 'Losa de la ermita',
+    style: 'official',
+    body: [
+      'Bajo el polvo y los excrementos de gaviota, una losa labrada: una torre y, a su lado, un olmo. Las mismas figuras de la ficha de tu padre.',
+      'Alrededor, en letra gótica gastada: «AQVI VELA LA CASA DE OLMEDO · LA OTRA MITAD DUERME DONDE LA PEÑA SE BEBE EL MAR».',
+      'Alguien ha raspado hace poco el musgo de las letras. Hay marcas de cuchillo recientes en el borde, como si hubieran intentado levantarla.',
+    ],
+  },
+  wreck_log: {
+    id: 'wreck_log',
+    title: 'Cuaderno del maestre (empapado)',
+    style: 'journal',
+    body: [
+      '...salimos de Almenara con plata del conde para pagar a la guarnición de Peñaseca. El piloto decía que el levante no...',
+      '...perdimos el timón frente al islote. Los hombres quieren abandonar la coca. Yo me quedo con la caja...',
+      'La última línea está escrita con otra mano: «La caja ya no está. R. V.»',
+    ],
+  },
+  penon_note: {
+    id: 'penon_note',
+    title: 'Nota envuelta en hule',
+    style: 'letter',
+    body: [
+      'A quien la halle, y ojalá sea Martín:',
+      'Tu padre y yo trajimos aquí la mitad de lo que buscaba. La otra la dejó en tierra, en sitio que solo él conoce. Dejo con esta nota la llave; sin la otra mitad no abre nada.',
+      'Si el cura pregunta por mí, dile que me llevó el mar. No es mentira del todo.',
+    ],
+    signature: 'Lope, marinero de Robledo',
+  },
 };

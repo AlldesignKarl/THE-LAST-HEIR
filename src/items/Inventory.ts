@@ -132,6 +132,13 @@ export class Equipment {
       this.autoQuick(id);
       return 'main';
     }
+    if (d.handTool) {
+      this.slots.main = id;
+      this.slots.off = null; // a dos manos
+      this.torchLit = false;
+      this.autoQuick(id);
+      return 'main';
+    }
     if (d.offhand) {
       const main = this.slots.main ? itemDef(this.slots.main) : null;
       if (main && (main.weapon === 'bow' || main.weapon === 'spear')) this.slots.main = null;

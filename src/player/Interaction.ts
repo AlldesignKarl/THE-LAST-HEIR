@@ -113,14 +113,18 @@ export class Interaction {
       if ((tag?.kind === 'terrain') && hit.toi <= REACH + 0.5) {
         const lvl = g.hf.waterLevelAt(hit.point.x, hit.point.z);
         if (lvl !== null) {
-          this.focus = { kind: 'water', text: 'Arroyo', sub: '[E] Beber / llenar', point: new THREE.Vector3(hit.point.x, lvl, hit.point.z) };
+          const sea = g.hf.isSeaWater(hit.point.x, hit.point.z);
+          this.focus = { kind: 'water', text: sea ? 'Mar' : 'Arroyo', sub: sea ? 'Agua salada: no se puede beber' : '[E] Beber / llenar', point: new THREE.Vector3(hit.point.x, lvl, hit.point.z) };
           return;
         }
       }
     }
     // Agua: mirando hacia abajo estando dentro o al borde.
     const lvl = g.hf.waterLevelAt(g.player.pos.x + fwd.x, g.player.pos.z + fwd.z);
-    if (lvl !== null && fwd.y < -0.35) this.focus = { kind: 'water', text: 'Arroyo', sub: '[E] Beber / llenar' };
+    if (lvl !== null && fwd.y < -0.35) {
+      const sea = g.hf.isSeaWater(g.player.pos.x + fwd.x, g.player.pos.z + fwd.z);
+      this.focus = { kind: 'water', text: sea ? 'Mar' : 'Arroyo', sub: sea ? 'Agua salada: no se puede beber' : '[E] Beber / llenar' };
+    }
   }
 
   private propName(id: string): string {
@@ -144,7 +148,8 @@ export class Interaction {
     } else if (f.kind === 'interactable' && f.inter) {
       f.inter.interact(g);
     } else if (f.kind === 'water') {
-      g.actions.useWater('arroyo');
+      if (f.text === 'Mar') g.bus.emit('notify', { text: 'El agua del mar es salada: te daría más sed.', kind: 'warning' });
+      else g.actions.useWater('arroyo');
     }
   }
 

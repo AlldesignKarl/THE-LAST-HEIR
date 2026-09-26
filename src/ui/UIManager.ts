@@ -479,7 +479,7 @@ export class UIManager {
           const act = (t: string, fn: () => void) => { const b = h('button', 'btn inline', t); b.onclick = () => { fn(); this.renderInventory(); }; acts.append(b); };
           if (sel.doc) act('Leer', () => g.actions.useItem(sel.id));
           else if (sel.food && sel.id !== 'waterskin_empty') act(sel.category === 'drink' ? 'Beber' : 'Comer', () => g.actions.useItem(sel.id));
-          if (sel.weapon || sel.offhand || sel.armor) {
+          if (sel.weapon || sel.offhand || sel.armor || sel.handTool) {
             const eq = Object.values(g.equipment.slots).includes(sel.id);
             if (eq) act('Quitar', () => { for (const k of ['main', 'off', 'head', 'body'] as const) if (g.equipment.slots[k] === sel.id) g.equipment.unequip(k); });
             else act('Equipar', () => g.actions.useItem(sel.id));

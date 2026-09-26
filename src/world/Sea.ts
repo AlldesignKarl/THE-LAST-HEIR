@@ -43,6 +43,7 @@ export class Sea {
       roughness: 0.07,
       metalness: 0,
       transparent: true,
+      side: THREE.DoubleSide,
       envMapIntensity: 0.55,
     });
     mat.onBeforeCompile = (shader) => {

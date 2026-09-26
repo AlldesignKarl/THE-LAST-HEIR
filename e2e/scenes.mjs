@@ -32,6 +32,9 @@ const scenes = {
   harbor: `__game.setHour(9); __game.teleport(48, 18, 0); __game.lookAt(110, 7, 6)`,
   pier: `__game.setHour(8); __game.teleport(__game.game.settlement.pier.x0 - 4, 11, 0); __game.lookAt(__game.game.settlement.pier.x1, 6.5, 14)`,
   south: `__game.setHour(15); __game.teleport(-4, 40, 0); __game.lookAt(-20, 14, 75)`,
+  chapel: `__game.setHour(11); { const p = __game.game.settlement.places.get('chapel_isle'); __game.teleport(p.x - 9, p.z + 3, 0); __game.lookAt(p.x, p.y + 1.5, p.z); }`,
+  wreck: `__game.setHour(16); { const p = __game.game.settlement.places.get('wreck_isle'); __game.teleport(p.x - 8, p.z + 6, 0); __game.lookAt(p.x + 2, p.y + 1, p.z - 2); }`,
+  penon: `__game.setHour(12); { const p = __game.game.settlement.places.get('penon_cave'); __game.teleport(p.x - 7, p.z, 0); __game.lookAt(p.x, p.y + 1.2, p.z); }`,
   fog: `__game.weather('fog'); __game.teleport(-100, 12, 0); __game.lookAt(-150, 12, -20); __game.setHour(7)`,
 };
 for (const [name, script] of Object.entries(scenes)) {

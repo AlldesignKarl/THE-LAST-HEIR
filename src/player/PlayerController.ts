@@ -103,8 +103,28 @@ export class PlayerController {
     return out.set(-Math.sin(this.yaw) * Math.cos(this.pitch), Math.sin(this.pitch), -Math.cos(this.yaw) * Math.cos(this.pitch));
   }
 
+  /** Montado en un vehículo (barca): otro sistema fija la posición. */
+  mounted = false;
+
+  /** Coloca al jugador sobre un vehículo (llamar cada tick mientras va montado). */
+  mountTo(x: number, y: number, z: number): void {
+    this.pos.set(x, y, z);
+    this.vel.set(0, 0, 0);
+    this.body.setNextKinematicTranslation({ x, y: y + PLAYER_HALF + PLAYER_RADIUS, z });
+    this.fallStartY = y;
+    this.airTime = 0;
+    this.grounded = true;
+  }
+
   update(dt: number): void {
     this.prevPos.copy(this.pos);
+    if (this.mounted) {
+      this.swimming = false;
+      this.inWater = false;
+      this.sprinting = false;
+      this.bobAmount = damp(this.bobAmount, 0, 8, dt);
+      return;
+    }
     const inp = this.input;
     const v = this.vitals;
     let mx = 0, mz = 0;

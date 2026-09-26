@@ -27,6 +27,8 @@ export interface ItemDef {
   offhand?: 'torch' | 'shield';
   armor?: { slot: 'head' | 'body'; slash: number; blunt: number; pierce: number; warmth: number };
   questItem?: boolean;
+  /** Se lleva en la mano derecha sin ser arma (caña de pescar). */
+  handTool?: boolean;
   /** Recipiente reutilizable (odre, cubo). */
   container?: { fullId?: string; emptyId?: string };
 }
@@ -51,7 +53,7 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries([
   I({ id: 'meat_cooked', name: 'Carne asada', desc: 'Caliente y jugosa. Alimenta y reconforta.', category: 'food', weight: 0.5, value: 8, stack: 10, model: 'meat_cooked', food: { hunger: 35, thirst: -4, warmth: 120, health: 5 } }),
   I({ id: 'fish_raw', name: 'Pescado fresco', desc: 'Sardinas y alguna lubina. Mejor asado; crudo sienta mal.', category: 'food', weight: 0.5, value: 4, stack: 10, model: 'fish_raw', food: { hunger: 6, thirst: -2, health: -4 }, cooksTo: 'fish_cooked' }),
   I({ id: 'fish_cooked', name: 'Pescado asado', desc: 'Con sal gorda. Alimenta bien.', category: 'food', weight: 0.4, value: 7, stack: 10, model: 'fish_cooked', food: { hunger: 30, thirst: -6, warmth: 80, health: 4 } }),
-  I({ id: 'fishing_rod', name: 'Caña de pescar', desc: 'Avellano, sedal de crin y anzuelo de hierro. Úsala mirando al agua.', category: 'tool', weight: 0.8, value: 18, stack: 1, model: 'fishing_rod' }),
+  I({ id: 'fishing_rod', name: 'Caña de pescar', desc: 'Avellano, sedal de crin y anzuelo de hierro. Úsala mirando al agua.', category: 'tool', weight: 0.8, value: 18, stack: 1, model: 'fishing_rod', handTool: true }),
   I({ id: 'pickaxe', name: 'Pico', desc: 'Para arrancar piedra de las rocas. También sirve de arma, aunque torpe.', category: 'tool', weight: 2.4, value: 40, stack: 1, model: 'pickaxe', weapon: 'pickaxe' }),
   I({ id: 'plank', name: 'Tablón', desc: 'Madera aserrada. Se obtiene partiendo troncos con el hacha.', category: 'resource', weight: 0.6, value: 3, stack: 30, model: 'plank' }),
   I({ id: 'thatch', name: 'Haz de paja', desc: 'Para techar. Se compra o se siega en los campos.', category: 'resource', weight: 0.5, value: 2, stack: 30, model: 'thatch_bundle' }),
@@ -69,6 +71,8 @@ export const ITEMS: Record<string, ItemDef> = Object.fromEntries([
   I({ id: 'letter_rodrigo', name: 'Carta de tu padre', desc: 'Doblada y lacrada con cera roja. La letra de Rodrigo.', category: 'document', weight: 0.05, value: 0, stack: 1, model: 'letter', doc: 'letter_rodrigo', questItem: true }),
   I({ id: 'satchel_rodrigo', name: 'Zurrón de Rodrigo', desc: 'Cuero viejo con las iniciales R. V. grabadas.', category: 'quest', weight: 1.5, value: 0, stack: 1, model: 'satchel', questItem: true }),
   I({ id: 'map_fragment_1', name: 'Fragmento de mapa (I)', desc: 'Un cuarto de un mapa del valle, dibujado a tinta. Hay una cruz cerca de un molino.', category: 'document', weight: 0.05, value: 0, stack: 1, model: 'map_fragment', doc: 'map_fragment_1', questItem: true }),
+  I({ id: 'olmedo_key', name: 'Llave de bronce', desc: 'Pesada, con una torre y un olmo en el ojo. Le falta la mitad del paletón.', category: 'quest', weight: 0.1, value: 0, stack: 1, model: 'olmedo_token', questItem: true }),
+  I({ id: 'silver_coin', name: 'Reales de plata', desc: 'Monedas de plata del conde, ennegrecidas por el mar. Valen mucho.', category: 'misc', weight: 0.2, value: 40, stack: 10, model: 'olmedo_token' }),
   I({ id: 'olmedo_token', name: 'Ficha con emblema', desc: 'Moneda de bronce dorado: una torre y un olmo. No es moneda corriente.', category: 'quest', weight: 0.05, value: 0, stack: 1, model: 'olmedo_token', questItem: true }),
   I({ id: 'journal_page_1', name: 'Página del diario de Rodrigo', desc: 'Arrancada de un cuaderno. Tinta corrida por la humedad.', category: 'document', weight: 0.02, value: 0, stack: 1, model: 'journal_page', doc: 'journal_page_1', questItem: true }),
   I({ id: 'payment_order', name: 'Orden de pago', desc: 'Papel sellado encontrado en un bandido.', category: 'document', weight: 0.02, value: 0, stack: 1, model: 'letter', doc: 'payment_order', questItem: true }),

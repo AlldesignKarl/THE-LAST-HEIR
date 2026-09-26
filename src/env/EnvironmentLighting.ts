@@ -24,6 +24,8 @@ export class EnvironmentLighting {
   /** 0 exterior, 1 interior profundo (cueva). Se suaviza. */
   interior = 0;
   interiorTarget = 0;
+  /** La cámara está bajo el agua (lo fija Game cada frame). */
+  underwater = false;
   /** 0 sin techo, 1 bajo techo (casa): menos luz ambiente pero hay ventanas. */
   private shadowFollowStep = 4;
   /** Iluminación basada en imagen: PMREM del cielo, regenerado al cambiar sol/nubes. */
@@ -170,6 +172,11 @@ export class EnvironmentLighting {
     this.fog.color.copy(fogCol);
     const baseDensity = 0.0022 + overcast * 0.0015;
     this.fog.density = baseDensity + weather.fog * 0.028 + weather.rain * 0.006;
+    // Bajo el agua: turbidez verdosa y visibilidad corta.
+    if (this.underwater) {
+      this.fog.color.setRGB(0.03, 0.14, 0.15).multiplyScalar(1 - night * 0.8);
+      this.fog.density = 0.11;
+    }
 
     this.updateEnvironment(dt, cloud, dayAmt, golden);
 

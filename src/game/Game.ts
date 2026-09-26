@@ -58,6 +58,8 @@ import { Sea } from '../world/Sea';
 import { Resources } from '../world/Resources';
 import { BuildSystem } from '../world/BuildSystem';
 import { Guide } from '../ui/Guide';
+import { Boats } from '../world/Boats';
+import { Fishing } from '../player/Fishing';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -117,6 +119,8 @@ export class Game {
   readonly resources: Resources;
   readonly build: BuildSystem;
   readonly guide: Guide;
+  readonly boats: Boats;
+  readonly fishing: Fishing;
   /** Id del jugador local (en multijugador, el del usuario). */
   localPlayerId = 'local';
   /** Controles en pantalla (solo en dispositivos táctiles). */
@@ -179,6 +183,8 @@ export class Game {
     this.settlement = new Settlement(this);
     this.resources = new Resources(this);
     this.build = new BuildSystem(this);
+    this.boats = new Boats(this);
+    this.fishing = new Fishing(this);
     this.grass = new Grass(this.hf, scene, (x, z) => {
       if (this.hf.isHole(x, z)) return true;
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.6)) return true;
@@ -276,6 +282,7 @@ export class Game {
       this.npcs.nav.setWallEnabled('breach', this.settlement.palisadeRepaired);
     });
     reg('worldItems', () => this.worldItems.serialize(), (d: Parameters<WorldItems['deserialize']>[0]) => this.worldItems.deserialize(d));
+    reg('boats', () => this.boats.serialize(), (d: Parameters<Boats['deserialize']>[0]) => this.boats.deserialize(d));
     reg('build', () => this.build.serialize(), (d: Parameters<BuildSystem['deserialize']>[0]) => this.build.deserialize(d));
     reg('resources', () => this.resources.serialize(), (d: Parameters<Resources['deserialize']>[0]) => this.resources.deserialize(d));
     reg('fires', () => this.fires.serialize(), (d: Parameters<Fires['deserialize']>[0]) => this.fires.deserialize(d));
@@ -403,15 +410,18 @@ export class Game {
     if (this.vitals.health < 25) this.player.speedMul *= 0.85;
     this.player.frozen = this.vitals.dead;
     this.build.update();
-    // En modo construcción el clic coloca y E desmonta: no hay combate ni uso.
-    if (!this.build.active) {
+    this.fishing.update(dt);
+    // En modo construcción el clic coloca y E desmonta; en la barca E baja;
+    // con la caña, el clic lanza: en esos casos no hay combate ni uso normal.
+    if (!this.build.active && !this.boats.riding) {
       this.interaction.update(dt);
-      this.combat.update(dt);
+      if (!this.fishing.holding) this.combat.update(dt);
     }
     // Antes de mover: dentro de la cueva el jugador está legítimamente bajo el terreno.
     const pp = this.player.pos;
     this.player.underground = this.settlement.cave.depthAt(pp.x, pp.y, pp.z) > 0.001 || this.hf.isHole(pp.x, pp.z);
     this.player.update(dt);
+    this.boats.update(dt);
     this.settlement.update(dt);
     this.npcs.update(dt);
     this.animals.update(dt);
@@ -557,7 +567,10 @@ export class Game {
     this.grass.update(this.camPos);
     this.scatter.update(this.camPos);
     this.build.updateGhost();
+    this.fishing.updateVisual();
     this.water.update(frameDt);
+    const wlCam = this.hf.waterLevelAt(this.camPos.x, this.camPos.z);
+    this.env.underwater = wlCam !== null && this.camPos.y < wlCam - 0.05;
     this.env.update(frameDt, this.time, this.weather, this.camPos);
     this.settlement.updateWindows(this.time.hourFloat);
     this.npcs.syncVisuals(alpha, frameDt);

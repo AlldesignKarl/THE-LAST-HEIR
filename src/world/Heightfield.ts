@@ -166,6 +166,11 @@ export class Heightfield {
     return false;
   }
 
+  /** ¿Agua de mar (salada) en (x,z)? */
+  isSeaWater(x: number, z: number): boolean {
+    return this.inSeaZone(x, z) && this.heightAt(x, z) < SEA.level + 0.05 && !this.streamInfo(x, z);
+  }
+
   /** Peso de arena de playa en (x,z) [0,1]. */
   beachWeight(x: number, z: number, h = this.heightAt(x, z)): number {
     if (!this.inSeaZone(x, z)) return 0;
