@@ -682,8 +682,8 @@ await test('heridas: hachazo a un vecino sin testigos, se desangra, cargarlo al 
     api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.1);
     const dragging = !!g.interaction.dragging;
     let sx = 0;
-    for (let xx = 60; xx < 300; xx += 2) if (g.hf.isSeaWater(xx, 10) && g.hf.waterLevelAt(xx, 10) - g.hf.heightAt(xx, 10) > 1.2) { sx = xx; break; }
-    api.teleport(sx - 1.2, 10, -Math.PI / 2); api.step(0.5);
+    for (let xx = 60; xx < 300; xx += 2) if (g.hf.isSeaWater(xx, 10) && g.hf.waterLevelAt(xx, 10) - g.hf.heightAt(xx, 10) > 2.5) { sx = xx; break; }
+    api.teleport(sx - 1.2, 10, -Math.PI / 2); api.step(1.2);
     // Llevarlo al agua honda y soltarlo: flota unos segundos y se hunde.
     api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.3);
     const floatY = n.c.pos.y - g.hf.waterLevelAt(n.c.pos.x, n.c.pos.z);
