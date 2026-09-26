@@ -222,9 +222,10 @@ export class Settlement {
       label: () => 'Abrir arcón',
       interact: (game) => game.ui.openContainer('chest_player'),
     });
-    const hearthP = this.inB(hut, 1.3, 0.12, 0.7);
-    const hearthCol = this.placeStatic('hearth', hearthP.x, fy + 0.12, hearthP.z, r, 'hut');
-    g.fires.add({ id: 'hearth_player', kind: 'hearth', pos: new THREE.Vector3(hearthP.x, fy + 0.15, hearthP.z), policy: 'manual', canCook: true, heat: 16, lit: true, fuel: 2.5, smokePos: hut.chimneyTop ?? undefined });
+    // El fuego está en el hogar de la chimenea (no una hoguera en el suelo de madera).
+    const hearthP = hut.hearthPos!.clone();
+    const hearthCol = this.placeStatic('fire_logs', hearthP.x, hearthP.y + 0.07, hearthP.z, r, 'hut');
+    g.fires.add({ id: 'hearth_player', kind: 'hearth', pos: new THREE.Vector3(hearthP.x, hearthP.y + 0.08, hearthP.z), policy: 'manual', canCook: true, heat: 16, lit: true, fuel: 2.5, smokePos: hut.chimneyTop ?? undefined });
     g.interactables.register(hearthCol.handle, {
       id: 'hearth_player', kind: 'hearth', pos: hearthP,
       label: (game) => game.actions.hearthLabel('hearth_player'),
@@ -284,14 +285,14 @@ export class Settlement {
       this.placeStatic('candle', cp.x, ty + 0.83, cp.z, 0, 'tavern');
     }
     for (let i = 0; i < 3; i++) {
-      const p = this.inB(tav, 4.6, 0.45, -1 + i * 0.8);
+      const p = this.inB(tav, 4.6, 0.45, 0.6 + i * 0.8);
       this.placeDynamic(`tav_barrel_${i}`, 'barrel', p.x, ty + 0.46, p.z, i);
     }
-    const tavHearth = this.inB(tav, -4.4, 0.12, -2.6);
-    this.placeStatic('hearth', tavHearth.x, ty + 0.12, tavHearth.z, tr, 'tavern');
-    g.fires.add({ id: 'hearth_tavern', kind: 'hearth', pos: new THREE.Vector3(tavHearth.x, ty + 0.15, tavHearth.z), policy: 'evening', canCook: true, heat: 14, smokePos: tav.chimneyTop ?? undefined, condition: () => this.isOccupied('tavern') });
-    const tavCauldron = this.inB(tav, -4.4, 0.25, -2.6);
-    this.placeStatic('cauldron', tavCauldron.x, ty + 0.25, tavCauldron.z, 0, 'tavern');
+    const tavHearth = tav.hearthPos!.clone();
+    this.placeStatic('fire_logs', tavHearth.x, tavHearth.y + 0.07, tavHearth.z, tr, 'tavern');
+    g.fires.add({ id: 'hearth_tavern', kind: 'hearth', pos: new THREE.Vector3(tavHearth.x, tavHearth.y + 0.08, tavHearth.z), policy: 'evening', canCook: true, heat: 14, smokePos: tav.chimneyTop ?? undefined, condition: () => this.isOccupied('tavern') });
+    // Olla colgada sobre el fuego, dentro del hogar.
+    this.placeStatic('cauldron', tavHearth.x, tavHearth.y + 0.34, tavHearth.z, 0, 'tavern');
     g.containers.create('tavern_stock', 'Despensa de la taberna', 'robledo', [{ id: 'bread', count: 6 }, { id: 'cheese', count: 3 }, { id: 'wine', count: 4 }], 20);
     const tavChestP = this.inB(tav, 4.6, 0.3, -3.2);
     const tavChest = this.placeStatic('chest', tavChestP.x, ty + 0.3, tavChestP.z, tr + Math.PI / 2, 'tavern');
@@ -378,10 +379,14 @@ export class Settlement {
     const b = this.board;
     if (b.opened) return;
     b.opened = true;
-    b.mesh.position.y += 0.05;
-    b.mesh.rotation.z = 0.5;
-    b.mesh.position.addScaledVector(new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot)), 0.25);
+    // La tabla levantada pasa a ser un tablón suelto de verdad (física: se
+    // puede agarrar, tirar o guardar); en el suelo queda el hueco.
     this.g.physics.removeBody(b.body);
+    b.mesh.geometry = new THREE.BoxGeometry(0.88, 0.006, 0.2);
+    b.mesh.material = this.g.materials.get('ash');
+    b.mesh.position.y = b.floorY + 0.058;
+    const side = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot));
+    this.g.worldItems.spawn('plank', b.pos.x + side.x * 0.45, b.floorY + 0.2, b.pos.z + side.z * 0.45, { uid: 'loose_board_plank', authored: true, rotY: b.rot + 0.2 });
     if (spawnLetter) {
       this.g.worldItems.spawn('letter_rodrigo', b.pos.x, b.floorY + 0.03, b.pos.z, { uid: 'letter_rodrigo', rotY: b.rot + 0.4 });
     }

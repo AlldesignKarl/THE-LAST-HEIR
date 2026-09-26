@@ -238,6 +238,14 @@ const D: Record<string, ModelDef> = {
   anvil: { shape: { type: 'box', hx: 0.35, hy: 0.4, hz: 0.18 }, mass: 0, build: (b) => b.box(0.3, 0.5, 0.3, 'planks', 0, -0.15, 0).box(0.25, 0.15, 0.18, 'iron', 0, 0.17, 0).box(0.6, 0.12, 0.2, 'iron', 0, 0.3, 0).add(new THREE.ConeGeometry(0.1, 0.25, 4), 'iron', 0.4, 0.3, 0, 0, 0, -Math.PI / 2) },
   forge: { shape: { type: 'box', hx: 0.8, hy: 0.5, hz: 0.6 }, mass: 0, build: (b) => b.box(1.6, 0.9, 1.2, 'stoneWall', 0, -0.05, 0).box(1.0, 0.1, 0.7, 'ash', 0, 0.42, 0).box(1.2, 1.2, 0.4, 'stoneWall', 0, 1.0, -0.4).add(new THREE.ConeGeometry(0.5, 1.0, 4), 'stoneWall', 0, 1.9, -0.3, 0, Math.PI / 4) },
   hearth: { shape: { type: 'box', hx: 0.5, hy: 0.12, hz: 0.5 }, mass: 0, build: (b) => { for (let i = 0; i < 9; i++) b.add(new THREE.DodecahedronGeometry(0.12, 0), 'rock', Math.cos(i * 0.7) * 0.42, 0, Math.sin(i * 0.7) * 0.42); b.cyl(0.35, 0.35, 0.03, 'ash', 0, -0.08, 0); for (let i = 0; i < 3; i++) b.cyl(0.04, 0.05, 0.6, 'bark', 0, 0.02, 0, Math.PI / 2, i * 1.05, 0, 6); } },
+  // Fuego de hogar: leños cruzados sobre morillos de hierro, ceniza y brasas.
+  fire_logs: { shape: { type: 'box', hx: 0.3, hy: 0.07, hz: 0.4 }, mass: 0, build: (b) => {
+    b.cyl(0.32, 0.36, 0.02, 'ash', 0, -0.06, 0, 0, 0, 0, 14);
+    for (const sz of [-1, 1]) { b.box(0.5, 0.03, 0.03, 'iron', 0, -0.02, sz * 0.2); b.box(0.03, 0.12, 0.03, 'iron', -0.24, 0.02, sz * 0.2); }
+    b.cyl(0.05, 0.055, 0.62, 'bark', 0.02, 0.03, 0, Math.PI / 2, 0, 0, 7);
+    b.cyl(0.045, 0.05, 0.55, 'charred', -0.05, 0.07, 0.04, Math.PI / 2, 0.35, 0, 7);
+    b.cyl(0.04, 0.045, 0.5, 'charred', 0.07, 0.08, -0.05, Math.PI / 2, -0.4, 0, 7);
+  } },
   woodpile: { shape: { type: 'box', hx: 0.9, hy: 0.45, hz: 0.4 }, mass: 0, build: (b) => { for (let r = 0; r < 4; r++) for (let i = 0; i < 5 - r; i++) b.cyl(0.1, 0.1, 0.8, 'bark', (i - (4 - r) / 2) * 0.21, -0.35 + r * 0.19, 0, Math.PI / 2, 0, 0, 7); } },
   workbench: { shape: { type: 'box', hx: 0.9, hy: 0.45, hz: 0.4 }, mass: 0, build: (b) => { b.box(1.8, 0.12, 0.8, 'planks', 0, 0.4, 0); for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.12, 0.8, 0.12, 'darkWood', sx * 0.8, 0, sz * 0.32); b.box(0.3, 0.05, 0.05, 'iron', 0.3, 0.49, 0.1); } },
   weapon_rack: { shape: { type: 'box', hx: 0.8, hy: 0.8, hz: 0.2 }, mass: 0, build: (b) => { b.box(1.6, 0.08, 0.1, 'darkWood', 0, 0.6, 0); b.box(1.6, 0.08, 0.3, 'darkWood', 0, -0.7, 0.1); for (const sx of [-1, 1]) b.box(0.1, 1.6, 0.1, 'darkWood', sx * 0.75, 0, 0); } },

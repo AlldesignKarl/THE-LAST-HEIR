@@ -105,7 +105,7 @@ export class WorldItems {
       .setRotation(rot)
       .setLinearDamping(0.2)
       .setAngularDamping(0.6)
-      .setCcdEnabled(def.weight < 1);
+      .setCcdEnabled(true); // lanzados o empujados no atraviesan paredes finas
     const body = this.physics.world.createRigidBody(bd);
     const mass = Math.max(0.05, def.weight);
     const cd = colliderForShape(model.shape)

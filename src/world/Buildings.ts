@@ -44,6 +44,10 @@ export class BuildingInstance {
   readonly windowMat: THREE.MeshStandardMaterial;
   readonly doors: Door[] = [];
   readonly chimneyTop: THREE.Vector3 | null = null;
+  /** Punto del fuego dentro del hogar de la chimenea (mundo). */
+  readonly hearthPos: THREE.Vector3 | null = null;
+  /** Hacia dónde mira la boca del hogar (giro local en Y). */
+  readonly hearthFacing = 0;
   readonly body: RAPIER.RigidBody;
   /** Puntos donde puede haber fuego (mundo). */
   readonly firePoints: THREE.Vector3[] = [];
@@ -294,11 +298,23 @@ export class BuildingInstance {
 
     // Chimenea.
     if (def.hasChimney) {
-      const cx = hw * 0.55, cz = -hd * 0.3;
+      // Chimenea de obra adosada al muro lateral, con hogar abierto hacia la
+      // estancia: el fuego está dentro de la chimenea, no en mitad del suelo.
+      const cx = hw - WALL_T / 2 - 0.36, cz = -hd * 0.3;
       const ch = ridgeY + 0.9;
-      box(0.7, ch, 0.7, cx, ch / 2, cz, 'stoneWall');
-      box(0.9, 0.14, 0.9, cx, ch - 0.1, cz, 'stoneWall');
-      (this as { chimneyTop: THREE.Vector3 | null }).chimneyTop = new THREE.Vector3(cx, ch + 0.2, cz);
+      const fw = 1.25; // ancho del hogar (a lo largo de Z)
+      const fireH = 1.15; // altura de la boca
+      solid(0.16, fireH, fw, cx + 0.28, fireH / 2, cz, 'stoneWall'); // trasera
+      for (const s2 of [-1, 1]) solid(0.72, fireH, 0.18, cx, fireH / 2, cz + s2 * (fw / 2 - 0.09), 'stoneWall'); // jambas
+      solid(0.78, 0.42, fw + 0.1, cx - 0.03, fireH + 0.21, cz, 'stoneWall'); // dintel / campana
+      box(0.12, 0.1, fw + 0.2, cx - 0.4, fireH + 0.05, cz, 'darkWood'); // repisa de madera
+      box(0.95, 0.08, fw + 0.2, cx - 0.1, 0.04, cz, 'stoneWall'); // losa del hogar
+      box(0.5, 0.012, fw - 0.4, cx + 0.02, 0.085, cz, 'ash'); // hollín del fondo
+      solid(0.62, ch - fireH - 0.42, 0.78, cx + 0.05, (ch + fireH + 0.42) / 2, cz, 'stoneWall'); // cañón
+      box(0.82, 0.14, 0.98, cx + 0.05, ch - 0.1, cz, 'stoneWall');
+      (this as { chimneyTop: THREE.Vector3 | null }).chimneyTop = new THREE.Vector3(cx + 0.05, ch + 0.2, cz);
+      (this as { hearthPos: THREE.Vector3 | null }).hearthPos = new THREE.Vector3(cx + 0.02, 0.09, cz);
+      (this as { hearthFacing: number }).hearthFacing = -Math.PI / 2;
     }
 
     // Torre (iglesia): campanario sobre la fachada izquierda.
@@ -407,6 +423,7 @@ export class BuildingInstance {
     this.interiorLight = toWorld(0, H * 0.7, -hd * 0.2);
     this.firePoints.push(toWorld(0, ridgeY - 0.5, 0), toWorld(hw * 0.5, H, hd * 0.3), toWorld(-hw * 0.5, H, -hd * 0.3));
     if (this.chimneyTop) this.chimneyTop.applyMatrix4(this.group.matrixWorld);
+    if (this.hearthPos) this.hearthPos.applyMatrix4(this.group.matrixWorld);
     if (this.bellPos) this.bellPos.applyMatrix4(this.group.matrixWorld);
   }
 

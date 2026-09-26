@@ -19,6 +19,8 @@ export interface Carried {
   propId: string | null;
   holdDist: number;
   prevGroups: number;
+  /** Radio aproximado del objeto (para no hundirlo en paredes). */
+  radius: number;
 }
 
 export interface FocusTarget {
@@ -206,13 +208,23 @@ export class Interaction {
     }
     if (!body || !collider) return;
     body.wakeUp();
+    // Detección continua: lo que se lleva o se lanza no atraviesa paredes finas.
+    body.enableCcd(true);
     const mass = body.mass();
+    const radius = this.colliderRadius(collider);
     const prevGroups = collider.collisionGroups();
     collider.setCollisionGroups(groups(GROUP.CARRIED, ALL & ~GROUP.PLAYER));
     body.setGravityScale(0, true);
     body.setAngularDamping(4);
-    this.carried = { body, collider, mass, item, propId, holdDist: mass > 15 ? 1.7 : 1.25, prevGroups };
+    this.carried = { body, collider, mass, item, propId, holdDist: Math.max(mass > 15 ? 1.7 : 1.25, radius + 0.7), prevGroups, radius };
     g.bus.emit('sfx', { id: mass > 15 ? 'grab_heavy' : 'grab' });
+  }
+
+  private colliderRadius(col: RAPIER.Collider): number {
+    const sh = col.shape as unknown as { halfExtents?: { x: number; y: number; z: number }; radius?: number; halfHeight?: number };
+    if (sh.halfExtents) return Math.min(0.9, Math.max(sh.halfExtents.x, sh.halfExtents.y, sh.halfExtents.z) * 0.7 + 0.05);
+    if (sh.radius !== undefined) return Math.min(0.9, Math.max(sh.radius, (sh.halfHeight ?? 0) * 0.7) + 0.05);
+    return 0.25;
   }
 
   private updateCarry(dt: number, eye: THREE.Vector3, fwd: THREE.Vector3): void {
@@ -220,6 +232,24 @@ export class Interaction {
     const g = this.g;
     const target = eye.clone().addScaledVector(fwd, c.holdDist);
     if (c.mass > 15) target.y = Math.min(target.y, eye.y - 0.5);
+    // No meter lo que llevas dentro de una pared: se sostiene delante de ella.
+    const toT = target.clone().sub(eye);
+    const lenT = toT.length();
+    toT.divideScalar(lenT || 1);
+    const wall = g.physics.raycast(eye.x, eye.y, eye.z, toT.x, toT.y, toT.z, lenT + c.radius, GROUP.TERRAIN | GROUP.STATIC, g.player.collider, c.body);
+    if (wall) target.copy(eye).addScaledVector(toT, Math.max(0.3, wall.toi - c.radius));
+    // Si el objeto ya quedó al otro lado de algo sólido, volverlo a la mano.
+    const t0 = c.body.translation();
+    const toO = new THREE.Vector3(t0.x - eye.x, t0.y - eye.y, t0.z - eye.z);
+    const lenO = toO.length();
+    if (lenO > 0.05) {
+      toO.divideScalar(lenO);
+      const block = g.physics.raycast(eye.x, eye.y, eye.z, toO.x, toO.y, toO.z, lenO, GROUP.TERRAIN | GROUP.STATIC, g.player.collider, c.body);
+      if (block && block.toi < lenO - 0.05) {
+        c.body.setTranslation({ x: target.x, y: target.y, z: target.z }, true);
+        c.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      }
+    }
     const t = c.body.translation();
     const dx = target.x - t.x, dy = target.y - t.y, dz = target.z - t.z;
     const dist = Math.hypot(dx, dy, dz);
