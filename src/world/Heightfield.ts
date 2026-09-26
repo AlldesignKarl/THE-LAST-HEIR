@@ -6,7 +6,7 @@
 import { Simplex2 } from '../core/noise';
 import { clamp, lerp, pointSegmentDist, smoothstep, toLocalXZ } from '../core/math';
 import {
-  BANDIT_CAMP, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
+  BANDIT_CAMP, BUILDINGS, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
   WORLD_HALF, WORLD_SEED, WOLF_DEN, type P2,
 } from './WorldLayout';
 
@@ -264,6 +264,7 @@ export class Heightfield {
     d -= smoothstep(-420, -600, z) * 0.6;
     // Exclusiones.
     for (const v of VILLAGES) if (Math.hypot(x - v.x, z - v.z) < v.radius + 6) return 0;
+    for (const b of BUILDINGS) if (Math.abs(x - b.x) < 14 && Math.abs(z - b.z) < 14) return 0;
     if (Math.hypot(x - BANDIT_CAMP.x, z - BANDIT_CAMP.z) < BANDIT_CAMP.radius + 4) return 0;
     if (Math.hypot(x - DEER_MEADOW.x, z - DEER_MEADOW.z) < DEER_MEADOW.radius) return 0;
     if (Math.hypot(x - WOLF_DEN.x, z - WOLF_DEN.z) < 8) return 0;

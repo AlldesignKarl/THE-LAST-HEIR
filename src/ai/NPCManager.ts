@@ -114,6 +114,7 @@ export class NPCManager {
 
   private animFor(e: ScheduleEntry, p: Place | undefined): AnimState {
     if (p?.anim === 'hammer') return 'hammer';
+    if (p?.anim === 'fish') return 'fish';
     switch (e.activity) {
       case 'work': return p?.anim === 'work' ? 'work' : 'idle';
       case 'pray': return 'pray';

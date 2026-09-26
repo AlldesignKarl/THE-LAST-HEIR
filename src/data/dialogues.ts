@@ -254,4 +254,61 @@ export const DIALOGUES: Record<string, NpcDialogue> = {
       rumor('ferran', ['Las heridas de flecha se infectan si no se limpian. Recuérdalo.', 'Las hierbas del bosque curan más que muchos boticarios.']),
     ],
   },
+  nuno: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ${c.g.time.hourFloat < 11 ? 'Hoy pican poco.' : 'Si vienes por pescado, llegas tarde para el bueno.'}`,
+    topics: [
+      trade,
+      { id: 'howfish', text: '¿Cómo se pesca aquí?', reply: 'Caña en mano, al final del embarcadero o desde una barca. Echa el anzuelo, espera a que el corcho se hunda y tira en ese momento, ni antes ni después.' },
+      rumor('nuno', ['En el Islote del Náufrago encalló una coca hace años. Nadie ha sacado lo que llevaba.', 'Las gaviotas anidan en la isla grande. Donde hay gaviotas hay peces.']),
+    ],
+  },
+  aldonza: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} Cuidado con las redes.`,
+    topics: [rumor('aldonza', ['Mateo presta barcas, pero cobra hasta el aire que respiras.', 'Mi Nuño dice que en el Peñón hay una cueva con un muro de piedra que no es natural.'])],
+  },
+  gonzalo: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ¿Vienes a por madera o a mirar cómo trabajo?`,
+    topics: [
+      trade,
+      { id: 'build', text: 'Quiero construirme una casa.', reply: 'Para una casa hacen falta tablones, piedra para el zócalo y paja o tablas para el tejado. Tablones te vendo, o tala tú y parte los troncos con el hacha. La piedra, con un pico en la peña de la cantera.' },
+      rumor('gonzalo', ['La barca buena es la de roble; la de pino se pudre en tres inviernos.', 'Mateo tiene dos barcas amarradas al muelle.']),
+    ],
+  },
+  mateo: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ${c.g.flags.has('boat_permit') ? 'La barca es tuya cuando quieras. Devuélvela entera.' : '¿Quieres salir al mar?'}`,
+    topics: [
+      {
+        id: 'boat', text: 'Quiero una barca (25 mrv).', cond: (c) => !c.g.flags.has('boat_permit'),
+        reply: (c) => (c.g.inventory.coins >= 25 ? 'Trato hecho. La barca amarrada al final del muelle es tuya. Rema con cabeza.' : 'Sin dinero no hay barca.'),
+        effect: (c) => {
+          if (c.g.inventory.coins < 25) return;
+          c.g.inventory.coins -= 25;
+          c.g.flags.set('boat_permit');
+          c.g.bus.emit('notify', { text: 'Ya puedes usar la barca del muelle.', kind: 'quest' });
+        },
+      },
+      { id: 'islands', text: '¿Qué hay en las islas?', reply: 'La Isla de las Gaviotas tiene una ermita en ruinas. El Peñón es roca pelada con una cueva. Y en el Islote del Náufrago está lo que queda de una coca que encalló.' },
+      rumor('mateo', ['Con viento de levante no se sale, que te estrella contra el Peñón.', 'Dicen que la coca llevaba plata de Almenara.']),
+    ],
+  },
+  elvira: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ¿Pan? Lo tengo recién hecho.`,
+    topics: [trade, rumor('elvira', ['Urraca no ha vuelto a ser la misma desde que el mar se llevó a su Lope.', 'El padre Anselmo compra más harina de la que come un cura.'])],
+  },
+  urraca: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} Hijo de Rodrigo... te pareces a él.`,
+    topics: [rumor('urraca', ['Tu padre y mi Lope zarparon juntos una vez, hacia la isla grande. Volvieron callados.', 'En la ermita de la isla hay una losa con una torre grabada. La misma torre de tu ficha, ¿no?'])],
+  },
+  diego: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} La tierra no se trabaja sola.`,
+    topics: [trade, rumor('diego', ['La paja buena para techar es la de centeno.', 'Si te haces casa en tu parcela, planta un huerto detrás.'])],
+  },
+  fortun: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} Aparta, que ruedan barriles.`,
+    topics: [rumor('fortun', ['El almacén de salazón huele a mar todo el año.', 'Con un pico se saca buena piedra en la cantera, junto a la peña del camino del norte.'])],
+  },
+  blasco: {
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ¿Traes caballo? No, ya veo que no.`,
+    topics: [rumor('blasco', ['Algún día llegarán caballos buenos de Almenara.', 'Bartolomé forja; yo hierro caballos. Cada uno lo suyo.'])],
+  },
 };

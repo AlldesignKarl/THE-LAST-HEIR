@@ -111,6 +111,7 @@ export class Character implements Actor {
     this.model = new HumanoidModel(o.appearance, mats);
     this.weapon = WEAPONS[o.weapon ?? 'fists'];
     this.shield = !!o.shield;
+    this.model.models = models;
     this.setWeapon(o.weapon);
     if (o.shield) this.model.setOffhand(models, 'shield');
   }

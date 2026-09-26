@@ -29,6 +29,9 @@ const scenes = {
   hutext: `__game.teleport(-47, 26, 0); __game.lookAt(-58, 15, 18); __game.setHour(16)`,
   coast: `__game.teleport(60, 5, 0); __game.lookAt(200, 6, -10); __game.setHour(10)`,
   beach: `__game.teleport(112, 20, 0); __game.lookAt(150, 5, 0); __game.setHour(17)`,
+  harbor: `__game.setHour(9); __game.teleport(48, 18, 0); __game.lookAt(110, 7, 6)`,
+  pier: `__game.setHour(8); __game.teleport(__game.game.settlement.pier.x0 - 4, 11, 0); __game.lookAt(__game.game.settlement.pier.x1, 6.5, 14)`,
+  south: `__game.setHour(15); __game.teleport(-4, 40, 0); __game.lookAt(-20, 14, 75)`,
   fog: `__game.weather('fog'); __game.teleport(-100, 12, 0); __game.lookAt(-150, 12, -20); __game.setHour(7)`,
 };
 for (const [name, script] of Object.entries(scenes)) {

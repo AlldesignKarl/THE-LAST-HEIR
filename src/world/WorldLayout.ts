@@ -93,6 +93,25 @@ export const BUILDINGS: BuildingDef[] = [
   B('granary', 'Granero', 42, -8, [20, -4], 8, 11, 'plank', 'thatch', { wallH: 4.2, maxHealth: 150 }),
   B('house_ferran', 'Casa del médico', 8, 30, PLAZA, 6, 5, 'timber', 'tile', { hasChimney: true }),
   B('stable', 'Establo', 32, -34, [16, -20], 9, 6, 'shed', 'thatch', { openFront: true, enterable: true }),
+  // ---- Ampliación: más vecinos dentro de la empalizada
+  B('house_n1', 'Casa de los Aranda', 47, -28, [30, -18], 6, 5, 'timber', 'tile', { hasChimney: true }),
+  B('house_n2', 'Casa del tonelero', 22, -51, [10, -36], 5.5, 4.5, 'wattle', 'thatch', { hasChimney: true }),
+  B('house_n3', 'Casa de la viuda Urraca', -31, -47, [-18, -34], 6, 5, 'stone', 'tile', { hasChimney: true }),
+  B('bakery', 'Horno de Elvira', -54, -18, [-36, -8], 7, 6, 'stone', 'tile', { hasChimney: true, enterable: true, maxHealth: 160 }),
+  B('house_n4', 'Casa del herrador', -41, -41, [-26, -30], 5, 4.5, 'wattle', 'thatch', { hasChimney: true }),
+  // ---- Barrio sur (fuera de la empalizada)
+  B('house_s1', 'Casa de los Pardo', -24, 52, [-6, 44], 6, 5, 'wattle', 'thatch', { hasChimney: true }),
+  B('house_s2', 'Casa del cestero', -38, 66, [-20, 58], 5.5, 4.5, 'wattle', 'thatch', { hasChimney: true }),
+  B('house_s3', 'Casa de Martín el Mozo', -15, 78, [0, 72], 5.5, 5, 'timber', 'thatch', { hasChimney: true }),
+  B('house_s4', 'Casa de los Ibáñez', 14, 62, [2, 56], 6, 5, 'timber', 'tile', { hasChimney: true }),
+  B('barn_s', 'Pajar', -30, 88, [-10, 80], 8, 6, 'plank', 'thatch', { wallH: 3.8 }),
+  // ---- Barrio del puerto (junto a la playa)
+  B('fisher_1', 'Casa del pescador Nuño', 70, -24, [96, -24], 5.5, 4.5, 'plank', 'thatch', { hasChimney: true }),
+  B('fisher_2', 'Casa de Aldonza', 72, -8, [96, -8], 5.5, 4.5, 'wattle', 'thatch', { hasChimney: true }),
+  B('fisher_3', 'Casa del calafate', 68, 34, [94, 30], 6, 5, 'plank', 'tile', { hasChimney: true }),
+  B('boat_shed', 'Atarazana', 84, 20, [110, 16], 8, 6, 'shed', 'plank', { openFront: true, enterable: true }),
+  B('harbor_house', 'Casa del patrón de barcas', 60, 52, [84, 44], 7, 5.5, 'timber', 'tile', { hasChimney: true }),
+  B('salt_store', 'Almacén de salazón', 56, 8, [80, 10], 7, 5, 'stone', 'tile', { maxHealth: 160 }),
 ];
 
 /** Pozo de la plaza. */

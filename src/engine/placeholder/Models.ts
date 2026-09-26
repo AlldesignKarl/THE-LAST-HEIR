@@ -59,6 +59,43 @@ function bowGeometry(): THREE.BufferGeometry {
   return new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 24, 0.016, 6, false);
 }
 
+/**
+ * Casco de barca de remos: secciones en U a lo largo de la eslora (eje X),
+ * más estrechas y altas en proa y popa. Doble cara (se ve por dentro).
+ */
+export function hullGeometry(length = 4.2, beam = 1.35, depth = 0.6): THREE.BufferGeometry {
+  const stations = 14, around = 8;
+  const pos: number[] = [], uv: number[] = [], idx: number[] = [];
+  for (let i = 0; i <= stations; i++) {
+    const t = (i / stations) * 2 - 1; // -1 popa .. 1 proa
+    const x = t * length / 2;
+    const w = beam / 2 * Math.pow(Math.max(0, 1 - Math.pow(Math.abs(t), t > 0 ? 2.2 : 3.2)), 0.55) + 0.02;
+    const sheer = depth + 0.18 * Math.pow(Math.abs(t), 2.5); // arrufo
+    for (let j = 0; j <= around; j++) {
+      const a = (j / around) * Math.PI; // 0..π de borda a borda
+      const zz = -Math.cos(a) * w;
+      const yy = -Math.sin(a) * depth * (0.55 + 0.45 * (1 - Math.abs(t))) + (sheer - depth);
+      pos.push(x, yy + depth, zz);
+      uv.push(x / 1.2, j / around * 2);
+    }
+  }
+  for (let i = 0; i < stations; i++) for (let j = 0; j < around; j++) {
+    const a = i * (around + 1) + j, b = a + 1, c = a + around + 1, d = c + 1;
+    idx.push(a, c, b, b, c, d);
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  // Cara interior (normales invertidas) para verlo desde dentro.
+  const inner = g.clone();
+  const ii = inner.index!.array as Uint16Array | Uint32Array;
+  for (let k = 0; k < ii.length; k += 3) { const tmp = ii[k]; ii[k] = ii[k + 1]; ii[k + 1] = tmp; }
+  inner.computeVertexNormals();
+  return mergeGeometries([g.toNonIndexed(), inner.toNonIndexed()])!;
+}
+
 const D: Record<string, ModelDef> = {
   // ---------------- Armas y herramientas ----------------
   sword: {
@@ -218,6 +255,54 @@ const D: Record<string, ModelDef> = {
   cauldron: { shape: { type: 'cyl', hh: 0.25, r: 0.35 }, mass: 0, build: (b) => b.add(new THREE.SphereGeometry(0.35, 12, 8, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), 'iron', 0, 0.2, 0).cyl(0.3, 0.3, 0.02, 'meatCooked', 0, 0.12, 0) },
   ladder: { shape: { type: 'box', hx: 0.3, hy: 4, hz: 0.06 }, mass: 0, build: (b) => { for (const sx of [-1, 1]) b.box(0.07, 8, 0.07, 'darkWood', sx * 0.25, 0, 0); for (let i = 0; i < 16; i++) b.cyl(0.025, 0.025, 0.5, 'darkWood', 0, -3.8 + i * 0.5, 0, 0, 0, Math.PI / 2, 5); } },
   candle: { shape: { type: 'cyl', hh: 0.08, r: 0.03 }, mass: 0, build: (b) => b.cyl(0.025, 0.025, 0.16, 'paper', 0, 0, 0).cyl(0.05, 0.06, 0.02, 'iron', 0, -0.08, 0) },
+  rowboat: { shape: { type: 'box', hx: 2.1, hy: 0.35, hz: 0.65, oy: 0.3 }, mass: 0, build: (b) => {
+    b.add(hullGeometry(), 'planks');
+    for (const x of [-0.9, 0.2, 1.1]) b.box(0.22, 0.04, 1.1 - Math.abs(x) * 0.25, 'roughWood', x, 0.42, 0);
+    b.box(4.1, 0.05, 0.06, 'darkWood', 0, 0.62, 0.66).box(4.1, 0.05, 0.06, 'darkWood', 0, 0.62, -0.66);
+    b.box(0.1, 0.5, 0.1, 'darkWood', 2.12, 0.62, 0);
+  } },
+  fishing_rod: { shape: { type: 'box', hx: 0.03, hy: 1.5, hz: 0.03 }, mass: 0.6, build: (b) => {
+    // Caña de avellano con sedal de crin y corcho.
+    b.cyl(0.008, 0.02, 2.9, 'roughWood', 0, 1.2, 0, 0, 0, 0, 6);
+    b.cyl(0.022, 0.022, 0.25, 'leather', 0, -0.1, 0, 0, 0, 0, 6);
+    b.cyl(0.0015, 0.0015, 1.6, 'paper', 0, 2.55, 0.05, 0.5, 0, 0, 3);
+    b.add(new THREE.SphereGeometry(0.02, 6, 4), 'clothRed', 0, 1.9, 0.42);
+  } },
+  fish_raw: { shape: { type: 'box', hx: 0.14, hy: 0.03, hz: 0.04 }, mass: 0.5, build: (b) => {
+    b.add(new THREE.SphereGeometry(0.05, 8, 6).scale(2.6, 0.8, 0.55), 'metal');
+    b.add(new THREE.ConeGeometry(0.04, 0.07, 4).rotateZ(Math.PI / 2).scale(1, 1, 0.3), 'metal', -0.16, 0, 0);
+  } },
+  fish_cooked: { shape: { type: 'box', hx: 0.14, hy: 0.03, hz: 0.04 }, mass: 0.4, build: (b) => {
+    b.add(new THREE.SphereGeometry(0.05, 8, 6).scale(2.6, 0.8, 0.55), 'meatCooked');
+    b.add(new THREE.ConeGeometry(0.04, 0.07, 4).rotateZ(Math.PI / 2).scale(1, 1, 0.3), 'meatCooked', -0.16, 0, 0);
+  } },
+  pickaxe: { shape: { type: 'box', hx: 0.25, hy: 0.4, hz: 0.04 }, mass: 2.4, build: (b) => {
+    b.cyl(0.021, 0.025, 0.85, 'roughWood', 0, 0, 0, 0, 0, 0, 8);
+    b.add(blade([[-0.3, 0.33], [-0.05, 0.37], [0.05, 0.37], [0.3, 0.33], [0.05, 0.32], [-0.05, 0.32]], 0.03, 0.008), 'iron');
+    b.box(0.07, 0.09, 0.05, 'iron', 0, 0.345, 0);
+  } },
+  plank: { shape: { type: 'box', hx: 0.6, hy: 0.02, hz: 0.1 }, mass: 1.5, build: (b) => b.box(1.2, 0.04, 0.2, 'planks') },
+  thatch_bundle: { shape: { type: 'cyl', hh: 0.35, r: 0.14 }, mass: 1, build: (b) => { b.cyl(0.14, 0.16, 0.7, 'straw', 0, 0, 0, 0, 0, 0, 9); b.add(new THREE.TorusGeometry(0.145, 0.012, 4, 12), 'rope', 0, 0.1, 0, Math.PI / 2); } },
+  oar: { shape: { type: 'box', hx: 1.2, hy: 0.03, hz: 0.08 }, mass: 2, build: (b) => { b.cyl(0.025, 0.025, 2.2, 'roughWood', 0, 0, 0, 0, 0, Math.PI / 2, 6); b.box(0.55, 0.02, 0.14, 'roughWood', 1.25, 0, 0); } },
+  net_rack: { shape: { type: 'box', hx: 1.5, hy: 1.0, hz: 0.2 }, mass: 0, build: (b) => {
+    for (const x of [-1.4, 1.4]) b.cyl(0.05, 0.06, 2.0, 'roughWood', x, 0, 0, 0, 0, 0, 6);
+    b.cyl(0.04, 0.04, 3.0, 'roughWood', 0, 0.95, 0, 0, 0, Math.PI / 2, 6);
+    for (let i = 0; i < 7; i++) b.box(0.42, 1.3 - (i % 3) * 0.12, 0.015, 'rope', -1.25 + i * 0.42, 0.25 + (i % 3) * 0.06, (i % 2) * 0.03, 0, 0, (i % 2 ? 1 : -1) * 0.05);
+  } },
+  fish_rack: { shape: { type: 'box', hx: 1.2, hy: 0.9, hz: 0.5 }, mass: 0, build: (b) => {
+    for (const x of [-1.1, 1.1]) for (const z of [-0.4, 0.4]) b.cyl(0.04, 0.05, 1.8, 'roughWood', x, 0, z, 0, 0, 0, 5);
+    for (const y of [0.4, 0.8]) for (const z of [-0.4, 0.4]) b.cyl(0.03, 0.03, 2.3, 'roughWood', 0, y, z, 0, 0, Math.PI / 2, 5);
+    for (let i = 0; i < 9; i++) b.add(new THREE.SphereGeometry(0.06, 6, 4).scale(0.5, 2.6, 1), 'ash', -1.0 + i * 0.25, 0.62 - (i % 2) * 0.4, (i % 2 ? 0.4 : -0.4));
+  } },
+  fish_crate: { shape: { type: 'box', hx: 0.4, hy: 0.15, hz: 0.28 }, mass: 0, build: (b) => {
+    b.box(0.8, 0.3, 0.56, 'roughWood', 0, 0, 0);
+    for (let i = 0; i < 6; i++) b.add(new THREE.SphereGeometry(0.06, 6, 4).scale(3, 1, 1.4), 'metal', -0.24 + (i % 3) * 0.24, 0.16, (i < 3 ? -0.1 : 0.12), 0, i * 0.4, 0);
+  } },
+  lobster_pot: { shape: { type: 'cyl', hh: 0.22, r: 0.3 }, mass: 0, build: (b) => {
+    b.add(new THREE.CylinderGeometry(0.3, 0.32, 0.45, 10, 1, true), 'rope');
+    b.add(new THREE.TorusGeometry(0.31, 0.02, 4, 12), 'roughWood', 0, 0.22, 0, Math.PI / 2);
+    b.add(new THREE.TorusGeometry(0.31, 0.02, 4, 12), 'roughWood', 0, -0.22, 0, Math.PI / 2);
+  } },
   cart: { shape: { type: 'box', hx: 0.8, hy: 0.5, hz: 1.3 }, mass: 0, build: (b) => { b.box(1.4, 0.08, 2.4, 'planks', 0, 0.2, 0); for (const sx of [-1, 1]) { b.box(0.06, 0.45, 2.4, 'planks', sx * 0.68, 0.45, 0); b.add(new THREE.TorusGeometry(0.45, 0.05, 5, 12), 'darkWood', sx * 0.8, -0.05, 0.2, 0, Math.PI / 2); } b.box(0.08, 0.08, 1.6, 'darkWood', 0.2, 0.2, 1.9).box(0.08, 0.08, 1.6, 'darkWood', -0.2, 0.2, 1.9); } },
 };
 

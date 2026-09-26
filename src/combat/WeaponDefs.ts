@@ -3,7 +3,7 @@
  * lo que da "peso" al combate: un ataque fuerte compromete al atacante.
  */
 export type DamageType = 'slash' | 'blunt' | 'pierce';
-export type WeaponId = 'fists' | 'knife' | 'sword' | 'axe' | 'club' | 'spear' | 'bow';
+export type WeaponId = 'fists' | 'knife' | 'sword' | 'axe' | 'club' | 'spear' | 'bow' | 'pickaxe';
 
 export interface MeleeTiming {
   windup: number;
@@ -32,6 +32,8 @@ export interface WeaponDef {
   model: string;
   /** Aturdimiento que causa el golpe fuerte (s). */
   stagger: number;
+  /** Multiplicador de extracción contra rocas (pico). */
+  mine?: number;
 }
 
 export const WEAPONS: Record<WeaponId, WeaponDef> = {
@@ -64,6 +66,12 @@ export const WEAPONS: Record<WeaponId, WeaponDef> = {
     light: { windup: 0.36, active: 0.16, recovery: 0.4, damage: 21, stamina: 15 },
     heavy: { windup: 0.7, active: 0.2, recovery: 0.58, damage: 40, stamina: 30 },
     blockEff: 0.45, blockCost: 1.0, chop: 0.2, model: 'club', stagger: 0.9,
+  },
+  pickaxe: {
+    id: 'pickaxe', name: 'Pico', kind: 'melee', type: 'pierce', twoHanded: false, reach: 1.9,
+    light: { windup: 0.4, active: 0.16, recovery: 0.45, damage: 16, stamina: 14 },
+    heavy: { windup: 0.75, active: 0.2, recovery: 0.6, damage: 30, stamina: 26 },
+    blockEff: 0.35, blockCost: 1.1, chop: 0.1, model: 'pickaxe', stagger: 0.6, mine: 1,
   },
   spear: {
     id: 'spear', name: 'Lanza', kind: 'melee', type: 'pierce', twoHanded: true, reach: 2.8,

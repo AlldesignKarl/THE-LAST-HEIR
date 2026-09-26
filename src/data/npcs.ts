@@ -17,7 +17,7 @@ export interface NpcDef {
   id: string;
   name: string;
   role: string;
-  profession: 'hunter' | 'smith' | 'innkeeper' | 'priest' | 'carpenter' | 'merchant' | 'guard' | 'farmer' | 'physician';
+  profession: 'hunter' | 'smith' | 'innkeeper' | 'priest' | 'carpenter' | 'merchant' | 'guard' | 'farmer' | 'physician' | 'fisher' | 'baker' | 'boatwright' | 'cooper' | 'widow';
   village: string;
   home: string; // id de edificio
   faction: 'villager' | 'guard';
@@ -167,6 +167,127 @@ export const NPCS: NpcDef[] = [
     ],
     weapon: null, bravery: 0.2, health: 70, relations: {},
     barks: ['Lávate las heridas con vino, no con agua de charca.', 'Sangría y reposo.'],
+  },
+  // ---------------- Ampliación del pueblo: puerto y barrios nuevos
+  {
+    id: 'nuno', name: 'Nuño', role: 'Pescador', profession: 'fisher', village: 'robledo', home: 'fisher_1', faction: 'villager',
+    appearance: { skin: skin[3], tunic: 0x3e4a52, pants: 0x3a3226, hair: 0x2a2420, beard: true, build: 1.05 },
+    schedule: [
+      { from: 5, place: 'door:fisher_1', activity: 'wander' },
+      { from: 5.6, place: 'pier_end', activity: 'work' },
+      { from: 11, place: 'fish_rack_work', activity: 'work' },
+      { from: 13, place: 'tavern_table', activity: 'eat' },
+      { from: 14.5, place: 'pier_end', activity: 'work' },
+      { from: 19.5, place: 'in:fisher_1', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.6, health: 95, relations: { aldonza: 'esposa' }, trader: true,
+    barks: ['Con este levante las sardinas se van a la isla.', 'El Peñón tiene cuevas donde anidan los cormoranes.'],
+  },
+  {
+    id: 'aldonza', name: 'Aldonza', role: 'Redera', profession: 'fisher', village: 'robledo', home: 'fisher_2', faction: 'villager',
+    appearance: { skin: skin[0], tunic: 0x6a4a3a, pants: 0x3a2a22, hair: 0x3a2618, beard: false, female: true, build: 0.96 },
+    schedule: [
+      { from: 6.5, place: 'beach_nets', activity: 'work' },
+      { from: 12, place: 'in:fisher_2', activity: 'eat' },
+      { from: 13.5, place: 'beach_nets2', activity: 'work' },
+      { from: 17.5, place: 'well', activity: 'social' },
+      { from: 19, place: 'in:fisher_2', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.3, health: 75, relations: { nuno: 'marido' },
+    barks: ['Una red rota es una cena perdida.', 'Mira dónde pisas, que las redes muerden.'],
+  },
+  {
+    id: 'gonzalo', name: 'Gonzalo el Calafate', role: 'Carpintero de ribera', profession: 'boatwright', village: 'robledo', home: 'fisher_3', faction: 'villager',
+    appearance: { skin: skin[1], tunic: 0x5a5040, pants: 0x2e2a26, hair: 0x6a6258, beard: true, apron: true, build: 1.08 },
+    schedule: [
+      { from: 6.5, place: 'boat_shed_work', activity: 'work' },
+      { from: 12.5, place: 'tavern_table2', activity: 'eat' },
+      { from: 13.5, place: 'boat_shed_work', activity: 'work' },
+      { from: 18.5, place: 'pier_mid', activity: 'social' },
+      { from: 20.5, place: 'in:fisher_3', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.5, health: 90, relations: {}, trader: true,
+    barks: ['Estopa y brea: así no entra el agua.', 'Una barca bien calafateada dura veinte años.'],
+  },
+  {
+    id: 'mateo', name: 'Mateo', role: 'Patrón de barcas', profession: 'fisher', village: 'robledo', home: 'harbor_house', faction: 'villager',
+    appearance: { skin: skin[3], tunic: 0x2e3a4a, pants: 0x2a2a2a, hair: 0x1a1612, beard: true, hood: true, build: 1.1 },
+    schedule: [
+      { from: 6, place: 'pier_mid', activity: 'work' },
+      { from: 12, place: 'in:harbor_house', activity: 'eat' },
+      { from: 13, place: 'pier_end2', activity: 'work' },
+      { from: 18, place: 'tavern_table', activity: 'tavern' },
+      { from: 22, place: 'in:harbor_house', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.7, health: 100, relations: { nuno: 'cuñado' },
+    barks: ['Nadie sale al mar sin preguntarme a mí.', 'Las islas tienen dueño: el que llega primero.'],
+  },
+  {
+    id: 'elvira', name: 'Elvira', role: 'Hornera', profession: 'baker', village: 'robledo', home: 'bakery', faction: 'villager',
+    appearance: { skin: skin[2], tunic: 0x8a7050, pants: 0x4a3a30, hair: 0x5a3a20, beard: false, female: true, apron: true, build: 1.02 },
+    schedule: [
+      { from: 4.5, place: 'bakery_oven', activity: 'work' },
+      { from: 9, place: 'market_stall', activity: 'sell' },
+      { from: 13, place: 'bakery_oven', activity: 'work' },
+      { from: 18, place: 'church_altar', activity: 'pray' },
+      { from: 19, place: 'in:bakery', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.3, health: 75, relations: {}, trader: true,
+    barks: ['¡Pan caliente, recién sacado!', 'El horno no espera a nadie.'],
+  },
+  {
+    id: 'urraca', name: 'Urraca', role: 'Viuda', profession: 'widow', village: 'robledo', home: 'house_n3', faction: 'villager',
+    appearance: { skin: skin[2], tunic: 0x2a2626, pants: 0x2a2626, hair: 0xa8a098, beard: false, female: true, robe: true, build: 0.9 },
+    schedule: [
+      { from: 7, place: 'church_altar', activity: 'pray' },
+      { from: 9, place: 'well', activity: 'social' },
+      { from: 11, place: 'plaza_bench', activity: 'social' },
+      { from: 13, place: 'in:house_n3', activity: 'eat' },
+      { from: 16, place: 'plaza', activity: 'social' },
+      { from: 19, place: 'in:house_n3', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.1, health: 60, relations: { anselmo: 'confesor' },
+    barks: ['En mis tiempos los bandidos no se atrevían a tanto.', 'Mi Lope se fue al mar y no volvió.'],
+  },
+  {
+    id: 'diego', name: 'Diego Aranda', role: 'Labrador', profession: 'farmer', village: 'robledo', home: 'house_n1', faction: 'villager',
+    appearance: { skin: skin[1], tunic: 0x5a5a3a, pants: 0x3a3226, hair: 0x3a2a1a, beard: false, build: 1.0 },
+    schedule: [
+      { from: 5.5, place: 'field_3', activity: 'farm' },
+      { from: 12, place: 'in:house_n1', activity: 'eat' },
+      { from: 13.5, place: 'field_1', activity: 'farm' },
+      { from: 18.5, place: 'tavern_table2', activity: 'tavern' },
+      { from: 21, place: 'in:house_n1', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.5, health: 90, relations: { teresa: 'vecina' },
+    barks: ['La paja de este año es buena para techar.', 'Si quieres paja para tu tejado, págamela bien.'],
+    trader: true,
+  },
+  {
+    id: 'fortun', name: 'Fortún', role: 'Tonelero', profession: 'cooper', village: 'robledo', home: 'house_n2', faction: 'villager',
+    appearance: { skin: skin[0], tunic: 0x4a3a2a, pants: 0x2a2622, hair: 0x2a2018, beard: true, apron: true, build: 1.04 },
+    schedule: [
+      { from: 7, place: 'salt_work', activity: 'work' },
+      { from: 12.5, place: 'in:house_n2', activity: 'eat' },
+      { from: 14, place: 'salt_work', activity: 'work' },
+      { from: 18, place: 'tavern_table', activity: 'tavern' },
+      { from: 21.5, place: 'in:house_n2', activity: 'sleep' },
+    ],
+    weapon: null, bravery: 0.4, health: 85, relations: {},
+    barks: ['Duelas de roble y aros de hierro, como manda el oficio.', 'Sin barriles no hay salazón.'],
+  },
+  {
+    id: 'blasco', name: 'Blasco', role: 'Herrador', profession: 'smith', village: 'robledo', home: 'house_n4', faction: 'villager',
+    appearance: { skin: skin[3], tunic: 0x4a4038, pants: 0x2a2622, hair: 0x1a1410, beard: true, build: 1.1 },
+    schedule: [
+      { from: 7, place: 'stable_work', activity: 'work' },
+      { from: 12, place: 'in:house_n4', activity: 'eat' },
+      { from: 13, place: 'stable_work', activity: 'work' },
+      { from: 18, place: 'plaza', activity: 'social' },
+      { from: 21, place: 'in:house_n4', activity: 'sleep' },
+    ],
+    weapon: 'club', bravery: 0.75, health: 105, relations: { bartolome: 'compadre' },
+    barks: ['Un caballo sin herrar no llega ni a Valdeolmo.', 'Si vienen los Cuervos, que vengan.'],
   },
 ];
 

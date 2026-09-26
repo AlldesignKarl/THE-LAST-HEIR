@@ -26,7 +26,7 @@ export interface Appearance {
 
 export type AnimState =
   | 'idle' | 'walk' | 'run' | 'windup' | 'strike' | 'recover' | 'block' | 'hit' | 'dead'
-  | 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'cower' | 'aim' | 'talk';
+  | 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'cower' | 'aim' | 'talk' | 'fish';
 
 export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number }
 
@@ -285,8 +285,20 @@ export class HumanoidModel {
     this.offObj = m;
   }
 
+  /** Biblioteca de modelos para objetos de oficio (caña de pescar). */
+  models: ModelLibrary | null = null;
+  private prop: THREE.Object3D | null = null;
+
   setState(s: AnimState): void {
     if (s === this.state) return;
+    // La caña aparece solo mientras pesca.
+    if (this.prop) { this.prop.parent?.remove(this.prop); this.prop = null; }
+    if (s === 'fish' && this.models) {
+      this.prop = this.models.create('fishing_rod').object;
+      this.prop.rotation.set(Math.PI / 2 - 0.1, 0, 0);
+      this.prop.position.set(0, -0.03, 0.05);
+      this.handR.add(this.prop);
+    }
     this.state = s;
     this.stateT = 0;
     if (s === 'dead') this.deadT = 0;
@@ -345,6 +357,10 @@ export class HumanoidModel {
       hipLx = 0.25; hipRx = -0.2; knR = 0.2;
     } else if (s === 'block') {
       shRx = -1.4; shRz = 0.4; elR = -1.3; shLx = -1.2; elL = -1.4; spineX = 0.1; hipLx = 0.3; hipRx = -0.25; knL = knR = 0.25; hipsY = -0.06;
+    } else if (s === 'fish') {
+      // Caña sujeta con las dos manos, con leves tirones.
+      const tug = Math.max(0, Math.sin(this.stateT * 0.7)) ** 8 * 0.25;
+      shRx = -0.75 - tug; elR = -0.5; shLx = -0.65 - tug; elL = -0.8; shLz = -0.25; spineX = 0.05;
     } else if (s === 'aim') {
       shLx = -1.5; shLz = 0.1; elL = 0; shRx = -1.5; shRz = -0.6; elR = -2.2; spineY = -0.4;
     } else if (s === 'hit') {

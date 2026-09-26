@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { BuildingInstance, type Door } from './Buildings';
 import {
-  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, WATCHTOWER, WELL, WOLF_DEN,
+  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
 } from './WorldLayout';
 import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
@@ -28,7 +28,7 @@ export interface Place {
   /** Edificio en cuyo interior está (el NPC "entra"). */
   building?: string;
   /** Actividad visual al llegar. */
-  anim?: 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop';
+  anim?: 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'fish';
 }
 
 export interface Gate {
@@ -77,6 +77,7 @@ export class Settlement {
     this.buildWatchtower();
     this.buildFields();
     this.buildBridges();
+    this.buildHarbor();
     this.cave = new Cave(g.hf, g.physics, g.renderer.scene, g.materials);
     this.buildCaveContent();
     this.buildBanditCamp();
@@ -875,6 +876,68 @@ export class Settlement {
     }
   }
 
+  // ------------------------------------------------------------ puerto
+
+  /** Extremos del embarcadero (mundo). */
+  readonly pier = { x0: 0, x1: 0, z: PIER.z, y: 0, w: PIER.width };
+
+  private buildHarbor(): void {
+    const g = this.g;
+    const hf = g.hf;
+    const zp = PIER.z;
+    // El embarcadero arranca donde la arena baja hasta cerca del agua.
+    let x0 = hf.coastX(zp) - 25;
+    while (x0 < hf.coastX(zp) + 20 && hf.heightAt(x0, zp) > SEA.level + 1.0) x0 += 0.5;
+    x0 -= 3;
+    const len = PIER.length, w = PIER.width;
+    const deckY = Math.max(SEA.level + 1.3, hf.heightAt(x0, zp) + 0.12);
+    Object.assign(this.pier, { x0, x1: x0 + len, y: deckY });
+    const parts: THREE.BufferGeometry[] = [];
+    const posts: THREE.BufferGeometry[] = [];
+    parts.push(worldBox(len, 0.1, w, 1.2).translate(x0 + len / 2, deckY - 0.05, zp));
+    for (const sz of [-1, 1]) parts.push(worldBox(len, 0.18, 0.14, 1).translate(x0 + len / 2, deckY - 0.19, zp + sz * (w / 2 - 0.2)));
+    for (let x = x0 + 1; x <= x0 + len; x += 3) {
+      for (const sz of [-1, 1]) {
+        const bottom = hf.heightAt(x, zp + sz * (w / 2)) - 0.6;
+        const h = deckY + 0.35 - bottom;
+        posts.push(new THREE.CylinderGeometry(0.13, 0.15, h, 7).translate(x, bottom + h / 2, zp + sz * (w / 2 + 0.05)));
+      }
+      parts.push(worldBox(0.14, 0.14, w + 0.2, 1).translate(x, deckY - 0.3, zp));
+    }
+    const norm = (gs: THREE.BufferGeometry[]) => gs.map((q) => { const n = q.index ? q.toNonIndexed() : q; for (const k of Object.keys(n.attributes)) if (!['position', 'normal', 'uv'].includes(k)) n.deleteAttribute(k); return n; });
+    const deck = new THREE.Mesh(mergeGeometries(norm(parts))!, g.materials.get('planks'));
+    const piles = new THREE.Mesh(mergeGeometries(norm(posts))!, g.materials.get('roughWood'));
+    for (const m of [deck, piles]) { m.castShadow = true; m.receiveShadow = true; this.staticObjs.push(m); }
+    const body = g.physics.world.createRigidBody(RAPIER.RigidBodyDesc.fixed().setTranslation(x0 + len / 2, deckY - 0.1, zp));
+    const col = g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(len / 2, 0.1, w / 2).setCollisionGroups(groups(GROUP.STATIC, ALL)), body);
+    g.physics.tag(col, { kind: 'static', id: 'pier' });
+    // Faroles del embarcadero.
+    [x0 + 2, x0 + len - 1].forEach((x, i) => {
+      const z = zp + w / 2 - 0.1;
+      this.placeStatic('torch_post', x, deckY + 1.1, z, 0, 'pier');
+      g.fires.add({ id: `pier_${i}`, kind: 'torch', pos: new THREE.Vector3(x, deckY + 2.35, z), policy: 'night', canCook: false, heat: 6 });
+    });
+    // Nasas y cajas de pescado sobre el muelle.
+    this.placeStatic('lobster_pot', x0 + 6, deckY + 0.22, zp - 0.9, 0.4, 'pier');
+    this.placeStatic('lobster_pot', x0 + 6.8, deckY + 0.22, zp - 0.6, 1.1, 'pier');
+    this.placeStatic('fish_crate', x0 + 9, deckY + 0.15, zp + 0.9, 0.2, 'pier');
+    // Playa: redes tendidas, secaderos, cajas y barriles.
+    const onGround = (model: string, x: number, z: number, rot: number, dy: number) => this.placeStatic(model, x, this.ground(x, z) + dy, z, rot, 'harbor');
+    onGround('net_rack', hf.coastX(-14) - 16, -14, Math.PI / 2, 1.0);
+    onGround('net_rack', hf.coastX(40) - 16, 40, Math.PI / 2 + 0.2, 1.0);
+    onGround('fish_rack', 79, -14, 0.3, 0.9);
+    onGround('fish_rack', 77, 44, -0.2, 0.9);
+    onGround('fish_crate', 62, 13, 0.4, 0.15);
+    onGround('fish_crate', 63, 14.2, 1.3, 0.15);
+    onGround('barrel', 64, 3.5, 0, 0.45);
+    // Barca varada en la arena, boca abajo (reparación).
+    const bx = hf.coastX(-2) - 10;
+    const hull = g.models.create('rowboat').object;
+    hull.position.set(bx, this.ground(bx, -2) + 0.62, -2);
+    hull.rotation.set(Math.PI, 0.6, 0);
+    this.staticObjs.push(hull);
+  }
+
   // ------------------------------------------------------------ lugares (IA)
 
   private buildPlaces(): void {
@@ -924,6 +987,21 @@ export class Settlement {
     add('patrol_4', -35, 25, 0);
     add('woodpile_zone', this.woodDropZone.x + 1.5, this.woodDropZone.z + 1.5, 0, 'work');
     add('bandit_camp', BANDIT_CAMP.x, BANDIT_CAMP.z + 3, 0, 'sit');
+    // Puerto y ampliación del pueblo.
+    const pr = this.pier;
+    add('pier_mid', (pr.x0 + pr.x1) / 2, pr.z + 0.6, Math.PI / 2, 'work', undefined, pr.y);
+    add('pier_end', pr.x1 - 1.5, pr.z - 0.6, Math.PI / 2, 'fish', undefined, pr.y);
+    add('pier_end2', pr.x1 - 3.5, pr.z + 0.8, Math.PI / 2, 'fish', undefined, pr.y);
+    add('pier_start', pr.x0 - 3, pr.z, Math.PI / 2);
+    add('beach_nets', this.g.hf.coastX(-14) - 16, -12.4, 0, 'work');
+    add('beach_nets2', this.g.hf.coastX(40) - 16, 41.6, Math.PI, 'work');
+    add('fish_rack_work', 79, -12.8, Math.PI, 'work');
+    inB('boat_shed', 0, 0.5, Math.PI, 'hammer', 'boat_shed_work');
+    inB('bakery', 0, -1.2, Math.PI, 'work', 'bakery_oven');
+    add('salt_work', this.buildings.get('salt_store')!.doors[0]?.outside.x ?? 60, this.buildings.get('salt_store')!.doors[0]?.outside.z ?? 10, 0, 'work');
+    add('field_3', FIELDS[0].x + 12, FIELDS[0].z + 10, 2, 'farm');
+    add('south_lane', -10, 64, 0);
+    add('harbor_lane', 70, 12, 0);
   }
 
   // ------------------------------------------------------------ persistencia
