@@ -83,6 +83,9 @@ export class Input {
   }
 
   private onKey(e: KeyboardEvent, isDown: boolean): void {
+    // Escribiendo (chat, nombre de servidor…): las teclas no mueven al jugador.
+    const tg = e.target as HTMLElement | null;
+    if (tg && (tg.tagName === 'INPUT' || tg.tagName === 'TEXTAREA')) return;
     const action = DEFAULT_BINDINGS[e.code];
     if (!action) return;
     if (e.code === 'Tab' || e.code === 'F3' || e.code === 'Space') e.preventDefault();

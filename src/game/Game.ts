@@ -61,6 +61,8 @@ import { Guide } from '../ui/Guide';
 import { Boats } from '../world/Boats';
 import { Fishing } from '../player/Fishing';
 import { SaveSystem } from '../save/SaveSystem';
+import { Multiplayer } from '../net/Multiplayer';
+import { MultiplayerUI } from '../ui/MultiplayerUI';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
 
@@ -123,6 +125,9 @@ export class Game {
   readonly fishing: Fishing;
   /** Id del jugador local (en multijugador, el del usuario). */
   localPlayerId = 'local';
+  /** Multijugador (servidor compartido); inactivo en partida individual. */
+  readonly mp: Multiplayer;
+  readonly mpUI: MultiplayerUI;
   /** Controles en pantalla (solo en dispositivos táctiles). */
   readonly touch: TouchControls | null;
   readonly save: SaveSystem;
@@ -218,6 +223,8 @@ export class Game {
     this.touch = this.input.touchMode ? new TouchControls(this) : null;
     this.save = new SaveSystem(this.bus);
     this.registerSaveables();
+    this.mp = new Multiplayer(this);
+    this.mpUI = new MultiplayerUI(this);
     this.wireEvents();
     this.loop = new GameLoop((dt) => this.fixedUpdate(dt), (a, fdt) => this.renderFrame(a, fdt), 30);
     // Vista inicial (menú): el pueblo al amanecer.
@@ -320,7 +327,7 @@ export class Game {
     b.on('doc:read', (e) => { if (e.docId === 'map_fragment_1') this.discovered.add('cave_crow'); });
     b.on('quest:completed', (e) => {
       if (e.questId === 'side_palisade') this.consumeDeliveredLogs();
-      this.save.save('auto');
+      this.save.autosave();
     });
     b.on('game:saved', () => { /* hook para UI */ });
   }
@@ -586,6 +593,7 @@ export class Game {
     this.ui.updateHUD(frameDt);
     this.touch?.update();
     this.guide.update(frameDt);
+    this.mp.frame(frameDt);
     this.updatePerf();
     this.renderer.render();
     if (this.started) this.viewmodel.render(this.renderer.renderer);

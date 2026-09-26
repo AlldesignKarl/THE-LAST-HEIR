@@ -30,6 +30,8 @@ interface Rock {
 export class Resources {
   readonly rocks = new Map<string, Rock>();
   private group = new THREE.Group();
+  /** Aviso al multijugador: una roca ha cambiado (piedras restantes). */
+  onChange: ((id: string, stones: number, depletedDay: number) => void) | null = null;
 
   constructor(private readonly g: Game) {
     g.renderer.scene.add(this.group);
@@ -91,6 +93,7 @@ export class Resources {
       g.bus.emit('notify', { text: 'Necesitas un pico para sacar piedra.', kind: 'warning' });
       return;
     }
+    const before = r.stones;
     r.progress += power;
     while (r.progress >= PER_STONE && r.stones > 0) {
       r.progress -= PER_STONE;
@@ -104,6 +107,17 @@ export class Resources {
       r.depletedDay = g.time.day;
       g.bus.emit('notify', { text: 'La roca se ha agotado. Volverá a haber piedra en unos días.', kind: 'info' });
     }
+    if (r.stones !== before) this.onChange?.(r.id, r.stones, r.depletedDay);
+    this.makeBody(r);
+  }
+
+  /** Estado de una roca recibido por red (otro jugador ha picado). */
+  setRock(id: string, stones: number, depletedDay: number): void {
+    const r = this.rocks.get(id);
+    if (!r || r.stones === stones) return;
+    r.stones = Math.max(0, Math.min(r.maxStones, stones));
+    r.depletedDay = depletedDay;
+    r.progress = 0;
     this.makeBody(r);
   }
 

@@ -103,6 +103,12 @@ Input → TimeOfDay → Weather → PlayerController → Interaction/Carry
 
 Persistencia del mundo: árboles talados (con fecha de rebrote), objetos recogidos y soltados, contenido de cofres, puertas, NPCs muertos, daños en edificios, historial de ataques, clima y hora.
 
+Guardado automático: `SaveSystem.autosave()` escribe en la ranura activa (`auto` o, en multijugador, `mp_<servidor>_<usuario>`) cada 45 s, al dormir, al cumplir una tarea, al cerrar la página y al pasar a segundo plano.
+
+## Multijugador
+
+`net/Net.ts` abstrae el transporte: en claude.ai usa las capacidades `room` (sala con nombre por servidor, presencia), `db` (documentos) y `user` (id y nombre); con `?mplocal`, `BroadcastChannel` + `localStorage` entre pestañas para pruebas. `net/Multiplayer.ts` no cambia la simulación: se engancha a `BuildSystem.onChange`, `Resources.onChange` y al evento `tree:felled`, publica una cola numerada de acciones en la presencia y aplica las ajenas con operaciones idempotentes (`addPiece`, `removePiece`, `toggleDoor`, `TreeFelling.fellRemote`, `Resources.setRock`). Al entrar se aplica la partida personal sin los sistemas del mundo (`build`, `vegetation`, `resources`, `boats`, `time`, `weather`) y después el documento `worlds/<servidor>`. Un solo cliente (el guardián) escribe ese documento para evitar pisadas (la base de datos es «último en escribir gana»).
+
 ## Pruebas
 
 - `npm test`: tests unitarios de lógica (inventario, necesidades, agenda, misiones, reputación, economía, director de ataques, guardado, heightfield).

@@ -28,6 +28,14 @@ Una zona completamente jugable alrededor de Robledo:
 - Versión de un solo archivo publicable (`scripts/build-artifact.mjs`).
 - Texturas procedurales en GPU (512–1024 px), terreno por capas con normales, árboles con follaje de tarjetas, hierba y detalle de suelo, edificios con entramado y carpintería, personas con rostro y vestuario, armas con perfiles propios, IBL del cielo.
 
+## Fase 1.6 · Costa, casa propia y multijugador ✅
+- Costa con playa, mar, embarcadero, barrio de pescadores y tres islas explorables; nado, barcas de remos y pesca.
+- Pueblo ampliado (16 edificios, 9 vecinos con oficio y comercio).
+- Recolección (tala → tablones, cantera → piedra) y construcción por piezas en la parcela del jugador.
+- Guía de objetivos con flecha y marcadores.
+- Multijugador cooperativo de hasta 5 por servidor con enlace de invitación y guardado automático en la nube (ver `ESTADO.md`).
+- Pendiente para una fase posterior: sincronizar vecinos, animales, asaltos, objetos sueltos y arcones; una parcela por jugador; colisión y combate entre jugadores.
+
 ## Fase 2 · Profundidad de sistemas
 - Cocina completa, fogatas colocables, odres, temperatura por ropa.
 - Armaduras y escudos con durabilidad; lanza, maza, daga.

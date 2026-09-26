@@ -14,7 +14,7 @@ import { PIECES } from '../world/BuildSystem';
 export interface DialogueOption { text: string; onSelect: () => void; disabled?: boolean }
 export interface DialogueView { name: string; role: string; text: string; options: DialogueOption[] }
 
-type ScreenId = 'menu' | 'pause' | 'inventory' | 'document' | 'journal' | 'map' | 'sleep' | 'death' | 'trade' | 'controls' | 'options' | 'load';
+type ScreenId = 'menu' | 'pause' | 'inventory' | 'document' | 'journal' | 'map' | 'sleep' | 'death' | 'trade' | 'controls' | 'options' | 'load' | 'mp';
 
 const CAT_NAMES: Record<ItemCategory, string> = {
   weapon: 'Armas', tool: 'Herramientas', ammo: 'Munición', food: 'Comida', drink: 'Bebida', resource: 'Materiales',
@@ -75,7 +75,7 @@ export class UIManager {
     this.dialogueEl.style.pointerEvents = 'auto';
     this.root.append(this.vignette, this.crosshair, this.prompt, this.buildBar, this.vitals, this.needs, this.weapon, this.notes, this.banner,
       this.toast, this.compass, this.subtitle, this.hint, this.dialogueEl, this.fadeEl, this.perf);
-    for (const id of ['menu', 'pause', 'inventory', 'document', 'journal', 'map', 'sleep', 'death', 'trade', 'controls', 'options', 'load'] as ScreenId[]) {
+    for (const id of ['menu', 'pause', 'inventory', 'document', 'journal', 'map', 'sleep', 'death', 'trade', 'controls', 'options', 'load', 'mp'] as ScreenId[]) {
       const s = h('div', 'screen');
       this.screens.set(id, s);
       this.root.append(s);
@@ -242,6 +242,11 @@ export class UIManager {
     this.g.onUIChanged();
   }
 
+  /** Pantalla libre (la usa el multijugador). */
+  openCustom(build: (el: HTMLElement) => void): void {
+    this.show('mp', build);
+  }
+
   close(): void {
     for (const s of this.screens.values()) s.classList.remove('show');
     this.current = null;
@@ -288,10 +293,12 @@ export class UIManager {
       b2.onclick = () => this.onNewGame?.();
       const b3 = h('button', 'btn', 'Cargar partida');
       b3.onclick = () => this.openLoad(true);
+      const b5 = h('button', 'btn', 'Jugar con amigos <span class="muted">(hasta 5)</span>');
+      b5.onclick = () => this.g.mpUI.openMenu();
       const b4 = h('button', 'btn', 'Controles');
       b4.onclick = () => this.openControls(true);
-      box.append(b1, b2, b3, b4);
-      const note = h('div', 'muted', 'Prototipo jugable (vertical slice). Modelos, texturas y sonidos son placeholders procedurales.');
+      box.append(b1, b2, b5, b3, b4);
+      const note = h('div', 'muted', 'La partida se guarda sola. Modelos, texturas y sonidos son placeholders procedurales.');
       note.style.marginTop = '14px';
       note.style.maxWidth = '420px';
       box.append(note);
@@ -310,17 +317,29 @@ export class UIManager {
       const p = h('div', 'panel', '<h2>Pausa</h2>');
       const mk = (t: string, fn: () => void) => { const b = h('button', 'btn', t); b.onclick = fn; p.append(b); };
       mk('Continuar', () => this.close());
-      for (const slot of ['1', '2', '3']) {
-        const info = this.g.save.info(slot);
-        mk(`Guardar en ranura ${slot}${info ? ` <span class="muted">(${info})</span>` : ''}`, () => {
-          this.g.save.save(slot);
-          this.close();
-        });
+      const last = this.g.save.lastAutosave;
+      const auto = h('div', 'muted', last ? `Guardado automático: hace ${Math.max(1, Math.round((Date.now() - last) / 1000))} s` : 'La partida se guarda sola cada poco.');
+      auto.style.margin = '2px 0 8px';
+      p.append(auto);
+      if (this.g.mp.active) {
+        this.g.mpUI.pauseSection(p);
+      } else {
+        for (const slot of ['1', '2', '3']) {
+          const info = this.g.save.info(slot);
+          mk(`Guardar en ranura ${slot}${info ? ` <span class="muted">(${info})</span>` : ''}`, () => {
+            this.g.save.save(slot);
+            this.close();
+          });
+        }
+        mk('Cargar partida', () => this.openLoad(false));
       }
-      mk('Cargar partida', () => this.openLoad(false));
       mk('Controles', () => this.openControls(false));
       mk('Opciones', () => this.openOptions());
-      mk('Salir al menú principal', () => { this.g.save.save('auto'); location.href = location.pathname + location.search; });
+      mk(this.g.mp.active ? 'Salir del servidor' : 'Salir al menú principal', () => {
+        this.g.save.autosave();
+        this.g.mp.leave();
+        location.href = location.pathname + location.search;
+      });
       el.append(p);
     });
   }

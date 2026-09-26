@@ -8,6 +8,7 @@ import { Game } from './game/Game';
 import { SaveSystem } from './save/SaveSystem';
 import { installDebugAPI } from './debug/DebugAPI';
 import { TouchControls } from './ui/TouchControls';
+import { parseServerId } from './net/Multiplayer';
 
 async function boot(): Promise<void> {
   const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
@@ -31,6 +32,7 @@ async function boot(): Promise<void> {
   loading.remove();
 
   const pending = SaveSystem.takePendingLoad();
+  const inviteSid = parseServerId(location.hash);
   const startPlaying = () => game.enterGame();
   game.ui.onNewGame = () => {
     game.newGame();
@@ -41,7 +43,7 @@ async function boot(): Promise<void> {
     if (slot) game.save.requestLoad(slot);
   };
 
-  if (pending && game.save.loadNow(pending)) {
+  if (pending && !inviteSid && game.save.loadNow(pending)) {
     game.started = true;
     game.ui.showToast('Partida cargada', game.save.info(pending) ?? '');
     // Requiere un gesto del usuario para el ratón y el audio.
@@ -54,6 +56,10 @@ async function boot(): Promise<void> {
     game.started = true;
     game.paused = false;
     game.input.gameplayEnabled = true;
+  } else if (inviteSid) {
+    // Enlace de invitación a un servidor multijugador (#s-<id>).
+    game.ui.openMainMenu(game.save.hasAny());
+    game.mpUI.openJoin(inviteSid);
   } else {
     game.ui.openMainMenu(game.save.hasAny());
   }
@@ -66,10 +72,14 @@ async function boot(): Promise<void> {
     if (!document.pointerLockElement && game.started && !game.ui.blocking && !game.vitals.dead && !params.has('autostart')) game.ui.openPause();
   });
   window.addEventListener('beforeunload', () => {
-    if (game.started && !game.vitals.dead) game.save.save('auto');
+    if (game.started && !game.vitals.dead) game.save.autosave();
   });
-  // Autoguardado periódico (5 min reales).
-  setInterval(() => { if (game.started && !game.paused && !game.vitals.dead && !game.raids.active) game.save.save('auto'); }, 5 * 60 * 1000);
+  // Al pasar a segundo plano (móvil: cambiar de app, bloquear) también se guarda.
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden' && game.started && !game.vitals.dead) game.save.autosave();
+  });
+  // Autoguardado periódico: cada 45 s de juego activo (no durante un asalto).
+  setInterval(() => { if (game.started && !game.vitals.dead && !game.raids.active) game.save.autosave(); }, 45 * 1000);
   game.start();
 }
 

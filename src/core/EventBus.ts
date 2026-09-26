@@ -31,7 +31,7 @@ export interface GameEvents {
   'raid:ended': { raidId: string; village: string; result: 'repelled' | 'failed'; summary: string };
   'building:damaged': { buildingId: string; health: number };
   'building:fire': { buildingId: string; burning: boolean };
-  'tree:felled': { treeId: string };
+  'tree:felled': { treeId: string; fromX?: number; fromZ?: number };
   'time:hour': { day: number; hour: number };
   'weather:changed': { state: string };
   'notify': { text: string; kind?: 'info' | 'quest' | 'warning' | 'alert' | 'item' };

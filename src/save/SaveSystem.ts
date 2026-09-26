@@ -62,6 +62,12 @@ export class SaveSystem {
   private saveables: Saveable[] = [];
   playTime = 0;
   summary: () => string = () => '';
+  /** Ranura del guardado automático ('auto'; en multijugador, la del servidor). */
+  autoSlot = 'auto';
+  /** Momento (Date.now) del último autoguardado correcto. */
+  lastAutosave = 0;
+  /** Tras cada autoguardado (el multijugador lo sube a la nube). */
+  onAutosave: ((doc: SaveDoc) => void) | null = null;
 
   constructor(private readonly bus: EventBus | null, private readonly storage: StorageBackend = safeStorage()) {}
 
@@ -95,6 +101,26 @@ export class SaveSystem {
     }
   }
 
+  /** Guardado automático: sin avisos, a la ranura activa. */
+  autosave(): boolean {
+    try {
+      const doc = this.build();
+      this.storage.setItem(PREFIX + this.autoSlot, JSON.stringify(doc));
+      this.lastAutosave = Date.now();
+      this.bus?.emit('game:saved', { slot: this.autoSlot });
+      this.onAutosave?.(doc);
+      return true;
+    } catch (err) {
+      console.error('[Save] autoguardado fallido', err);
+      return false;
+    }
+  }
+
+  /** Guarda un documento ya construido en una ranura (p. ej. el de la nube). */
+  writeDoc(slot: string, doc: SaveDoc): void {
+    this.storage.setItem(PREFIX + slot, JSON.stringify(doc));
+  }
+
   read(slot: string): SaveDoc | null {
     const raw = this.storage.getItem(PREFIX + slot);
     if (!raw) return null;
@@ -107,10 +133,10 @@ export class SaveSystem {
   }
 
   /** Aplica un documento a los sistemas registrados (en orden de registro). */
-  apply(doc: SaveDoc): void {
+  apply(doc: SaveDoc, skip?: Set<string>): void {
     this.playTime = doc.playTime;
     for (const s of this.saveables) {
-      if (!(s.id in doc.systems)) continue;
+      if (!(s.id in doc.systems) || skip?.has(s.id)) continue;
       try {
         s.deserialize(doc.systems[s.id]);
       } catch (err) {

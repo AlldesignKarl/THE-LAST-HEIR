@@ -50,7 +50,7 @@ export class Actions {
     g.animals?.onTimeSkip();
     g.bus.emit('player:slept', { hours });
     g.bus.emit('notify', { text: sleeping ? `Duermes. Despiertas: ${g.time.periodName().toLowerCase()}, día ${g.time.day}.` : `Descansas ${hours} h.`, kind: 'info' });
-    if (sleeping) g.save.save('auto');
+    if (sleeping) g.save.autosave();
     return true;
   }
 

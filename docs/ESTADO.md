@@ -7,8 +7,9 @@ Resumen honesto de lo que funciona, cómo se ha verificado y qué falta.
 | Tipo | Cómo | Resultado |
 |---|---|---|
 | Tipos | `npm run typecheck` (TS estricto) | Sin errores |
-| Unitarias | `npm test` (Vitest): terreno, transformaciones, inventario, necesidades, misiones, reputación, guardado, navegación | 27/27 |
+| Unitarias | `npm test` (Vitest): terreno, transformaciones, inventario, necesidades, misiones, reputación, guardado, navegación, trazado del pueblo y la costa, multijugador | 31/31 |
 | E2E | `npm run e2e`: el juego real en Chromium (WebGL por software) dirigido por `window.__game` | 21/21 |
+| E2E multijugador | `node e2e/mp.mjs <url>`: dos jugadores en dos pestañas | 25/25 |
 | Build | `npm run build` | Correcto (JS ~3,7 MB, 1,3 MB gzip; incluye el WASM de Rapier) |
 
 Escenarios E2E (todos juegan sobre los sistemas reales, sin simulaciones):
@@ -18,6 +19,21 @@ arranque · coger el hacha de la mesa · agarrar/transportar/lanzar · tabla sue
 
 - **Controles táctiles** (`ui/TouchControls.ts`): joystick dinámico a la izquierda, arrastrar para mirar, botones de atacar (mantener = fuerte / tensar arco, arrastrando se apunta), bloquear, usar, saltar, esquivar, patada, agarrar, antorcha, cambio de arma, correr y agacharse (fijos), inventario, diario, mapa y pausa. Botón ✕ en las pantallas. Se activan solos en pantallas táctiles, con calidad baja por defecto. Prueba: `node e2e/touch.mjs <url>?debug` (emulación de móvil en horizontal).
 - **Un solo archivo**: `node scripts/build-artifact.mjs` genera `artifact/the-last-heir.html` (JS, CSS y WASM en línea, ~3,7 MB) para publicarlo como página sin servidor.
+
+## Multijugador (hasta 5 por servidor)
+
+Implementado sobre las capacidades de la página publicada en claude.ai (`src/net/Net.ts`, `src/net/Multiplayer.ts`, `src/ui/MultiplayerUI.ts`):
+
+- **Servidor** = mundo compartido con id propio. Menú «Jugar con amigos»: crear servidor, unirse con enlace/código, «Tus servidores». Enlace de invitación `…/artifact/<id>#s-<servidor>` con botón de copiar en la pausa.
+- **Tiempo real**: sala con nombre por servidor (`room.join`). Cada jugador publica su presencia ~10 veces/s (posición, mirada, animación, herramienta, antorcha, barca) y en ella una cola numerada de acciones (construir, desmontar, puertas, talar, picar) y el chat. Los demás aplican las acciones de forma idempotente; tras un corte se sigue por el último número aplicado.
+- **Límite de 5**: al entrar se cuentan los conectados a la sala; con 5 se rechaza con un aviso.
+- **Persistencia**: `worlds/<servidor>` (construcciones, árboles talados, rocas, barcas, hora, tiempo, miembros) lo escribe un único «guardián» (el jugador con permiso de escritura de menor id de conexión) 2 s después de cada cambio y cada 30 s. La partida personal va a `data/users/<usuario>/w_<servidor>` (privado) y a una copia local; al entrar se usa la más reciente.
+- **Hora y tiempo** los marca el dueño del servidor si está conectado; si no, el de menor id.
+- Otros jugadores se ven como personas con su herramienta, antorcha (con luz real), nombre encima y animación; se les ve remar.
+- **Permisos** (los pone la plataforma): quien tiene la página compartida como «Puede interactuar» (colaborador) juega y guarda; los invitados de fuera de la organización con acceso de solo lectura pueden jugar y verse, pero no escribir la base de datos: su partida se guarda en su navegador y el mundo lo guarda otro jugador con permiso.
+- **Prueba**: `node e2e/mp.mjs <url>` abre dos jugadores en dos pestañas con el transporte local (`?mplocal`): invitación por enlace, servidor lleno con 5, verse y moverse, construir/desmontar, talar, picar, chat, hora común, mundo guardado, volver a entrar con inventario y mundo, «Tus servidores», enlace en la pausa (25 comprobaciones).
+
+**Lo que no se sincroniza** (cada cliente lo simula por su cuenta): vecinos y sus rutinas, animales, asaltos de bandidos, objetos sueltos en el suelo (troncos, tablones, flechas), el contenido de los arcones y la historia/misiones de cada jugador. Los otros jugadores no chocan físicamente contigo ni se puede combatir entre jugadores. La parcela es una sola y se comparte en cada servidor. Fuera de claude.ai (archivo local) el multijugador no está disponible y el menú lo dice.
 
 ## Calidad visual (placeholders mejorados)
 
@@ -48,7 +64,7 @@ Optimizaciones activas: streaming de terreno por chunks con LOD y faldones, coll
 - **Animación de personajes procedural** por poses sobre un esqueleto rígido; legible pero no natural. Preparado para `AnimationMixer` + glTF.
 - **Voces**: los NPCs "hablan" con subtítulos; no hay voces grabadas.
 - **Navegación** por grafo de visibilidad con muros finos: en esquinas cerradas un NPC puede rozar una pared visualmente.
-- **Solo Robledo** está construido; el resto del valle (otros pueblos, río Arnós, Almenara, Peñaseca) es terreno y bosque. La misión principal llega a la **etapa 3 de 10** y su último objetivo (Valdeolmo) está marcado en el diario como contenido de la fase 3.
+- **Solo Robledo** (ahora con barrio del puerto, 16 edificios más y 9 vecinos nuevos), la costa y tres islas están construidos; el resto del valle (otros pueblos, río Arnós, Almenara, Peñaseca) es terreno y bosque. La misión principal llega a la **etapa 3 de 10** y su último objetivo (Valdeolmo) está marcado en el diario como contenido de la fase 3.
 - **Sin caballos ni armas de pólvora** todavía (fase 4); la arquitectura de armas (fases, tipos de daño) ya contempla recarga lenta y dispersión.
 - **Interiores**: la choza, la taberna y la iglesia son visitables; el resto de casas están cerradas (sus habitantes "entran" y las ventanas se iluminan).
 - **Sin mando** ni reasignación de teclas en la UI (el sistema de acciones ya lo permite).

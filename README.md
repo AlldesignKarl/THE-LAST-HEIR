@@ -16,7 +16,7 @@ npm run e2e        # pruebas E2E en Chromium real (levanta su propio servidor; o
 
 Versión de un solo archivo (para publicar sin servidor, p. ej. en móvil): `node scripts/build-artifact.mjs` → `artifact/the-last-heir.html`.
 
-Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game` para pruebas).
+Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game` para pruebas), `?mplocal&uid=<id>` (multijugador de prueba entre pestañas del mismo navegador), `#s-<id>` (enlace de invitación a un servidor).
 
 ## Qué hay en el vertical slice
 
@@ -30,11 +30,18 @@ Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game`
 - **Fauna**: ciervos que pastan, se alertan y huyen (y dejan huellas); lobos en manada de noche que temen el fuego. Despiece con cuchillo.
 - **Misiones**: historia principal (etapas 1–3 del Arca), «Madera para la empalizada», «Pieles para el invierno» y la defensa del pueblo.
 - **Ataques de bandidos**: salen de su campamento, se reúnen, se acercan, entran por la brecha o fuerzan el portón, incendian y saquean, y huyen si caen su cabecilla o la mitad. Campana de alarma, guardias a sus puestos, vecinos a casa. Consecuencias persistentes (casas dañadas, vecinos muertos, comerciante ausente, reputación, recompensas, reparaciones al alba).
-- **Reputación, economía** (maravedíes, precios según confianza, stock limitado que se repone), **habilidades por uso**, **guardado** persistente (autoguardado + 3 ranuras).
+- **Reputación, economía** (maravedíes, precios según confianza, stock limitado que se repone), **habilidades por uso**.
+- **Costa**: playa, embarcadero, barrio de pescadores y mar con oleaje, profundidad y espuma; se nada (con cansancio y riesgo de ahogarse). **Barcas de remos** (se alquilan a Mateo) para llegar a tres **islas** con contenido: ermita en ruinas, coca naufragada y el refugio del Peñón. **Pesca con caña** desde la orilla, el muelle o la barca.
+- **Tu parcela**: tala árboles, parte los troncos en tablones, pica piedra en la cantera y **construye tu casa por piezas** (cimientos, suelos, paredes con puerta o ventana, hastiales, tejados, valla, escalera, cama, arcón y hoguera) con colisión real, puertas que se abren y medio material de vuelta al desmontar.
+- **Guía de objetivos**: flecha con distancia, marcador en el mundo y en el mapa para la tarea que sigues.
+- **Multijugador cooperativo** (hasta 5 a la vez por servidor) en la versión publicada en claude.ai: crea un servidor, comparte el enlace de invitación y jugad juntos. Construcciones, árboles talados, piedra, barcas, hora y tiempo son comunes; inventario e historia, de cada uno. Chat con Enter.
+- **Guardado automático** (cada 45 s, al dormir, al cumplir tareas, al salir o cambiar de app) + 3 ranuras manuales en partida individual. En multijugador, el mundo se guarda en la base de datos de la página y la partida de cada jugador en su espacio privado.
 
 ## Controles
 
 **Móvil/tableta**: joystick con el pulgar izquierdo, arrastrar a la derecha para mirar y botones en pantalla (se activan solos en pantallas táctiles).
+
+**Construir**: B modo construcción · X/Z o rueda cambiar pieza · Q girar · clic colocar · E desmontar. **Barca**: E subir/bajar, W/S remar, A/D girar. **Multijugador**: Enter chat · Esc → invitar.
 
 **Teclado y ratón**: WASD mover · Shift correr · Ctrl agacharse · Espacio saltar · E usar/coger · R agarrar/soltar · Clic ataque (mantener: fuerte / tensar arco) · Clic der. bloquear · C esquivar · F patada · T antorcha · 1–4 armas · Tab inventario · J diario · M mapa · Esc pausa · F3 rendimiento.
 

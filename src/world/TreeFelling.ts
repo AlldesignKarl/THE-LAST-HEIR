@@ -13,6 +13,8 @@ interface Falling {
   mesh: THREE.Object3D;
   t: number;
   length: number;
+  /** Talado por otro jugador: solo la caída (los troncos salen en su partida). */
+  remote?: boolean;
 }
 
 export class TreeFelling {
@@ -29,13 +31,25 @@ export class TreeFelling {
     g.particles.burst('dust', t.x, t.y + 1.2, t.z, 6, 1.5);
     if (t.health > 0) return false;
     g.vegetation.fell(treeId, g.time.day);
-    g.bus.emit('tree:felled', { treeId });
+    g.bus.emit('tree:felled', { treeId, fromX: from.x, fromZ: from.z });
     g.bus.emit('sfx', { id: 'tree_crack', x: t.x, y: t.y + 2, z: t.z });
     this.spawnFalling(t, from);
     return true;
   }
 
-  private spawnFalling(t: Tree, from: THREE.Vector3): void {
+  /** Un árbol que ha talado otro jugador (red): cae igual, sin troncos aquí. */
+  fellRemote(treeId: string, fromX: number, fromZ: number): void {
+    const g = this.g;
+    const t = g.vegetation.getTree(treeId);
+    if (!t || !g.vegetation.isStanding(t)) return;
+    g.vegetation.fell(treeId, g.time.day);
+    const near = g.player.pos.distanceTo(new THREE.Vector3(t.x, t.y, t.z)) < 120;
+    if (!near) return;
+    g.bus.emit('sfx', { id: 'tree_crack', x: t.x, y: t.y + 2, z: t.z });
+    this.spawnFalling(t, new THREE.Vector3(fromX, t.y, fromZ), true);
+  }
+
+  private spawnFalling(t: Tree, from: THREE.Vector3, remote = false): void {
     const g = this.g;
     const geo = g.vegetation.speciesGeometry(t.species);
     const mesh = new THREE.Group();
@@ -57,7 +71,7 @@ export class TreeFelling {
     );
     const away = new THREE.Vector3(t.x - from.x, 0, t.z - from.z).normalize();
     body.applyImpulseAtPoint({ x: away.x * 260, y: 0, z: away.z * 260 }, { x: t.x, y: t.y + h * 0.8, z: t.z }, true);
-    this.falling.push({ tree: t, body, mesh, t: 0, length: h });
+    this.falling.push({ tree: t, body, mesh, t: 0, length: h, remote });
   }
 
   update(dt: number): void {
@@ -70,7 +84,12 @@ export class TreeFelling {
       f.mesh.quaternion.set(r.x, r.y, r.z, r.w);
       const settled = f.t > 2.2 && (f.body.isSleeping() || Math.hypot(f.body.linvel().x, f.body.linvel().y, f.body.linvel().z) < 0.3);
       if (f.t > 1.2 && f.t - dt <= 1.2) g.bus.emit('sfx', { id: 'tree_fall', x: p.x, y: p.y, z: p.z });
-      if (settled || f.t > 8) {
+      if ((settled || f.t > 8) && f.remote) {
+        g.particles.burst('dust', p.x, p.y + 0.5, p.z, 20, 2.5);
+        g.physics.removeBody(f.body);
+        g.renderer.scene.remove(f.mesh);
+        this.falling.splice(i, 1);
+      } else if (settled || f.t > 8) {
         // Partir en troncos a lo largo del eje del árbol.
         const up = new THREE.Vector3(0, 1, 0).applyQuaternion(f.mesh.quaternion);
         const n = f.tree.species === 'oak' ? 3 : 4;

@@ -517,7 +517,7 @@ export class RaidSystem {
     this.raiders = [];
     this.setPhase('none');
     this.alertT = 45;
-    g.save.save('auto');
+    g.save.autosave();
   }
 
   /** Cadáveres de bandidos (se registran para saquear). */
