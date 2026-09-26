@@ -14,7 +14,7 @@ export const GlobalUniforms = {
 
 export type MatId =
   | 'stoneWall' | 'plaster' | 'wattle' | 'planks' | 'darkWood' | 'beam' | 'thatch' | 'tiles'
-  | 'rock' | 'caveRock' | 'bark' | 'pineBark' | 'roughWood' | 'cobble' | 'rope' | 'sand' | 'leaves' | 'pine' | 'cloth' | 'clothRed' | 'metal' | 'iron' | 'gold'
+  | 'rock' | 'caveRock' | 'bark' | 'pineBark' | 'roughWood' | 'cobble' | 'rope' | 'sand' | 'wellWater' | 'leaves' | 'pine' | 'cloth' | 'clothRed' | 'metal' | 'iron' | 'gold'
   | 'straw' | 'dirt' | 'bread' | 'meat' | 'meatCooked' | 'apple' | 'leather' | 'paper' | 'ash' | 'charred';
 
 interface MatSpec {
@@ -43,6 +43,7 @@ const SPECS: Record<MatId, MatSpec> = {
   cobble: { tex: 'cobble', roughness: 0.9, normalScale: 1 },
   rope: { tex: 'rope', roughness: 0.95 },
   sand: { tex: 'sand', roughness: 1 },
+  wellWater: { color: 0x0a1614, roughness: 0.04, metalness: 0.2 },
   leaves: { tex: 'leaves', roughness: 0.9, wind: true },
   pine: { tex: 'pine', roughness: 0.9, wind: true },
   cloth: { tex: 'cloth', roughness: 0.95 },

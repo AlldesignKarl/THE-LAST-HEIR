@@ -8,8 +8,40 @@ import type { Game } from '../game/Game';
 import { itemDef } from '../data/items';
 import { WEAPONS, BOW } from '../combat/WeaponDefs';
 import { damp } from '../core/math';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 interface Pose { p: THREE.Vector3; r: THREE.Euler }
+
+/** Punto de agarre (altura a lo largo del eje Y del modelo) de cada objeto en mano. */
+const GRIP: Record<string, number> = {
+  sword: -0.33, axe: -0.3, knife: -0.04, club: -0.26, spear: -0.45, pickaxe: -0.3, fishing_rod: -0.05, torch: -0.12,
+};
+
+/**
+ * Puño cerrado: cuatro dedos (toros) alrededor del eje Z (el mango), pulgar
+ * encima, palma y nudillos. Se orienta para que su eje coincida con el mango.
+ */
+function fistGeometry(): THREE.BufferGeometry[] {
+  const parts: THREE.BufferGeometry[] = [];
+  for (let i = 0; i < 4; i++) {
+    const z = -0.03 + i * 0.019;
+    const r = i === 3 ? 0.021 : 0.024;
+    const f = new THREE.TorusGeometry(r, i === 3 ? 0.0085 : 0.0102, 6, 12, Math.PI * 1.35);
+    f.rotateZ(Math.PI * 0.82);
+    f.translate(0, 0, z);
+    parts.push(f);
+  }
+  const palm = new THREE.SphereGeometry(1, 12, 8);
+  palm.scale(0.022, 0.04, 0.05).translate(0.026, 0.006, -0.002);
+  parts.push(palm);
+  const thumb = new THREE.CapsuleGeometry(0.0105, 0.035, 4, 8);
+  thumb.rotateX(Math.PI / 2).rotateY(-0.5).translate(0.004, -0.024, 0.036);
+  parts.push(thumb);
+  const knuckles = new THREE.SphereGeometry(1, 10, 6);
+  knuckles.scale(0.013, 0.026, 0.042).translate(-0.024, 0.008, -0.004);
+  parts.push(knuckles);
+  return parts.map((g) => { const n = g.index ? g.toNonIndexed() : g; n.deleteAttribute('uv'); return n; });
+}
 
 const P = (x: number, y: number, z: number, rx: number, ry: number, rz: number): Pose => ({ p: new THREE.Vector3(x, y, z), r: new THREE.Euler(rx, ry, rz) });
 
@@ -53,25 +85,46 @@ export class Viewmodel {
   readonly torchTip = new THREE.Vector3();
   visible = true;
   private flame: THREE.Sprite;
+  private flameCore: THREE.Sprite;
+  private flameTip: THREE.Sprite;
+  private rightFist!: THREE.Mesh;
+  private leftFist!: THREE.Mesh;
+
+  /** Orienta el puño para que su eje (Z) coincida con el eje Y de un objeto con rotación `r`. */
+  private alignFist(fist: THREE.Mesh, r: THREE.Euler): void {
+    fist.quaternion.setFromEuler(r).multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2));
+  }
 
   constructor(private readonly g: Game) {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.scene.add(this.camera, this.hemi, this.dir, this.dir.target, this.torchLight, ...this.fireLights);
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc09070, roughness: 0.7 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xc49474, roughness: 0.58 });
     const sleeve = g.materials.tint('cloth', 0x5a4a38);
-    const mkArm = (grp: THREE.Group, hand: THREE.Group) => {
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.055, 0.5, 8), sleeve);
+    const cuffMat = g.materials.get('leather');
+    const fistGeo = mergeGeometries(fistGeometry())!;
+    const mkArm = (grp: THREE.Group, hand: THREE.Group, fist: THREE.Mesh) => {
+      // Manga de lana, puño de cuero y muñeca.
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.056, 0.46, 12), sleeve);
       arm.rotation.x = Math.PI / 2;
-      arm.position.set(0, -0.02, 0.28);
-      grp.add(arm);
-      const h = new THREE.Mesh(new THREE.SphereGeometry(0.048, 10, 8), skin);
-      h.scale.set(1, 0.85, 1.2);
-      hand.add(h);
+      arm.position.set(0, -0.015, 0.3);
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.05, 12), cuffMat);
+      cuff.rotation.x = Math.PI / 2;
+      cuff.position.set(0, -0.015, 0.09);
+      const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.032, 0.07, 10), skin);
+      wrist.rotation.x = Math.PI / 2;
+      wrist.position.set(0.012, -0.005, 0.045);
+      grp.add(arm, cuff, wrist);
+      hand.add(fist);
       grp.add(hand);
       this.camera.add(grp);
     };
-    mkArm(this.right, this.rightHand);
-    mkArm(this.left, this.leftHand);
+    this.rightFist = new THREE.Mesh(fistGeo, skin);
+    this.leftFist = new THREE.Mesh(fistGeo, skin);
+    this.leftFist.scale.x = -1; // mano izquierda: espejo
+    mkArm(this.right, this.rightHand, this.rightFist);
+    mkArm(this.left, this.leftHand, this.leftFist);
+    this.alignFist(this.rightFist, new THREE.Euler(-Math.PI / 2 + 0.25, 0, 0));
+    this.alignFist(this.leftFist, new THREE.Euler(-0.35, 0, 0.15));
     const c = document.createElement('canvas');
     c.width = c.height = 64;
     const ctx = c.getContext('2d')!;
@@ -82,8 +135,18 @@ export class Viewmodel {
     grd.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, 64, 64);
-    this.flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+    const flameTex = new THREE.CanvasTexture(c);
+    const mk = (color: number, op: number) => new THREE.Sprite(new THREE.SpriteMaterial({ map: flameTex, color, opacity: op, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false }));
+    // Llama en tres capas: envolvente anaranjada, núcleo claro y lengua superior.
+    this.flame = mk(0xffffff, 1);
     this.flame.scale.set(0.16, 0.24, 1);
+    this.flameCore = mk(0xfff0c0, 0.9);
+    this.flameCore.scale.set(0.07, 0.11, 1);
+    this.flameCore.position.set(0, -0.03, 0.005);
+    this.flameTip = mk(0xff7a20, 0.8);
+    this.flameTip.scale.set(0.07, 0.16, 1);
+    this.flameTip.position.set(0, 0.09, 0);
+    this.flame.add(this.flameCore, this.flameTip);
   }
 
   /** Animación de "alcanzar" al recoger un objeto. */
@@ -114,7 +177,9 @@ export class Viewmodel {
       } else {
         const m = models.create(d.model).object;
         m.rotation.set(-Math.PI / 2 + 0.25, 0, 0);
-        m.position.set(0, 0.02, -0.12);
+        // El mango pasa por el puño.
+        const axis = new THREE.Vector3(0, 1, 0).applyEuler(m.rotation);
+        m.position.copy(axis.multiplyScalar(-(GRIP[d.model] ?? -0.1)));
         this.rightHand.add(m);
         this.weaponObj = m;
       }
@@ -123,10 +188,11 @@ export class Viewmodel {
       const m = models.create(itemDef(off).model).object;
       if (off === 'torch') {
         m.rotation.set(-0.35, 0, 0.15);
-        m.position.set(0, 0.02, -0.04);
-        m.scale.setScalar(0.7);
+        m.scale.setScalar(0.8);
+        const axis = new THREE.Vector3(0, 1, 0).applyEuler(m.rotation);
+        m.position.copy(axis.multiplyScalar(-GRIP.torch * 0.8));
         // Llama propia del viewmodel (se dibuja sobre la escena).
-        this.flame.position.set(0, 0.36, 0.02);
+        this.flame.position.set(0, 0.42, 0.01);
         m.add(this.flame);
       }
       else { m.rotation.set(0, Math.PI / 2, 0); m.position.set(0.05, 0.05, -0.1); }
@@ -223,8 +289,10 @@ export class Viewmodel {
     // leftHand está en espacio de la cámara del viewmodel: pasar a mundo con la cámara principal.
     this.torchTip.copy(tipLocal).applyMatrix4(mainCam.matrixWorld);
 
-    // Luces que imitan el mundo.
+    // Luces que imitan el mundo (y el mismo reflejo del cielo para el metal).
     const env = g.env;
+    this.scene.environment = g.renderer.scene.environment;
+    this.scene.environmentIntensity = g.renderer.scene.environmentIntensity;
     this.hemi.intensity = env.hemi.intensity;
     this.hemi.color.copy(env.hemi.color);
     this.hemi.groundColor.copy(env.hemi.groundColor);
@@ -237,7 +305,11 @@ export class Viewmodel {
     this.torchLight.intensity = torchOn ? 0.9 * fl : 0;
     this.torchLight.position.set(-0.25, 0.25, -0.75);
     this.flame.visible = torchOn;
+    const tt = performance.now() / 1000;
     this.flame.scale.set(0.15 * fl, 0.22 * (0.9 + Math.random() * 0.2), 1);
+    this.flameCore.scale.set(0.45 + Math.sin(tt * 23) * 0.05, 0.45 + Math.sin(tt * 17) * 0.06, 1);
+    this.flameTip.position.x = Math.sin(tt * 7.3) * 0.12;
+    this.flameTip.scale.set(0.4 + Math.random() * 0.1, 0.6 + Math.sin(tt * 11) * 0.15 + Math.random() * 0.1, 1);
     // Dos fuegos más cercanos.
     const near = [...g.fires.fires.values()].filter((f) => f.lit && !f.hidden).map((f) => ({ f, d: f.pos.distanceTo(mainCam.position) })).sort((a, b) => a.d - b.d).slice(0, 2);
     this.fireLights.forEach((l, i) => {

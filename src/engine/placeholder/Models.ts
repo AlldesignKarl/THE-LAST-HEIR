@@ -177,9 +177,11 @@ const D: Record<string, ModelDef> = {
   torch: {
     shape: { type: 'cyl', hh: 0.3, r: 0.04 }, mass: 0.5,
     build: (b) => {
-      b.cyl(0.018, 0.026, 0.6, 'roughWood', 0, 0, 0, 0, 0, 0, 7);
-      b.add(new THREE.SphereGeometry(0.045, 8, 6).scale(1, 1.5, 1), 'ash', 0, 0.3, 0);
-      for (const y of [0.25, 0.33]) b.add(new THREE.TorusGeometry(0.044, 0.006, 4, 10), 'ash', 0, y, 0, Math.PI / 2);
+      // Palo de pino y cabeza de estopa empapada en sebo, atada con cordel.
+      b.cyl(0.017, 0.025, 0.6, 'roughWood', 0, 0, 0, 0, 0, 0, 7);
+      b.cyl(0.036, 0.03, 0.14, 'charred', 0, 0.29, 0, 0, 0, 0, 9);
+      b.cyl(0.03, 0.036, 0.03, 'charred', 0, 0.375, 0, 0, 0, 0, 9);
+      for (const y of [0.24, 0.3, 0.35]) b.add(new THREE.TorusGeometry(0.036, 0.005, 4, 12), 'rope', 0, y, 0, Math.PI / 2);
     },
   },
   bucket: {
@@ -243,12 +245,57 @@ const D: Record<string, ModelDef> = {
   altar: { shape: { type: 'box', hx: 0.9, hy: 0.5, hz: 0.45 }, mass: 0, build: (b) => b.box(1.8, 1.0, 0.9, 'stoneWall', 0, 0, 0).box(1.9, 0.02, 1.0, 'cloth', 0, 0.51, 0).box(0.06, 0.6, 0.06, 'gold', 0, 0.8, -0.2).box(0.35, 0.06, 0.06, 'gold', 0, 0.95, -0.2) },
   counter: { shape: { type: 'box', hx: 1.5, hy: 0.55, hz: 0.35 }, mass: 0, build: (b) => b.box(3.0, 1.1, 0.7, 'planks', 0, 0, 0).box(3.1, 0.06, 0.8, 'darkWood', 0, 0.57, 0) },
   stall: { shape: { type: 'box', hx: 1.2, hy: 0.45, hz: 0.6 }, mass: 0, build: (b) => { b.box(2.4, 0.08, 1.2, 'planks', 0, 0.45, 0); b.box(2.4, 0.9, 0.06, 'planks', 0, 0, 0.55); for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.1, 2.4, 0.1, 'darkWood', sx * 1.15, 0.75, sz * 0.55); b.box(2.8, 0.04, 1.6, 'clothRed', 0, 1.95, 0, 0.15); } },
-  well: { shape: { type: 'cyl', hh: 0.5, r: 1.0 }, mass: 0, build: (b) => { b.add(new THREE.CylinderGeometry(1.0, 1.05, 1.0, 16, 1, true), 'stoneWall', 0, 0, 0); b.add(new THREE.TorusGeometry(1.0, 0.12, 5, 16), 'stoneWall', 0, 0.5, 0, Math.PI / 2); for (const sx of [-1, 1]) b.box(0.14, 2.0, 0.14, 'darkWood', sx * 0.9, 1.0, 0); b.box(2.0, 0.12, 0.12, 'darkWood', 0, 1.95, 0); b.cyl(0.08, 0.08, 1.6, 'darkWood', 0, 1.6, 0, 0, 0, Math.PI / 2); b.add(new THREE.CylinderGeometry(0.95, 0.95, 0.02, 16), 'dirt', 0, -0.6, 0); } },
+  well: { shape: { type: 'cyl', hh: 0.5, r: 1.0 }, mass: 0, build: (b) => {
+    // Brocal con grosor: pared exterior, pared interior que baja 3 m (caras
+    // invertidas para verse desde dentro), corona de piedra y agua al fondo.
+    b.add(new THREE.CylinderGeometry(1.0, 1.05, 1.0, 20, 1, true), 'stoneWall', 0, 0, 0);
+    const inner = new THREE.CylinderGeometry(0.72, 0.72, 3.6, 18, 1, true);
+    const ii = inner.index!.array as Uint16Array | Uint32Array;
+    for (let k = 0; k < ii.length; k += 3) { const t = ii[k]; ii[k] = ii[k + 1]; ii[k + 1] = t; }
+    inner.computeVertexNormals();
+    const nr = inner.attributes.normal as THREE.BufferAttribute;
+    for (let k = 0; k < nr.count; k++) nr.setXYZ(k, -nr.getX(k), -nr.getY(k), -nr.getZ(k));
+    b.add(inner, 'stoneWall', 0, -1.3, 0);
+    b.add(new THREE.RingGeometry(0.72, 1.08, 24, 1).rotateX(-Math.PI / 2), 'stoneWall', 0, 0.5, 0);
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      b.add(new THREE.BoxGeometry(0.42, 0.14, 0.3), 'stoneWall', Math.cos(a) * 0.9, 0.56, Math.sin(a) * 0.9, 0, -a, 0);
+    }
+    b.add(new THREE.CircleGeometry(0.72, 20).rotateX(-Math.PI / 2), 'wellWater', 0, -2.4, 0);
+    // Armazón, rodillo, cuerda y cubo colgando.
+    for (const sx of [-1, 1]) b.box(0.14, 2.0, 0.14, 'darkWood', sx * 0.95, 1.0, 0);
+    b.box(2.1, 0.12, 0.12, 'darkWood', 0, 1.95, 0);
+    b.cyl(0.08, 0.08, 1.6, 'roughWood', 0, 1.55, 0, 0, 0, Math.PI / 2);
+    b.add(new THREE.TorusGeometry(0.085, 0.02, 5, 12), 'rope', 0, 1.55, 0, 0, Math.PI / 2, 0);
+    b.cyl(0.012, 0.012, 1.6, 'rope', 0.05, 0.75, 0);
+    b.add(new THREE.CylinderGeometry(0.15, 0.12, 0.26, 10, 1, true), 'planks', 0.05, -0.1, 0);
+    b.cyl(0.12, 0.12, 0.02, 'planks', 0.05, -0.23, 0);
+    b.add(new THREE.TorusGeometry(0.15, 0.008, 4, 12), 'iron', 0.05, 0.02, 0, Math.PI / 2);
+    b.box(0.26, 0.03, 0.02, 'iron', 0.05, 0.12, 0, 0, 0, 0);
+    // Tejadillo a dos aguas.
+    for (const s of [-1, 1]) b.box(2.3, 0.06, 1.0, 'planks', 0, 2.25, s * 0.38, s * 0.55, 0, 0);
+  } },
   tent: { shape: { type: 'box', hx: 1.4, hy: 1.0, hz: 1.8 }, mass: 0, build: (b) => { const g = new THREE.CylinderGeometry(0.01, 1.6, 2.0, 3, 1, false); b.add(g, 'cloth', 0, 0, 0, 0, 0, Math.PI / 2).parts.get('cloth')![0].scale(1, 1, 1.9); b.box(0.06, 2.0, 0.06, 'darkWood', 0, 0.0, 1.8).box(0.06, 2.0, 0.06, 'darkWood', 0, 0.0, -1.8); } },
   firering: { shape: { type: 'cyl', hh: 0.1, r: 0.6 }, mass: 0, build: (b) => { for (let i = 0; i < 10; i++) b.add(new THREE.DodecahedronGeometry(0.13, 0), 'rock', Math.cos(i * 0.63) * 0.55, 0, Math.sin(i * 0.63) * 0.55); b.cyl(0.45, 0.45, 0.03, 'ash', 0, -0.08, 0); for (let i = 0; i < 4; i++) b.cyl(0.05, 0.06, 0.8, 'charred', 0, 0.1, 0, 1.1, i * 0.8, 0, 6); } },
   skeleton: { shape: { type: 'box', hx: 0.3, hy: 0.1, hz: 0.9 }, mass: 0, build: (b) => { b.add(new THREE.SphereGeometry(0.1, 8, 6), 'paper', 0, 0.05, -0.8); for (let i = 0; i < 6; i++) b.box(0.3 - i * 0.02, 0.02, 0.03, 'paper', 0, 0.02, -0.55 + i * 0.07); b.cyl(0.02, 0.02, 0.6, 'paper', 0, 0.02, -0.4, Math.PI / 2); for (const sx of [-1, 1]) { b.cyl(0.02, 0.02, 0.8, 'paper', sx * 0.12, 0.02, 0.3, Math.PI / 2); b.cyl(0.015, 0.015, 0.55, 'paper', sx * 0.28, 0.02, -0.45, Math.PI / 2, 0, sx * 0.2); } } },
-  wall_torch: { shape: { type: 'cyl', hh: 0.3, r: 0.05 }, mass: 0, build: (b) => b.cyl(0.025, 0.03, 0.6, 'darkWood', 0, 0, 0, -0.35).cyl(0.045, 0.035, 0.12, 'cloth', 0, 0.3, 0.1, -0.35).box(0.05, 0.2, 0.05, 'iron', 0, -0.1, -0.12) },
-  torch_post: { shape: { type: 'cyl', hh: 1.1, r: 0.08 }, mass: 0, build: (b) => b.cyl(0.06, 0.08, 2.2, 'darkWood', 0, 0, 0).add(new THREE.CylinderGeometry(0.15, 0.08, 0.25, 8, 1, true), 'iron', 0, 1.15, 0) },
+  wall_torch: { shape: { type: 'cyl', hh: 0.3, r: 0.05 }, mass: 0, build: (b) => {
+    b.cyl(0.022, 0.03, 0.6, 'roughWood', 0, 0, 0, -0.35, 0, 0, 7);
+    b.add(new THREE.SphereGeometry(0.045, 8, 6).scale(1, 1.6, 1), 'charred', 0, 0.3, 0.1, -0.35);
+    b.add(new THREE.TorusGeometry(0.04, 0.008, 4, 10), 'iron', 0, -0.05, -0.02, Math.PI / 2 - 0.35);
+    b.box(0.04, 0.22, 0.04, 'iron', 0, -0.1, -0.12).box(0.12, 0.04, 0.02, 'iron', 0, -0.2, -0.13);
+  } },
+  torch_post: { shape: { type: 'cyl', hh: 1.1, r: 0.08 }, mass: 0, build: (b) => {
+    // Poste con tederero de hierro: varillas en cono, aros y teas ennegrecidas.
+    b.cyl(0.055, 0.085, 2.2, 'roughWood', 0, 0, 0, 0, 0, 0, 8);
+    b.cyl(0.07, 0.07, 0.08, 'iron', 0, 1.02, 0, 0, 0, 0, 8);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2;
+      b.cyl(0.008, 0.008, 0.34, 'iron', Math.cos(a) * 0.1, 1.2, Math.sin(a) * 0.1, Math.sin(a) * 0.45, 0, -Math.cos(a) * 0.45, 4);
+    }
+    b.add(new THREE.TorusGeometry(0.17, 0.012, 4, 14), 'iron', 0, 1.34, 0, Math.PI / 2);
+    b.add(new THREE.TorusGeometry(0.08, 0.01, 4, 12), 'iron', 0, 1.1, 0, Math.PI / 2);
+    for (let i = 0; i < 4; i++) b.cyl(0.03, 0.035, 0.3, 'charred', Math.cos(i * 1.6) * 0.05, 1.24, Math.sin(i * 1.6) * 0.05, Math.cos(i * 2.1) * 0.3, 0, Math.sin(i * 2.1) * 0.3, 5);
+  } },
   stalagmite: { shape: { type: 'cyl', hh: 0.8, r: 0.3 }, mass: 0, build: (b) => b.add(new THREE.ConeGeometry(0.35, 1.6, 7), 'caveRock') },
   boulder: { shape: { type: 'ball', r: 1.0 }, mass: 0, build: (b) => b.add(new THREE.DodecahedronGeometry(1.0, 1), 'rock') },
   crops: { shape: { type: 'box', hx: 0.1, hy: 0.4, hz: 0.1 }, mass: 0, build: (b) => { for (let i = 0; i < 6; i++) b.cyl(0.006, 0.01, 0.9, 'straw', Math.cos(i) * 0.08, 0.45, Math.sin(i * 1.7) * 0.08, Math.cos(i * 2) * 0.1, 0, Math.sin(i * 3) * 0.1, 3); } },
