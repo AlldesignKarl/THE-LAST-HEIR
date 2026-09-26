@@ -157,7 +157,7 @@ export class Grass {
       const x = (cx + hash2(cx * 31 + i, cz, 5)) * CELL;
       const z = (cz + hash2(cx, cz * 17 + i, 9)) * CELL;
       const w = this.hf.surfaceWeights(x, z);
-      if (w.road > 0.3 || w.field > 0.5 || w.camp > 0.5) continue;
+      if (w.road > 0.3 || w.field > 0.5 || w.camp > 0.5 || w.beach > 0.25) continue;
       const vill = w.village;
       if (vill > 0.4 && hash2(i, cx + cz, 3) < 0.8) continue; // pisoteado en el pueblo
       if (this.hf.waterLevelAt(x, z) !== null) continue;

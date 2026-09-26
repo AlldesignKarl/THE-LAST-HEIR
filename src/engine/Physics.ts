@@ -23,7 +23,7 @@ export const groups = (membership: number, filter: number): number => ((membersh
 
 export type ColliderTagKind =
   | 'terrain' | 'building' | 'static' | 'prop' | 'item' | 'door' | 'interactable'
-  | 'tree' | 'actor' | 'player' | 'cave';
+  | 'tree' | 'actor' | 'player' | 'cave' | 'rock' | 'build' | 'boat';
 
 export interface ColliderTag {
   kind: ColliderTagKind;

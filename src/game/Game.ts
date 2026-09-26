@@ -55,6 +55,8 @@ import { UIManager } from '../ui/UIManager';
 import { TouchControls } from '../ui/TouchControls';
 import { GroundScatter } from '../world/GroundScatter';
 import { Sea } from '../world/Sea';
+import { Resources } from '../world/Resources';
+import { BuildSystem } from '../world/BuildSystem';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -111,6 +113,10 @@ export class Game {
   readonly ui: UIManager;
   readonly scatter: GroundScatter;
   readonly sea: Sea;
+  readonly resources: Resources;
+  readonly build: BuildSystem;
+  /** Id del jugador local (en multijugador, el del usuario). */
+  localPlayerId = 'local';
   /** Controles en pantalla (solo en dispositivos táctiles). */
   readonly touch: TouchControls | null;
   readonly save: SaveSystem;
@@ -169,6 +175,8 @@ export class Game {
     this.viewmodel = new Viewmodel(this);
     this.treeFelling = new TreeFelling(this);
     this.settlement = new Settlement(this);
+    this.resources = new Resources(this);
+    this.build = new BuildSystem(this);
     this.grass = new Grass(this.hf, scene, (x, z) => {
       if (this.hf.isHole(x, z)) return true;
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.6)) return true;
@@ -265,6 +273,8 @@ export class Game {
       this.npcs.nav.setWallEnabled('breach', this.settlement.palisadeRepaired);
     });
     reg('worldItems', () => this.worldItems.serialize(), (d: Parameters<WorldItems['deserialize']>[0]) => this.worldItems.deserialize(d));
+    reg('build', () => this.build.serialize(), (d: Parameters<BuildSystem['deserialize']>[0]) => this.build.deserialize(d));
+    reg('resources', () => this.resources.serialize(), (d: Parameters<Resources['deserialize']>[0]) => this.resources.deserialize(d));
     reg('fires', () => this.fires.serialize(), (d: Parameters<Fires['deserialize']>[0]) => this.fires.deserialize(d));
     reg('reputation', () => this.reputation.serialize(), (d: Parameters<Reputation['deserialize']>[0]) => this.reputation.deserialize(d));
     reg('quests', () => this.quests.serialize(), (d: Parameters<QuestSystem['deserialize']>[0]) => this.quests.deserialize(d));
@@ -288,6 +298,7 @@ export class Game {
       if (e.hour === 6) {
         this.economy.restock();
         this.vegetation.regrow(this.time.day);
+        this.resources.regrow(this.time.day);
         this.raids.updateCorpses();
       }
     });
@@ -383,8 +394,12 @@ export class Game {
     this.player.speedMul = this.inventory.overEncumbered ? 0.6 : 1;
     if (this.vitals.health < 25) this.player.speedMul *= 0.85;
     this.player.frozen = this.vitals.dead;
-    this.interaction.update(dt);
-    this.combat.update(dt);
+    this.build.update();
+    // En modo construcción el clic coloca y E desmonta: no hay combate ni uso.
+    if (!this.build.active) {
+      this.interaction.update(dt);
+      this.combat.update(dt);
+    }
     // Antes de mover: dentro de la cueva el jugador está legítimamente bajo el terreno.
     const pp = this.player.pos;
     this.player.underground = this.settlement.cave.depthAt(pp.x, pp.y, pp.z) > 0.001 || this.hf.isHole(pp.x, pp.z);
@@ -533,6 +548,7 @@ export class Game {
     this.vegetation.update(this.camPos.x, this.camPos.z);
     this.grass.update(this.camPos);
     this.scatter.update(this.camPos);
+    this.build.updateGhost();
     this.water.update(frameDt);
     this.env.update(frameDt, this.time, this.weather, this.camPos);
     this.settlement.updateWindows(this.time.hourFloat);

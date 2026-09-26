@@ -30,6 +30,10 @@ const BUTTONS: ButtonDef[] = [
   { a: 'weapon', label: 'Arma', cls: 'b-weapon' },
   { a: 'sprintToggle', label: 'Correr', cls: 'b-sprint' },
   { a: 'crouchToggle', label: 'Agachar', cls: 'b-crouch' },
+  { a: 'build', label: 'Construir', cls: 'b-build' },
+  { a: 'rotate', label: 'Girar', cls: 'b-rot' },
+  { a: 'buildPrev', label: '◀', cls: 'b-bprev' },
+  { a: 'buildNext', label: '▶', cls: 'b-bnext' },
   { a: 'inventory', label: 'Inventario', cls: 'b-top b-inv' },
   { a: 'journal', label: 'Diario', cls: 'b-top b-jour' },
   { a: 'map', label: 'Mapa', cls: 'b-top b-map' },
@@ -250,5 +254,14 @@ export class TouchControls {
     this.buttons.get('grab')!.classList.toggle('hot', !!g.interaction.carried);
     this.buttons.get('torch')!.classList.toggle('latched', g.equipment.slots.off === 'torch');
     this.orient.style.display = window.innerHeight > window.innerWidth ? 'block' : 'none';
+    // Construcción: botones propios y etiquetas contextuales.
+    const b = g.build;
+    const building = b.active;
+    const canBuild = building || b.nearPlot(g.player.pos.x, g.player.pos.z, 2);
+    this.buttons.get('build')!.style.display = canBuild ? 'flex' : 'none';
+    this.buttons.get('build')!.textContent = building ? 'Salir' : 'Construir';
+    for (const k of ['rotate', 'buildPrev', 'buildNext']) this.buttons.get(k)!.style.display = building ? 'flex' : 'none';
+    this.buttons.get('attack')!.textContent = building ? 'Colocar' : 'Atacar';
+    this.buttons.get('interact')!.textContent = building ? 'Quitar' : 'Usar';
   }
 }

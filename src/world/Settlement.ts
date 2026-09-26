@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { BuildingInstance, type Door } from './Buildings';
 import {
-  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
+  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, PLAYER_PLOT, SEA, WATCHTOWER, WELL, WOLF_DEN,
 } from './WorldLayout';
 import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
@@ -78,6 +78,7 @@ export class Settlement {
     this.buildFields();
     this.buildBridges();
     this.buildHarbor();
+    this.buildPlotStart();
     this.cave = new Cave(g.hf, g.physics, g.renderer.scene, g.materials);
     this.buildCaveContent();
     this.buildBanditCamp();
@@ -936,6 +937,26 @@ export class Settlement {
     hull.position.set(bx, this.ground(bx, -2) + 0.62, -2);
     hull.rotation.set(Math.PI, 0.6, 0);
     this.staticObjs.push(hull);
+  }
+
+  // ------------------------------------------------------------ parcela del jugador
+
+  private buildPlotStart(): void {
+    const g = this.g;
+    const half = PLAYER_PLOT.size / 2;
+    const cx = PLAYER_PLOT.x - half - 1.3, cz = PLAYER_PLOT.z - half + 2;
+    const chest = this.placeStatic('chest', cx, this.ground(cx, cz) + 0.3, cz, Math.PI / 2, 'plot');
+    g.containers.create('plot_chest', 'Arcón de la parcela', null, [
+      { id: 'pickaxe', count: 1 }, { id: 'plank', count: 10 }, { id: 'thatch', count: 4 },
+    ], 0);
+    g.interactables.register(chest.handle, {
+      id: 'plot_chest', kind: 'container', pos: new THREE.Vector3(cx, this.ground(cx, cz) + 0.5, cz),
+      label: () => 'Arcón de la parcela (los materiales de aquí cuentan para construir)',
+      interact: (game) => game.ui.openContainer('plot_chest'),
+    });
+    // Caballete y leñera junto al arcón.
+    const wx = cx, wz = cz + 3;
+    this.placeStatic('woodpile', wx, this.ground(wx, wz) + 0.45, wz, Math.PI / 2, 'plot');
   }
 
   // ------------------------------------------------------------ lugares (IA)

@@ -4,7 +4,7 @@
  * mundo sin que la lógica de juego los conozca.
  */
 export interface GameEvents {
-  'item:acquired': { itemId: string; count: number; source: 'pickup' | 'trade' | 'reward' | 'container' | 'craft' | 'loot' };
+  'item:acquired': { itemId: string; count: number; source: 'pickup' | 'trade' | 'reward' | 'container' | 'craft' | 'loot' | 'gather' };
   'item:removed': { itemId: string; count: number; reason: 'drop' | 'consume' | 'trade' | 'deliver' | 'store' };
   'item:stolen': { itemId: string; ownerVillage: string; witnessed: boolean };
   'item:placed': { itemId: string; x: number; y: number; z: number };

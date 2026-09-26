@@ -17,7 +17,7 @@ const CELL = 12;
 type Kind = 'rock' | 'bush' | 'fern' | 'branch';
 const MAX: Record<Kind, number> = { rock: 1400, bush: 1200, fern: 2400, branch: 700 };
 
-function rockGeometry(seed: number): THREE.BufferGeometry {
+export function rockGeometry(seed: number): THREE.BufferGeometry {
   const g = new THREE.IcosahedronGeometry(1, 1);
   const p = g.attributes.position as THREE.BufferAttribute;
   const rng = new Rng(seed);
@@ -137,7 +137,7 @@ export class GroundScatter {
       const x = (cx + rng.next()) * CELL, z = (cz + rng.next()) * CELL;
       if (this.hf.waterLevelAt(x, z) !== null || this.hf.isHole(x, z)) continue;
       const w = this.hf.surfaceWeights(x, z);
-      if (w.road > 0.2 || w.field > 0.3 || w.village > 0.5 || w.camp > 0.6) continue;
+      if (w.road > 0.2 || w.field > 0.3 || w.village > 0.5 || w.camp > 0.6 || w.beach > 0.3) continue;
       if (this.blocked(x, z)) continue;
       const forest = this.hf.forestDensity(x, z);
       const n = this.hf.normalAt(x, z, 1);

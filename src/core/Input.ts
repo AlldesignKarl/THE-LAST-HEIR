@@ -8,7 +8,8 @@ export type Action =
   | 'sprint' | 'crouch' | 'jump'
   | 'interact' | 'grab' | 'attack' | 'block' | 'dodge' | 'kick' | 'torch'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4'
-  | 'inventory' | 'journal' | 'map' | 'pause' | 'perf';
+  | 'inventory' | 'journal' | 'map' | 'pause' | 'perf'
+  | 'build' | 'buildNext' | 'buildPrev' | 'rotate';
 
 const DEFAULT_BINDINGS: Record<string, Action> = {
   KeyW: 'forward', KeyS: 'back', KeyA: 'left', KeyD: 'right',
@@ -20,6 +21,7 @@ const DEFAULT_BINDINGS: Record<string, Action> = {
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4',
   Tab: 'inventory', KeyI: 'inventory', KeyJ: 'journal', KeyM: 'map',
   Escape: 'pause', F3: 'perf',
+  KeyB: 'build', KeyX: 'buildNext', KeyZ: 'buildPrev', KeyQ: 'rotate',
 };
 
 /** Acciones de interfaz: se consumen explícitamente y no se borran en cada tick. */
@@ -49,6 +51,11 @@ export class Input {
     element.addEventListener('mousedown', (e) => this.onMouse(e, true));
     window.addEventListener('mouseup', (e) => this.onMouse(e, false));
     element.addEventListener('contextmenu', (e) => e.preventDefault());
+    element.addEventListener('wheel', (e) => {
+      const a: Action = e.deltaY > 0 ? 'buildNext' : 'buildPrev';
+      this.setAction(a, true);
+      this.setAction(a, false);
+    }, { passive: true });
     document.addEventListener('mousemove', (e) => {
       if (!this.pointerLocked) return;
       this.mouseDX += e.movementX;

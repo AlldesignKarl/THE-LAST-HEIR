@@ -275,9 +275,18 @@ export class Combat {
       this.hitStop = 0.05;
       return;
     }
+    if (tag?.kind === 'rock') {
+      g.resources.mine(tag.id, dmg * (w.mine ?? 0) * g.skills.mul('survival') * (this.heavy ? 1.3 : 1), hit.point);
+      this.swingBlocked = true;
+      this.hitStop = 0.06;
+      this.shake = Math.max(this.shake, 0.15);
+      return;
+    }
     const body = hit.collider.parent();
     if (body && body.isDynamic()) {
       const wi = g.worldItems.forCollider(hit.collider.handle);
+      // Hachazo a un tronco caído: tablones.
+      if (wi && wi.itemId === 'log' && w.chop >= 0.5 && g.resources.splitLog(wi, hit.point)) { this.hitStop = 0.05; return; }
       if (wi) g.worldItems.unfreeze(wi);
       body.applyImpulseAtPoint({ x: dir.x * dmg * 0.3, y: dir.y * dmg * 0.3 + 1, z: dir.z * dmg * 0.3 }, hit.point, true);
       g.bus.emit('sfx', { id: 'block_wood', x: hit.point.x, y: hit.point.y, z: hit.point.z });

@@ -122,6 +122,10 @@ canvas.map { display: block; border: 1px solid var(--panel-edge); }
 .b-weapon { right: 164px; bottom: 124px; width: 50px; height: 50px; }
 .b-torch { right: 168px; bottom: 186px; width: 48px; height: 48px; }
 .b-sprint { left: 20px; bottom: 150px; width: 52px; height: 52px; }
+.b-build { left: 20px; top: 56px; width: 64px; height: 40px; border-radius: 20px; }
+.b-rot { right: 250px; bottom: 30px; width: 52px; height: 52px; }
+.b-bprev { left: 50%; margin-left: -120px; bottom: 120px; width: 46px; height: 46px; font-size: 18px; }
+.b-bnext { left: 50%; margin-left: 74px; bottom: 120px; width: 46px; height: 46px; font-size: 18px; }
 .b-crouch { left: 20px; bottom: 212px; width: 52px; height: 52px; }
 .b-top { top: 10px; width: auto; height: 34px; padding: 0 12px; border-radius: 17px; font-size: 13px; }
 .b-inv { right: 250px; } .b-jour { right: 172px; } .b-map { right: 110px; } .b-pause { right: 44px; } .b-fs { right: 4px; width: 34px; padding: 0; }
@@ -152,3 +156,13 @@ canvas.map { display: block; border: 1px solid var(--panel-edge); }
   .keys b { min-width: 90px; }
   .close-x { top: 6px; right: 8px; width: 40px; height: 40px; }
 }
+
+/* ---------- Construcción ---------- */
+.buildbar { position: absolute; left: 50%; bottom: 150px; transform: translateX(-50%); text-align: center; background: rgba(12,9,6,.62); border: 1px solid var(--panel-edge); padding: 6px 14px; min-width: 280px; opacity: 0; transition: opacity .2s; text-shadow: 0 1px 2px #000; }
+.buildbar.show { opacity: 1; }
+.buildbar .n { font-family: 'IM Fell English', serif; color: #f0dca0; font-size: 19px; }
+.buildbar .c { font-size: 15px; }
+.buildbar .ok { color: #b9d8a0; }
+.buildbar .bad { color: #ff9a80; font-size: 14px; }
+.buildbar .k { font-size: 13px; color: var(--ink-dim); }
+@media (max-height: 520px), (max-width: 700px) { .buildbar { bottom: 40px; min-width: 0; max-width: 60vw; font-size: 13px; } .buildbar .n { font-size: 15px; } }
