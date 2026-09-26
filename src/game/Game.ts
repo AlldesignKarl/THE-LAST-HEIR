@@ -207,10 +207,11 @@ export class Game {
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -1.5)) return true;
       return false;
     }, this.qualityName === 'low' ? 40 : this.qualityName === 'medium' ? 70 : 95);
-    this.worldItems.groundAt = (x, z) => {
+    this.worldItems.groundAt = (x, y, z) => {
       if (this.hf.isHole(x, z)) return null;
       const t = this.hf.heightAt(x, z);
-      if (this.settlement.cave.depthAt(x, t - 0.5, z) > 0.001) return null;
+      // Dentro de la cueva (bajo el terreno) el suelo es la roca de la cueva.
+      if (this.settlement.cave.depthAt(x, y, z) > 0.001 || this.settlement.cave.depthAt(x, y + 0.5, z) > 0.001) return null;
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.2)) return b.floorY;
       return t;
     };

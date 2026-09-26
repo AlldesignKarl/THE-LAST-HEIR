@@ -167,7 +167,7 @@ export class WorldItems {
    * Suelo mínimo en un punto (suelo de la casa o terreno); null donde se
    * puede estar legítimamente por debajo (cueva, agujeros). Lo fija el juego.
    */
-  groundAt: ((x: number, z: number) => number | null) | null = null;
+  groundAt: ((x: number, y: number, z: number) => number | null) | null = null;
 
   update(dt: number): void {
     for (const wi of this.items.values()) {
@@ -182,7 +182,7 @@ export class WorldItems {
       // Un objeto nunca debe quedar bajo el suelo (colisión atravesada):
       // vuelve a su último sitio válido.
       if (this.groundAt && !wi.carried) {
-        const gy = this.groundAt(t.x, t.z);
+        const gy = this.groundAt(t.x, t.y, t.z);
         if (gy !== null) {
           const v = wi.body.linvel();
           if (t.y >= gy - 0.05 && Math.hypot(v.x, v.y, v.z) < 0.6) (wi.safe ??= new THREE.Vector3()).set(t.x, t.y, t.z);
