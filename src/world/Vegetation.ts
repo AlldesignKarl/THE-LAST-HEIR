@@ -305,6 +305,16 @@ export class Vegetation {
   }
 
   /** Geometrías de la especie (para el árbol que cae). */
+  /** Estación: color del follaje y robles desnudos en invierno. */
+  setSeasonLook(oak: THREE.Color, pine: THREE.Color, oakBare: boolean): void {
+    const tint = (m: THREE.Material, c: THREE.Color) => { const sm = m as THREE.MeshStandardMaterial; if (sm.color) sm.color.copy(c); };
+    tint(this.species.oak.canopyMat, oak);
+    tint(this.species.pine.canopyMat, pine);
+    this.oakBare = oakBare;
+    this.species.oak.nearCanopy.visible = this.species.oak.farCanopy.visible = !oakBare;
+  }
+  oakBare = false;
+
   speciesGeometry(s: TreeSpecies): SpeciesGeo {
     return this.species[s].geo;
   }

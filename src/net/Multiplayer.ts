@@ -33,7 +33,7 @@ export const MAX_PLAYERS = 5;
 /** Dirección pública del juego publicado (para los enlaces de invitación). */
 export const ARTIFACT_URL = 'https://claude.ai/artifact/GzFDGhFYs8k2mdVn115mby';
 /** Sistemas del guardado que pertenecen al mundo compartido, no al jugador. */
-const WORLD_SYSTEMS = ['vegetation', 'resources', 'boats', 'time', 'weather'];
+const WORLD_SYSTEMS = ['seasons', 'vegetation', 'resources', 'boats', 'time', 'weather'];
 const ACT_KEEP = 12;
 
 /** Acciones que viajan en la presencia: [tipo, nº de secuencia, ...datos]. */
@@ -53,6 +53,7 @@ export interface WorldDoc {
   felled: [string, number][];
   rocks: Record<string, [number, number]>;
   boats: Record<string, [number, number, number]>;
+  seasons?: Record<string, unknown>;
 }
 
 interface Remote {
@@ -321,6 +322,7 @@ export class Multiplayer {
     g.vegetation.deserialize({ felled: w.felled ?? [] });
     g.resources.deserialize(w.rocks ?? {});
     g.boats.deserialize(w.boats ?? {});
+    if (w.seasons) g.seasons.deserialize(w.seasons as Parameters<typeof g.seasons.deserialize>[0]);
   }
 
   private snapshotWorld(): WorldDoc {
@@ -338,6 +340,7 @@ export class Multiplayer {
       felled: (g.vegetation.serialize() as { felled: [string, number][] }).felled,
       rocks: g.resources.serialize() as Record<string, [number, number]>,
       boats: g.boats.serialize() as Record<string, [number, number, number]>,
+      seasons: g.seasons.serialize() as Record<string, unknown>,
     };
   }
 

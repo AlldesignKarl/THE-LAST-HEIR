@@ -200,7 +200,10 @@ export class NPCManager {
     const pp = g.player.pos;
     const raid = g.raids?.alertActive ?? false;
     const night = g.time.isNight;
+    const pin = this.playerInside();
+    if (this.tick % 60 === 0) this.lockDoors(hour);
     for (const n of this.npcs.values()) {
+      this.homeVisibility(n, pin);
       const c = n.c;
       const d = c.pos.distanceTo(pp);
       // LOD de simulación.
@@ -210,7 +213,7 @@ export class NPCManager {
       const every = lod === 0 ? 1 : lod === 1 ? 6 : 30;
       const step = (this.tick + n.def.id.length) % every === 0;
       const prevHandle = c.collider?.handle;
-      c.ensureCollider(g.physics, lod === 0 && !c.indoors && c.alive && !c.downed);
+      c.ensureCollider(g.physics, lod === 0 && (!c.indoors || c.homeShown) && c.alive && !c.downed);
       // Los handles de Rapier se reutilizan: desregistrar al destruir el collider.
       if (prevHandle !== undefined && c.collider?.handle !== prevHandle) g.interactables.unregisterCollider(prevHandle);
       if (c.collider && !g.interactables.forCollider(c.collider.handle)) this.registerTalk(n);
@@ -243,7 +246,7 @@ export class NPCManager {
       c.chooseAnim(speed, n.talking ? 'talk' : n.state === 'shelter' ? 'cower' : n.idleAnim);
       c.visible = d < this.viewDist;
       c.updateModel(sdt, lod === 0);
-      c.hitboxesValid = lod === 0 && c.visible && !c.indoors;
+      c.hitboxesValid = lod === 0 && c.visible && (!c.indoors || c.homeShown);
       // Antorcha de noche al andar por fuera.
       c.setTorch(night && !c.indoors && (c.faction === 'guard' || speed > 0.3) && n.def.weapon !== 'bow');
       this.updateTorchLight(n);
@@ -262,6 +265,48 @@ export class NPCManager {
       const nt = t - dt;
       if (nt <= 0) { door.open = false; this.doorTimers.delete(door); }
       else this.doorTimers.set(door, nt);
+    }
+  }
+
+  /** Edificio visitable en el que está el jugador (o null). */
+  private playerInside(): string | null {
+    const p = this.g.player.pos;
+    for (const b of this.g.settlement.buildings.values()) {
+      if (b.def.enterable && !b.def.openFront && b.contains(p.x, p.z, 0.05) && p.y > b.floorY - 0.5 && p.y < b.floorY + 2.5) return b.def.id;
+    }
+    return null;
+  }
+
+  /**
+   * Si entras en una casa, sus dueños están ahí: sentados a la mesa o, de
+   * noche, durmiendo en la cama. Fuera, están "dentro" sin dibujarse.
+   */
+  private homeVisibility(n: NPC, pin: string | null): void {
+    const c = n.c;
+    const home = n.placeId.startsWith('in:') ? n.placeId.slice(3) : null;
+    const show = !!pin && c.alive && !c.downed && c.indoors && home === pin && c.arrived;
+    if (show && !c.homeShown) {
+      const spot = this.g.settlement.homeSpots.get(pin!);
+      c.homeShown = true;
+      if (!spot) return;
+      const sleeping = n.entry?.activity === 'sleep';
+      const s = sleeping && spot.bed ? spot.bed : spot.seat;
+      c.place(s.p.x, s.p.y, s.p.z, s.yaw);
+      c.stop();
+      c.faceYaw = s.yaw;
+      n.idleAnim = sleeping && spot.bed ? 'sleep' : 'sit';
+    } else if (!show && c.homeShown) c.homeShown = false;
+  }
+
+  /** De noche las casas habitadas se cierran con llave (la taberna y la iglesia no). */
+  private lockDoors(hour: number): void {
+    const night = hour >= 22 || hour < 6;
+    for (const d of this.g.settlement.doors.values()) {
+      const bid = d.buildingId;
+      if (bid === 'player_hut' || bid === 'tavern' || bid === 'church') continue;
+      const b = this.g.settlement.buildings.get(bid);
+      if (!b?.def.enterable) continue;
+      d.locked = night && this.g.settlement.isOccupied(bid);
     }
   }
 

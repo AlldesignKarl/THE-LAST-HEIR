@@ -86,12 +86,15 @@ export class Settlement {
         this.doors.set(d.id, d);
         this.registerDoor(b, d);
       }
-      // Hogar oculto (humo de chimenea) en casas con chimenea no visitables.
-      if (b.chimneyTop && !['player_hut', 'tavern', 'smithy'].includes(def.id)) {
-        g.fires.add({ id: `hearth_${def.id}`, kind: 'hearth', pos: b.interiorLight, policy: 'evening', canCook: false, heat: 0, hidden: true, smokePos: b.chimneyTop, condition: () => this.isOccupied(def.id) });
+      // Hogar en la chimenea de cada casa: se enciende al caer la tarde si
+      // hay alguien en casa (el humo sale por la chimenea).
+      if (b.chimneyTop && b.hearthPos && !['player_hut', 'tavern', 'smithy'].includes(def.id)) {
+        const hp = b.hearthPos;
+        g.fires.add({ id: `hearth_${def.id}`, kind: 'hearth', pos: new THREE.Vector3(hp.x, hp.y + 0.08, hp.z), policy: 'home', canCook: true, heat: 14, smokePos: b.chimneyTop, condition: () => this.isOccupied(def.id) });
       }
     }
     this.buildInteriors();
+    this.furnishHomes();
     this.buildVillageProps();
     this.buildPalisade();
     this.buildWatchtower();
@@ -414,6 +417,94 @@ export class Settlement {
   /** Aplica estado dependiente de flags tras cargar partida. */
   applyFlags(): void {
     if (this.g.flags.has('board_opened')) this.openBoard(false);
+  }
+
+  // ------------------------------------------------------------ casas de los vecinos
+
+  /** Sitios dentro de cada casa donde se ve a sus dueños (mesa y cama). */
+  readonly homeSpots = new Map<string, { seat: { p: THREE.Vector3; yaw: number }; bed: { p: THREE.Vector3; yaw: number } | null }>();
+
+  /**
+   * Amuebla por dentro todas las casas y almacenes que no tienen un
+   * interior propio: cama junto a la pared del fondo, mesa con banco o
+   * taburetes y vela, arcón (ajeno: coger de él a la vista es robo),
+   * barriles, fuego en el hogar de la chimenea con su olla; en casas de
+   * pescadores, nasas y cajas de pescado; en almacenes, sacos, barriles,
+   * cajas y leña.
+   */
+  private furnishHomes(): void {
+    const g = this.g;
+    const done = new Set(['player_hut', 'tavern', 'church', 'smithy', 'carpentry', 'stable', 'boat_shed']);
+    const rng = new Rng(913);
+    const storage = new Set(['granary', 'barn_s', 'salt_store']);
+    for (const b of this.buildings.values()) {
+      const def = b.def;
+      if (done.has(def.id) || def.openFront || !def.enterable) continue;
+      const r = b.rotY, fy = b.floorY;
+      const hw = def.w / 2 - 0.14, hd = def.d / 2 - 0.14; // cara interior de los muros
+      const P = (lx: number, ly: number, lz: number) => this.inB(b, lx, ly, lz);
+      const put = (model: string, lx: number, ly: number, lz: number, ry = 0) => { const p = P(lx, ly, lz); return this.placeStatic(model, p.x, fy + ly, p.z, r + ry, def.id); };
+      const dyn = (id: string, model: string, lx: number, ly: number, lz: number, ry = 0) => { const p = P(lx, ly, lz); this.placeDynamic(`${def.id}_${id}`, model, p.x, fy + ly, p.z, r + ry); };
+      if (storage.has(def.id)) {
+        // Almacén: sacos, barriles, cajas y leña contra las paredes.
+        for (let i = 0; i < Math.floor(def.w / 1.2); i++) dyn(`sack${i}`, 'sack', -hw + 0.5 + i * 1.1, 0.32, -hd + 0.45, rng.range(0, 3));
+        for (let i = 0; i < 3; i++) dyn(`barrel${i}`, 'barrel', hw - 0.5, 0.46, -hd + 0.5 + i * 0.75, i);
+        put('crate', -hw + 0.5, 0.3, hd - 0.9, 0.2);
+        put('crate', -hw + 0.5, 0.9, hd - 0.9, 0.5);
+        if (def.w > 6) put('woodpile', 0.5, 0.45, -hd + 1.4, 0);
+        continue;
+      }
+      const hasHearth = !!b.hearthPos;
+      // Cama a lo largo del muro del fondo, a la izquierda.
+      const bedP = P(-hw + 1.05, 0.3, -hd + 0.58);
+      const bedCol = this.placeStatic('bed', bedP.x, fy + 0.3, bedP.z, r + Math.PI / 2, def.id);
+      void bedCol;
+      // Segunda cama en casas grandes.
+      if (def.w >= 7) put('bed', -hw + 1.05, 0.3, -hd + 1.75, Math.PI / 2);
+      // Mesa con taburetes y una vela.
+      const tx = -hw + 0.95, tz = Math.min(hd - 1.2, hd * 0.3);
+      put('table', tx, 0.4, tz, Math.PI / 2);
+      dyn('stool1', 'stool', tx + 0.7, 0.25, tz - 0.35, rng.range(0, 3));
+      dyn('stool2', 'stool', tx + 0.7, 0.25, tz + 0.45, rng.range(0, 3));
+      const cp = P(tx, 0.83, tz - 0.2);
+      this.placeStatic('candle', cp.x, fy + 0.83, cp.z, 0, def.id);
+      g.fires.add({ id: `candle_${def.id}`, kind: 'candle', pos: new THREE.Vector3(cp.x, fy + 0.92, cp.z), policy: 'evening', canCook: false, heat: 0, condition: () => this.isOccupied(def.id) });
+      // Pan y jarra sobre la mesa (del vecino: cogerlos a la vista es robo).
+      const bp = P(tx, 0.84, tz + 0.3);
+      g.worldItems.spawn(rng.next() < 0.5 ? 'bread' : 'cheese', bp.x, fy + 0.84, bp.z, { uid: `${def.id}_food`, authored: true, owner: 'robledo', rotY: rng.range(0, 3), frozen: true });
+      // Arcón en la esquina del fondo derecha (lejos del hogar).
+      const chestZ = -hd + 0.45;
+      const ch = put('chest', hw - 0.75, 0.3, chestZ, 0);
+      const cid = `chest_${def.id}`;
+      const pool = [['bread', 2], ['cheese', 1], ['apple', 3], ['firewood', 3], ['torch', 1], ['waterskin', 1], ['herbs', 2], ['arrow', 4]] as const;
+      const contents = [0, 1, 2].map(() => pool[Math.floor(rng.next() * pool.length)]).map(([id, n]) => ({ id, count: n }));
+      g.containers.create(cid, `Arcón (${def.name})`, 'robledo', contents, Math.floor(rng.range(0, 14)));
+      const chP = P(hw - 0.75, 0.5, chestZ);
+      g.interactables.register(ch.handle, { id: cid, kind: 'container', pos: new THREE.Vector3(chP.x, fy + 0.5, chP.z), label: () => `Abrir el arcón (ajeno)`, interact: (game) => game.ui.openContainer(cid) });
+      // Barriles en la esquina delantera derecha.
+      dyn('barrel', 'barrel', hw - 0.55, 0.46, hd - 0.6, rng.range(0, 3));
+      // Fuego en la chimenea con olla.
+      if (hasHearth) {
+        const hp = b.hearthPos!;
+        this.placeStatic('fire_logs', hp.x, hp.y + 0.07, hp.z, r, def.id);
+        this.placeStatic('cauldron', hp.x, hp.y + 0.34, hp.z, 0, def.id);
+      }
+      // Oficio.
+      if (def.id.startsWith('fisher') || def.id === 'harbor_house') {
+        put('lobster_pot', -hw + 0.55, 0.22, hd - 0.6, 0.4);
+        put('fish_crate', 0.2, 0.15, -hd + 0.45, 0);
+      }
+      if (def.id === 'bakery') {
+        for (let i = 0; i < 3; i++) dyn(`flour${i}`, 'sack', hw - 0.5, 0.32, -hd + 1.3 + i * 0.7, i);
+      }
+      // Dónde se ve a los dueños: sentados a la mesa o en la cama.
+      const seat = P(tx + 0.7, 0, tz - 0.35);
+      const faceTable = Math.atan2(P(tx, 0, tz - 0.35).x - seat.x, P(tx, 0, tz - 0.35).z - seat.z);
+      // Pies en el extremo de la cama; el cuerpo se tiende hacia la cabecera.
+      const foot = P(-hw + 1.05 + 0.95, 0, -hd + 0.58), head = P(-hw + 1.05 - 0.95, 0, -hd + 0.58);
+      const bedYaw = Math.atan2(foot.x - head.x, foot.z - head.z);
+      this.homeSpots.set(def.id, { seat: { p: new THREE.Vector3(seat.x, fy, seat.z), yaw: faceTable }, bed: { p: new THREE.Vector3(foot.x, fy + 0.34, foot.z), yaw: bedYaw } });
+    }
   }
 
   // ------------------------------------------------------------ pueblo
@@ -773,40 +864,80 @@ export class Settlement {
       const top = Math.max(water + 0.9, (a.y + c.y) / 2 + 0.25);
       const pts = [a.clone().setY(a.y + 0.02), new THREE.Vector3().lerpVectors(a, c, 0.3).setY(top), new THREE.Vector3().lerpVectors(a, c, 0.7).setY(top), c.clone().setY(c.y + 0.02)];
       this.bridgeDecks.push({ a: a.clone(), c: c.clone(), top, width: b.width });
+      const rng = new Rng(77);
+      const across = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot));
       for (let i = 0; i < 3; i++) {
         const p0 = pts[i], p1 = pts[i + 1];
         const mid = new THREE.Vector3().lerpVectors(p0, p1, 0.5);
         const len = p0.distanceTo(p1);
         const pitch = Math.atan2(p1.y - p0.y, Math.hypot(p1.x - p0.x, p1.z - p0.z));
         const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-pitch, b.rot, 0, 'YXZ'));
-        const deck = new THREE.Mesh(worldBox(b.width, 0.16, len + 0.1, 1.2), g.materials.get('planks'));
-        deck.position.copy(mid).y -= 0.08;
-        deck.quaternion.copy(q);
-        deck.castShadow = deck.receiveShadow = true;
-        this.staticObjs.push(deck);
+        const along = new THREE.Vector3().subVectors(p1, p0).normalize();
+        // Colisión: un tablero continuo (las tablas son solo visuales).
         const col = g.physics.world.createCollider(RAPIER.ColliderDesc.cuboid(b.width / 2, 0.08, len / 2 + 0.05).setTranslation(mid.x, mid.y - 0.08, mid.z).setRotation(q).setCollisionGroups(groups(GROUP.STATIC, ALL)));
         g.physics.tag(col, { kind: 'static', id: 'bridge' });
+        // Vigas de tronco bajo el tablero.
         for (const s of [-1, 1]) {
-          const rail = new THREE.Mesh(worldBox(0.1, 0.1, len, 1), g.materials.get('beam'));
-          const side = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot)).multiplyScalar(s * (b.width / 2 - 0.05));
-          rail.position.copy(mid).add(side).y += 0.85;
-          rail.quaternion.copy(q);
-          this.staticObjs.push(rail);
-          for (const p of [p0, p1]) {
-            const post = new THREE.Mesh(worldBox(0.12, 1.0, 0.12, 1), g.materials.get('beam'));
-            post.position.copy(p).add(side).y += 0.4;
+          const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.14, len + 0.3, 8).rotateX(Math.PI / 2), g.materials.get('bark'));
+          beam.position.copy(mid).addScaledVector(across, s * (b.width / 2 - 0.35)).y -= 0.22;
+          beam.quaternion.copy(q);
+          beam.castShadow = true;
+          this.staticObjs.push(beam);
+        }
+        // Tablones sueltos, con holgura y algo de desorden.
+        const nPl = Math.max(2, Math.floor(len / 0.25));
+        for (let k = 0; k < nPl; k++) {
+          const t = (k + 0.5) / nPl - 0.5;
+          const pl = new THREE.Mesh(worldBox(b.width + rng.range(-0.08, 0.12), 0.06, len / nPl - 0.025, 1.2), g.materials.get(k % 5 === 2 ? 'roughWood' : 'planks'));
+          pl.position.copy(mid).addScaledVector(along, t * len).addScaledVector(across, rng.range(-0.05, 0.05)).y += rng.range(-0.012, 0.008) - 0.04;
+          pl.quaternion.copy(q).multiply(new THREE.Quaternion().setFromEuler(new THREE.Euler(rng.range(-0.02, 0.02), rng.range(-0.03, 0.03), rng.range(-0.015, 0.015))));
+          pl.castShadow = pl.receiveShadow = true;
+          this.staticObjs.push(pl);
+        }
+        // Barandas: postes, pasamanos de troncos y jabalcones.
+        for (const s of [-1, 1]) {
+          const side = across.clone().multiplyScalar(s * (b.width / 2 - 0.02));
+          const nPost = Math.max(1, Math.round(len / 1.4));
+          for (let k = 0; k <= nPost; k++) {
+            const p = new THREE.Vector3().lerpVectors(p0, p1, k / nPost).add(side);
+            const post = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, 1.05, 7), g.materials.get('bark'));
+            post.position.copy(p).y += 0.48;
             this.staticObjs.push(post);
+            // Jabalcón hacia fuera (refuerzo).
+            const br = new THREE.Mesh(worldBox(0.07, 0.6, 0.07, 1), g.materials.get('beam'));
+            br.position.copy(p).addScaledVector(across, s * 0.16).y += 0.1;
+            br.rotation.set(0, b.rot, s * 0.55);
+            this.staticObjs.push(br);
+          }
+          for (const hgt of [0.95, 0.5]) {
+            const rail = new THREE.Mesh(new THREE.CylinderGeometry(hgt > 0.8 ? 0.055 : 0.04, hgt > 0.8 ? 0.055 : 0.04, len + 0.1, 7).rotateX(Math.PI / 2), g.materials.get(hgt > 0.8 ? 'bark' : 'roughWood'));
+            rail.position.copy(mid).add(side).y += hgt;
+            rail.quaternion.copy(q);
+            this.staticObjs.push(rail);
           }
         }
+      }
+      // Estribos de piedra en las orillas.
+      for (const e of [a, c]) {
+        const ab = new THREE.Mesh(worldBox(b.width + 0.9, 1.4, 1.3, 1.5), g.materials.get('stoneWall'));
+        ab.position.copy(e).y -= 0.62;
+        ab.rotation.y = b.rot;
+        ab.castShadow = ab.receiveShadow = true;
+        this.staticObjs.push(ab);
       }
       // Pilotes.
       for (const t of [0.3, 0.7]) {
         const p = new THREE.Vector3().lerpVectors(a, c, t);
         for (const s of [-1, 1]) {
-          const side = new THREE.Vector3(Math.cos(b.rot), 0, -Math.sin(b.rot)).multiplyScalar(s * (b.width / 2 - 0.2));
-          const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.14, 0.16, 3, 7), g.materials.get('bark'));
-          pile.position.copy(p).add(side).setY(top - 1.6);
+          const side = across.clone().multiplyScalar(s * (b.width / 2 - 0.35));
+          const pile = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 3, 8), g.materials.get('bark'));
+          pile.position.copy(p).add(side).setY(top - 1.7);
           this.staticObjs.push(pile);
+          // Tornapuntas entre pilotes.
+          const x = new THREE.Mesh(worldBox(0.08, 1.6, 0.08, 1), g.materials.get('beam'));
+          x.position.copy(p).setY(top - 1.0);
+          x.rotation.set(0, b.rot + Math.PI / 2, s * 0.9);
+          this.staticObjs.push(x);
         }
       }
     }

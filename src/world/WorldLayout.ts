@@ -71,7 +71,7 @@ const B = (
   style: BuildingStyle, roof: BuildingDef['roof'], extra: Partial<BuildingDef> = {},
 ): BuildingDef => ({
   id, name, village: 'robledo', x, z, faceX: face[0], faceZ: face[1], w, d,
-  wallH: extra.wallH ?? 3.2, style, roof, enterable: false, maxHealth: 100, ...extra,
+  wallH: extra.wallH ?? 3.2, style, roof, enterable: true, maxHealth: 100, ...extra,
 });
 
 const PLAZA: P2 = [0, 0];
@@ -144,6 +144,11 @@ export const ROADS: RoadDef[] = [
   { id: 'forest_path', width: 2.6, kind: 'path', points: [[-20, 8], [-42, 14], [-58, 22], [-78, 20], [-95, 15], [-120, 4], [-150, -20], [-176, -70], [-184, -112], [-188, -130]] },
   { id: 'bandit_trail', width: 1.8, kind: 'trail', points: [[170, -280], [128, -205], [70, -140], [26, -106], [3, -110]] },
   { id: 'field_path', width: 2.2, kind: 'path', points: [[4, 40], [30, 62], [52, 90]] },
+  // Senderos pisados (sin hierba) que llevan a los sitios.
+  { id: 'meadow_trail', width: 1.6, kind: 'trail', points: [[-120, 4], [-131, -6], [-143, -18], [-156, -32], [-165, -44]] },
+  { id: 'quarry_trail', width: 1.6, kind: 'trail', points: [[-20, 26], [-31, 40], [-40, 55], [-47, 68], [-58, 80]] },
+  { id: 'beach_walk', width: 1.4, kind: 'trail', points: [[104, -60], [108, -30], [110, 0], [110, 30], [104, 60], [96, 84]] },
+  { id: 'den_trail', width: 1.3, kind: 'trail', points: [[-176, -70], [-186, -100], [-196, -130], [-203, -160]] },
 ];
 
 /** Arroyo del Robledo (afluente del Arnós). */

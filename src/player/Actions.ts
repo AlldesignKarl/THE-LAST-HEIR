@@ -13,7 +13,10 @@ export class Actions {
   constructor(private readonly g: Game) {}
 
   toggleDoor(d: Door): void {
-    if (d.locked) {
+    // Desde dentro siempre se puede abrir (se descorre el cerrojo).
+    const b = this.g.settlement.buildings.get(d.buildingId);
+    const inside = !!b && b.contains(this.g.player.pos.x, this.g.player.pos.z, 0.05);
+    if (d.locked && !inside) {
       this.g.bus.emit('notify', { text: 'Está cerrada con llave.', kind: 'info' });
       this.g.bus.emit('sfx', { id: 'door_locked', x: d.worldPos.x, y: d.worldPos.y, z: d.worldPos.z });
       return;

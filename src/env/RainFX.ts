@@ -33,9 +33,13 @@ export class RainFX {
     this.pos[o + 3] = x + 0.05; this.pos[o + 4] = y + 0.55; this.pos[o + 5] = z;
   }
 
+  /** Nevando (invierno): copos blancos, lentos y que se mecen. */
+  snow = false;
+
   update(dt: number, cam: THREE.Vector3, intensity: number, wind: number): void {
     const mat = this.lines.material as THREE.LineBasicMaterial;
-    mat.opacity = Math.min(0.55, intensity * 0.6);
+    mat.color.setHex(this.snow ? 0xf6f8fb : 0x9aa4b0);
+    mat.opacity = Math.min(this.snow ? 0.9 : 0.55, intensity * (this.snow ? 1 : 0.6));
     this.lines.visible = intensity > 0.02;
     if (!this.lines.visible) return;
     this.lines.position.copy(cam);
@@ -43,8 +47,8 @@ export class RainFX {
     this.lines.geometry.setDrawRange(0, active * 2);
     for (let i = 0; i < active; i++) {
       const o = i * 6;
-      let y = this.pos[o + 1] - this.speed[i] * dt;
-      let x = this.pos[o] + wind * 3 * dt;
+      let y = this.pos[o + 1] - this.speed[i] * dt * (this.snow ? 0.08 : 1);
+      let x = this.pos[o] + wind * 3 * dt * (this.snow ? 0.5 : 1) + (this.snow ? Math.sin(y * 1.3 + i) * dt * 0.5 : 0);
       let z = this.pos[o + 2];
       if (y < -8) {
         y = 12 + Math.random() * 6;
@@ -53,6 +57,7 @@ export class RainFX {
       }
       if (x > BOX) x -= BOX * 2;
       this.set(i, x, y, z);
+      if (this.snow) { this.pos[o + 3] = x + 0.02; this.pos[o + 4] = y + 0.04; }
     }
     (this.lines.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
   }

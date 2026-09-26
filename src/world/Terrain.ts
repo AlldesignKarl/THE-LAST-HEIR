@@ -6,6 +6,7 @@
  * - Fondo lejano: una malla de baja resolución de todo el valle.
  */
 import * as THREE from 'three';
+import { SeasonUniforms } from '../env/Seasons';
 import type { Heightfield } from './Heightfield';
 import { Physics, RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 import type { TextureLibrary } from '../engine/placeholder/Textures';
@@ -295,6 +296,8 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
     u.tSand = { value: sand.map }; u.tSandN = { value: sand.normalMap };
     u.uSea = { value: SEA.level };
     u.uWetness = GlobalUniforms.uWetness;
+    u.uGrassTint = SeasonUniforms.uGrassTint;
+    u.uSnowCover = SeasonUniforms.uSnowCover;
     if (lowQuality) shader.defines = { ...(shader.defines ?? {}), TERRAIN_LQ: '' };
     shader.vertexShader = shader.vertexShader
       .replace('#include <common>', '#include <common>\nattribute vec4 aSplat;\nattribute vec4 aSplat2;\nvarying vec4 vSplat;\nvarying vec4 vSplat2;\nvarying vec3 vWPos;\nvarying vec3 vWN;')
@@ -305,7 +308,7 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
         uniform sampler2D tDirt; uniform sampler2D tDirtN; uniform sampler2D tRock; uniform sampler2D tRockN;
         uniform sampler2D tMud; uniform sampler2D tField; uniform sampler2D tFieldN;
         uniform sampler2D tSand; uniform sampler2D tSandN; uniform float uSea;
-        uniform float uWetness;
+        uniform float uWetness; uniform vec3 uGrassTint; uniform float uSnowCover;
         varying vec4 vSplat; varying vec4 vSplat2; varying vec3 vWPos; varying vec3 vWN;
         vec2 rot2(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
         // Mezcla por altura: la capa con más relieve "gana" en la transición.
@@ -401,6 +404,11 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
         float snow = smoothstep(175.0, 235.0, vWPos.y + nmod * 50.0) * smoothstep(0.5, 0.8, normalize(vWN).y);
         terr = mix(terr, vec3(0.82, 0.85, 0.9) * (0.9 + 0.1 * hh), snow);
         wr *= 1.0 - snow;
+        // Estación: tono de la hierba y nieve invernal en lo llano.
+        terr *= mix(vec3(1.0), uGrassTint, (1.0 - wr) * 0.85);
+        float sc = uSnowCover * smoothstep(0.55, 0.85, normalize(vWN).y) * smoothstep(0.3, 0.75, macro + hh * 0.4 + macro2 * 0.2) * step(uSea + 0.6, vWPos.y);
+        terr = mix(terr, vec3(0.86, 0.88, 0.92) * (0.92 + 0.08 * hh), sc);
+        wr *= 1.0 - sc;
         // Variación macro de tono y brillo (rompe la repetición a distancia).
         terr *= mix(0.84, 1.1, macro2);
         terr = mix(terr, terr * vec3(1.08, 1.02, 0.86), smoothstep(0.55, 0.8, macro) * (1.0 - wr) * 0.6);

@@ -30,7 +30,9 @@ export type AnimState =
   /** Herido de muerte: de rodillas sujetándose (kneel) o tendido retorciéndose (downed). */
   | 'kneel' | 'downed'
   /** Cargado al hombro: doblado por la cintura, brazos y piernas colgando. */
-  | 'carried';
+  | 'carried'
+  /** Durmiendo tendido boca arriba (en una cama). */
+  | 'sleep';
 
 /** Miembros que se pueden cercenar. */
 export type Limb = 'head' | 'armL' | 'armR' | 'legL' | 'legR';
@@ -444,6 +446,9 @@ export class HumanoidModel {
       shLx = -0.5 + wr * 0.4; shRx = -1.2 - wr * 0.3; elL = -1.2; elR = -0.6 + wr * 0.5; shRz = -0.3;
       knL = 0.5 + Math.max(0, wr) * 0.6; knR = 0.2; hipLx = -0.4 - Math.max(0, wr) * 0.3;
       headX = -0.2 + wr * 0.15;
+    } else if (s === 'sleep') {
+      rootX = -1.52; hipsY = -0.72; spineX = Math.sin(this.stateT * 1.1) * 0.015;
+      shLx = shRx = -0.15; shLz = 0.12; shRz = -0.12; elL = elR = -0.4; knL = 0.15; hipsYaw = 0.05;
     } else if (s === 'carried') {
       const sw2 = Math.sin(this.stateT * 3) * 0.06;
       spineX = 1.25; headX = 0.45;

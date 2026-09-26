@@ -4,12 +4,13 @@
  * balanceo por viento en el vertex shader.
  */
 import * as THREE from 'three';
+import { SeasonUniforms } from '../env/Seasons';
 import type { Heightfield } from './Heightfield';
 import { hash2 } from '../core/rng';
 import { GlobalUniforms } from '../engine/placeholder/Materials';
 
 const CELL = 8;
-const RADIUS = 42;
+const RADIUS = 50;
 const MAX = 16000;
 
 /**
@@ -121,6 +122,10 @@ export class Grass {
     mat.onBeforeCompile = (shader) => {
       shader.uniforms.uTime = GlobalUniforms.uTime;
       shader.uniforms.uWind = GlobalUniforms.uWind;
+      shader.uniforms.uGrassTint = SeasonUniforms.uGrassTint;
+      shader.fragmentShader = shader.fragmentShader
+        .replace('#include <common>', '#include <common>\nuniform vec3 uGrassTint;')
+        .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= uGrassTint;');
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;\nattribute float aVariant;')
         .replace('#include <uv_vertex>', `#include <uv_vertex>
@@ -152,7 +157,7 @@ export class Grass {
     let list = this.cache.get(key);
     if (list) return list;
     list = [];
-    const n = 44;
+    const n = 78;
     for (let i = 0; i < n; i++) {
       const x = (cx + hash2(cx * 31 + i, cz, 5)) * CELL;
       const z = (cz + hash2(cx, cz * 17 + i, 9)) * CELL;

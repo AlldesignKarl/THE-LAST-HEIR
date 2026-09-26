@@ -101,6 +101,8 @@ export class Character implements Actor {
   /** Pérdida de salud por segundo (sangrado). */
   bleed = 0;
   woundAnim: AnimState = 'downed';
+  /** Está en su casa y el jugador ha entrado: se le ve dentro. */
+  homeShown = false;
   /** Cuerpo escondido (en el agua, lejos de miradas): nadie lo encontrará. */
   hiddenBody = false;
   onHurt: ((c: Character, attacker: string | null) => void) | null = null;
@@ -437,7 +439,7 @@ export class Character implements Actor {
     r.position.lerpVectors(this.prevPos, this.pos, alpha);
     this.renderYaw = this.renderYaw + wrapAngle(this.yaw - this.renderYaw) * Math.min(1, dt * 12);
     r.rotation.y = this.renderYaw;
-    r.visible = this.visible && !this.indoors;
+    r.visible = this.visible && (!this.indoors || this.homeShown);
     void damp;
   }
 

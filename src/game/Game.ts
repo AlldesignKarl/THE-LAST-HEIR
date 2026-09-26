@@ -60,6 +60,7 @@ import { Guide } from '../ui/Guide';
 import { Boats } from '../world/Boats';
 import { Fishing } from '../player/Fishing';
 import { Wounds } from '../combat/Wounds';
+import { Seasons } from '../env/Seasons';
 import { Bodies } from '../social/Bodies';
 import { SaveSystem } from '../save/SaveSystem';
 import { Multiplayer } from '../net/Multiplayer';
@@ -124,6 +125,7 @@ export class Game {
   readonly boats: Boats;
   readonly fishing: Fishing;
   readonly wounds: Wounds;
+  readonly seasons: Seasons;
   readonly bodies: Bodies;
   /** Id del jugador local (en multijugador, el del usuario). */
   localPlayerId = 'local';
@@ -193,6 +195,7 @@ export class Game {
     this.boats = new Boats(this);
     this.fishing = new Fishing(this);
     this.wounds = new Wounds(this);
+    this.seasons = new Seasons(this);
     this.bodies = new Bodies(this);
     this.grass = new Grass(this.hf, scene, (x, z) => {
       if (this.hf.isHole(x, z)) return true;
@@ -203,7 +206,7 @@ export class Game {
     this.scatter = new GroundScatter(this.hf, scene, this.materials, (x, z) => {
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -1.5)) return true;
       return false;
-    }, this.qualityName === 'low' ? 40 : this.qualityName === 'medium' ? 70 : 95);
+    }, this.qualityName === 'low' ? 50 : this.qualityName === 'medium' ? 100 : 135);
     this.worldItems.groundAt = (x, y, z) => {
       if (this.hf.isHole(x, z)) return null;
       const t = this.hf.heightAt(x, z);
@@ -238,6 +241,7 @@ export class Game {
     this.mp = new Multiplayer(this);
     this.mpUI = new MultiplayerUI(this);
     this.wireEvents();
+    this.seasons.apply();
     this.loop = new GameLoop((dt) => this.fixedUpdate(dt), (a, fdt) => this.renderFrame(a, fdt), 30);
     // Vista inicial (menú): el pueblo al amanecer.
     this.terrain.preload(PLAYER_START.x, PLAYER_START.z);
@@ -309,6 +313,7 @@ export class Game {
     reg('quests', () => this.quests.serialize(), (d: Parameters<QuestSystem['deserialize']>[0]) => this.quests.deserialize(d));
     reg('economy', () => this.economy.serialize(), (d: Parameters<Economy['deserialize']>[0]) => this.economy.deserialize(d));
     reg('npcs', () => this.npcs.serialize(), (d: Parameters<NPCManager['deserialize']>[0]) => this.npcs.deserialize(d));
+    reg('seasons', () => this.seasons.serialize(), (d: Parameters<Seasons['deserialize']>[0]) => this.seasons.deserialize(d));
     reg('bodies', () => this.bodies.serialize(), (d: Parameters<Bodies['deserialize']>[0]) => this.bodies.deserialize(d));
     reg('animals', () => this.animals.serialize(), (d: Parameters<AnimalManager['deserialize']>[0]) => this.animals.deserialize(d));
     reg('raids', () => this.raids.serialize(), (d: Parameters<RaidSystem['deserialize']>[0]) => this.raids.deserialize(d));
@@ -350,6 +355,9 @@ export class Game {
     this.inventory.coins = 18;
     this.discovered.add('robledo');
     this.quests.start('main_legacy');
+    this.seasons.apply();
+    this.seasons.rollDay(this.time.day);
+    this.bus.emit('notify', { text: `${this.seasons.name}.`, kind: 'info' });
     // La puerta de la choza empieza abierta: entra la luz de la mañana.
     const hutDoor = this.settlement.buildings.get('player_hut')?.doors[0];
     if (hutDoor && !hutDoor.open) this.actions.toggleDoor(hutDoor);
@@ -547,7 +555,7 @@ export class Game {
     const torch = this.equipment.torchLit && this.equipment.slots.off === 'torch';
     const indoors = this.env.interiorTarget > 0.3 && !this.player.underground;
     const temp = ambientTemperature({
-      hour: this.time.hourFloat, altitude: p.y, chill: indoors ? 0 : this.weather.chill,
+      hour: this.time.hourFloat, altitude: p.y, chill: (indoors ? 0 : this.weather.chill) + this.seasons.chill * (indoors ? 0.5 : 1),
       sheltered: indoors, inCave: this.player.underground, fireHeat: this.fires.heatAt(p) + (torch ? 3 : 0),
     });
     const combatExertion = this.combat.state !== 'idle' ? 0.5 : 0;

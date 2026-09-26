@@ -9,7 +9,7 @@ import type { LightPool } from '../engine/LightPool';
 import type { Particles } from '../engine/Particles';
 
 export type FireKind = 'torch' | 'hearth' | 'campfire' | 'forge' | 'candle' | 'blaze';
-export type FirePolicy = 'night' | 'evening' | 'work' | 'always' | 'manual';
+export type FirePolicy = 'night' | 'evening' | 'home' | 'work' | 'always' | 'manual';
 
 export interface Fire {
   id: string;
@@ -97,6 +97,8 @@ export class Fires {
       switch (f.policy) {
         case 'night': want = cond && (hour >= 19.3 || hour < 6.6); break;
         case 'evening': want = cond && ((hour >= 5.5 && hour < 8.5) || (hour >= 18 && hour < 23)); break;
+        // Hogar de una casa habitada: de la tarde al desayuno (brasas toda la noche).
+        case 'home': want = cond && (hour >= 17.5 || hour < 8.5); break;
         case 'work': want = cond && hour >= 7.5 && hour < 18.5; break;
         case 'always': want = cond; break;
         case 'manual':

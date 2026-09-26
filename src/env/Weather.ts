@@ -46,7 +46,7 @@ export class Weather {
   private lightningTimer = 8;
   onThunder: ((delay: number) => void) | null = null;
 
-  constructor(private readonly bus: EventBus | null, seed = 7) {
+  constructor(private readonly bus: EventBus | null, seed = Math.floor(Math.random() * 1e9)) {
     this.rng = new Rng(seed);
   }
 
@@ -74,7 +74,22 @@ export class Weather {
     }
   }
 
+  /** Tipo de tiempo del día (lo sortean las estaciones al alba). */
+  dayType: WeatherState | null = null;
+
+  setDay(state: WeatherState): void {
+    this.dayType = state;
+    this.set(state);
+    this.nextChangeIn = this.rng.range(180, 420);
+  }
+
   private transition(): void {
+    // El día tiende a mantener su carácter (lluvioso, de niebla…).
+    if (this.dayType && this.state !== this.dayType && this.rng.next() < 0.55) {
+      this.nextChangeIn = this.rng.range(150, 360);
+      this.set(this.dayType);
+      return;
+    }
     const options = TRANSITIONS[this.state];
     let r = this.rng.next();
     let next = this.state;
