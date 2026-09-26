@@ -87,7 +87,7 @@ await test('arranque: mundo, jugador en la choza y misión inicial', async () =>
     };
   });
   assert(s.stage === 'search_hut', `etapa inicial ${s.stage}`);
-  assert(s.npcs === 10, '10 habitantes');
+  assert(s.npcs === 19, `19 habitantes (${s.npcs})`);
   assert(s.buildings >= 15, 'edificios');
   assert(s.inHut, 'el jugador empieza dentro de su choza');
   assert(s.trees > 500, `árboles ${s.trees}`);
@@ -243,11 +243,14 @@ await test('misión de la empalizada: talar, transportar troncos, cobrar', async
     const coins0 = g.inventory.coins;
     // Talar un árbol real de la arboleda con el hacha.
     g.equipment.equip('axe');
-    __game.teleport(82, -62, 0);
+    // Un árbol en pie del bosque al oeste del pueblo (al este ahora está la costa).
+    const bx = -40, bz = 70;
+    __game.teleport(bx, bz, 0);
     __game.step(0.5);
-    const trees = g.vegetation.nearbyTrees(82, -72, 14).sort((a, b) => Math.hypot(a.x - 82, a.z + 62) - Math.hypot(b.x - 82, b.z + 62));
+    const trees = g.vegetation.nearbyTrees(bx, bz, 40).filter((x) => g.vegetation.isStanding(x) && !g.hf.isSeaWater(x.x, x.z))
+      .sort((a, b) => Math.hypot(a.x - bx, a.z - bz) - Math.hypot(b.x - bx, b.z - bz));
     const t = trees[0];
-    const dx = t.x - 82, dz = t.z + 62, d = Math.hypot(dx, dz);
+    const dx = t.x - bx, dz = t.z - bz, d = Math.hypot(dx, dz) || 1;
     __game.teleport(t.x - (dx / d) * 1.3, t.z - (dz / d) * 1.3, 0);
     let swings = 0;
     for (; swings < 20 && g.vegetation.isStanding(t); swings++) {
@@ -264,7 +267,7 @@ await test('misión de la empalizada: talar, transportar troncos, cobrar', async
     const needed = 6;
     for (let i = 0; i < needed; i++) {
       const w = logs[i] ?? g.worldItems.spawn('log', t.x, t.y + 1, t.z, {});
-      w.body.setTranslation({ x: z.x + Math.cos(i) * 1.2, y: z.y + 0.6 + i * 0.5, z: z.z + Math.sin(i) * 1.2 }, true);
+      w.body.setTranslation({ x: z.x + Math.cos(i) * 0.5, y: z.y + 0.6 + i * 0.5, z: z.z + Math.sin(i) * 0.5 }, true); w.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
     }
     __game.step(4);
     const stage = __game.quest('side_palisade');

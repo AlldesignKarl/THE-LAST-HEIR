@@ -161,6 +161,10 @@ export class EnvironmentLighting {
     this.hemi.intensity = amb;
     this.hemi.color.setRGB(lerp(0.8, 0.3, night), lerp(0.85, 0.38, night), lerp(0.92, 0.62, night));
     this.hemi.groundColor.setRGB(lerp(0.3, 0.05, night), lerp(0.3, 0.05, night), lerp(0.18, 0.07, night));
+    // Dentro de casa la luz llega rebotada en barro, madera y paja: cálida, no azul cielo.
+    const inside = Math.min(1, this.interior * 2.2) * (1 - night * 0.6);
+    this.hemi.color.lerp(new THREE.Color(0.86, 0.76, 0.62), inside * 0.8);
+    this.hemi.groundColor.lerp(new THREE.Color(0.32, 0.24, 0.16), inside * 0.8);
 
     // Niebla: color del horizonte según la hora.
     const dayFog = new THREE.Color(0xa9b8c6).lerp(new THREE.Color(0x9a9ea2), overcast);
@@ -218,7 +222,7 @@ export class EnvironmentLighting {
     }
     // El IBL no conoce la oclusión: casi nada de noche, al atardecer se atenúa
     // (el cielo azul teñiría todo) y cae rápido en interiores y cuevas.
-    const open = Math.pow(1 - Math.min(1, this.interior), 3);
+    const open = Math.pow(1 - Math.min(1, this.interior), 4);
     this.scene.environmentIntensity = (0.02 + 0.42 * dayAmt * (1 - golden * 0.5)) * open;
   }
 

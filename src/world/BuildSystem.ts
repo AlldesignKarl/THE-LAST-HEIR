@@ -70,7 +70,7 @@ export interface Piece {
 interface Part { geo: THREE.BufferGeometry; mat: MatId }
 interface Col { hx: number; hy: number; hz: number; m: THREE.Matrix4 }
 
-interface Built {
+export interface Built {
   piece: Piece;
   bodies: RAPIER.RigidBody[];
   handles: number[];

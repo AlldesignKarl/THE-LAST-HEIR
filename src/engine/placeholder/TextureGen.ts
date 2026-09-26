@@ -172,69 +172,121 @@ void main() {
     c = mix(c, vec3(0.2, 0.26, 0.1), moss * 0.6);
     h = n * 0.7 + strata * 0.2 - crack * 0.5 + fbm(uv, vec2(32), 3, 57.0) * 0.15;
   } else if (uPainter == 5 || uPainter == 19) { // tablas (5) / madera tosca (19)
+    // Roble aserrado y envejecido: veta fina y larga (sin "ondas" de dibujo),
+    // tono distinto por tabla, desgaste de paso, suciedad en juntas y clavos.
     float boards = uPainter == 5 ? 5.0 : 3.0;
     float bi = floor(uv.y * boards);
     float fy = fract(uv.y * boards);
     float seed = 61.0 + bi * 7.0;
     float off = hash12(vec2(bi, 3.0));
-    // Veta: ruido muy estirado + anillos.
-    float warp = gnoise(vec2(uv.x * 3.0, fy * 2.0 + bi), vec2(3, 200), seed) * 0.6;
-    float grain = gnoise(vec2(uv.x * 4.0 + off * 4.0, (fy + warp) * 40.0), vec2(4, 40), seed + 1.0);
-    float rings = 0.5 + 0.5 * sin((fy + warp * 0.8) * 60.0 + gnoise(uv * vec2(8, 2), vec2(8, 2), seed + 2.0) * 6.0);
-    float n = fbm(uv, vec2(6), 4, seed + 3.0);
-    c = mix(vec3(0.25, 0.16, 0.09), vec3(0.45, 0.32, 0.19), grain * 0.5 + rings * 0.25 + n * 0.25);
-    c *= 0.8 + 0.35 * off;
-    // Nudos.
-    vec3 kn = voronoi(uv, vec2(3, boards), seed + 4.0, 0.8);
-    float knot = smoothstep(0.12, 0.04, kn.x) * step(0.75, kn.z);
-    c = mix(c, vec3(0.12, 0.07, 0.04), knot * 0.8);
-    float gap = smoothstep(0.035, 0.0, fy) + smoothstep(0.965, 1.0, fy);
-    // Juntas a tope en posiciones aleatorias.
+    float off2 = hash12(vec2(bi, 9.0));
+    // Deriva lenta de la veta a lo largo de la tabla.
+    float drift = (gnoise(vec2(uv.x * 2.0 + off * 5.0, bi), vec2(2, 64), seed) - 0.5) * 0.35;
+    float gy = fy + drift;
+    // Veta: fibras finas muy estiradas (alta frecuencia en Y de la tabla).
+    float fib = gnoise(vec2(uv.x * 6.0 + off * 9.0, gy * 70.0), vec2(6, 70), seed + 1.0);
+    float fib2 = gnoise(vec2(uv.x * 14.0, gy * 160.0), vec2(14, 160), seed + 5.0);
+    // Anillos de crecimiento: bandas finas e irregulares, casi paralelas.
+    float ringPh = gy * (18.0 + off2 * 10.0) + gnoise(vec2(uv.x * 3.0, gy * 4.0), vec2(3, 4), seed + 2.0) * 2.0;
+    float rings = smoothstep(0.55, 0.95, abs(fract(ringPh) * 2.0 - 1.0));
+    float blot = fbm(uv * vec2(1.0, boards), vec2(3, boards), 4, seed + 3.0);
+    vec3 light = mix(vec3(0.36, 0.27, 0.18), vec3(0.42, 0.33, 0.23), off2);
+    vec3 dark = mix(vec3(0.17, 0.12, 0.08), vec3(0.22, 0.16, 0.11), off);
+    c = mix(dark, light, fib * 0.55 + blot * 0.35 + fib2 * 0.1);
+    c = mix(c, dark * 0.85, rings * 0.35);
+    c *= 0.82 + 0.3 * off;
+    // Envejecido: la madera al aire se agrisa.
+    float grey = fbm(uv, vec2(3), 4, 67.0);
+    c = mix(c, vec3(0.3, 0.29, 0.27) * (0.8 + 0.4 * fib), smoothstep(0.45, 0.85, grey) * (uPainter == 19 ? 0.65 : 0.3));
+    // Desgaste de paso en el centro de las tablas (más claro y liso).
+    float wear = smoothstep(0.25, 0.5, fy) * smoothstep(0.75, 0.5, fy) * smoothstep(0.4, 0.8, fbm(uv, vec2(2, 5), 3, 68.0));
+    c = mix(c, c * 1.18 + vec3(0.02, 0.015, 0.01), wear * 0.5);
+    // Nudos pequeños y alargados.
+    vec3 kn = voronoi(uv * vec2(1.0, 1.0), vec2(4, boards), seed + 4.0, 0.8);
+    float knot = smoothstep(0.09, 0.03, kn.x) * step(0.8, kn.z);
+    c = mix(c, vec3(0.1, 0.065, 0.04), knot * 0.85);
+    // Juntas y testas; suciedad acumulada junto a ellas.
+    float gap = smoothstep(0.03, 0.0, fy) + smoothstep(0.97, 1.0, fy);
     float jx = fract(uv.x * 2.0 + off);
-    gap = max(gap, smoothstep(0.012, 0.0, abs(jx - 0.5)) * step(0.4, off));
-    c = mix(c, vec3(0.05, 0.035, 0.025), sat(gap));
-    if (uPainter == 19) c = mix(c, vec3(0.32, 0.3, 0.27), smoothstep(0.55, 0.8, fbm(uv, vec2(4), 4, 66.0)) * 0.5); // envejecida
-    h = 0.55 + grain * 0.2 + rings * 0.1 - knot * 0.2 - sat(gap) * 0.7;
-  } else if (uPainter == 6) { // muro de mampostería irregular
-    vec3 v = voronoi(uv * vec2(1.0, 1.0), vec2(5, 7), 71.0, 0.85);
-    float edge = v.y - v.x;
-    float mortar = smoothstep(0.1, 0.03, edge);
-    float n = fbm(uv, vec2(8), 5, 72.0);
-    float tone = v.z;
-    c = mix(vec3(0.36, 0.33, 0.29), vec3(0.6, 0.55, 0.48), tone * 0.55 + n * 0.45);
-    c = mix(c, c * vec3(1.05, 0.95, 0.85), step(0.7, fract(tone * 7.3)) * 0.5); // piedras más cálidas
-    c *= 0.85 + 0.25 * fbm(uv, vec2(48), 3, 73.0);
-    c = mix(c, vec3(0.3, 0.28, 0.25), mortar);
-    float grime = smoothstep(0.3, 1.0, uv.y) * fbm(uv, vec2(3), 3, 74.0);
+    float butt = smoothstep(0.01, 0.0, abs(jx - 0.5)) * step(0.35, off);
+    gap = max(gap, butt);
+    float grime = (smoothstep(0.12, 0.0, fy) + smoothstep(0.88, 1.0, fy)) * 0.5;
     c *= 1.0 - grime * 0.35;
-    float bulge = sat(edge * 5.0);
-    h = mortar > 0.5 ? 0.05 : 0.35 + sqrt(bulge) * 0.45 + n * 0.2;
+    c = mix(c, vec3(0.04, 0.03, 0.02), sat(gap));
+    // Clavos de hierro en las testas.
+    float nl = smoothstep(0.018, 0.008, length(vec2(abs(jx - 0.5) - 0.025, abs(fy - 0.5) - 0.3) * vec2(2.0, 1.0))) * step(0.35, off);
+    c = mix(c, vec3(0.08, 0.075, 0.07), nl);
+    h = 0.55 + fib * 0.12 + fib2 * 0.05 - rings * 0.05 - knot * 0.2 - sat(gap) * 0.7 - wear * 0.05 + nl * 0.1;
+    if (uPainter == 19) h += (grey - 0.5) * 0.15;
+  } else if (uPainter == 6) { // muro de mampostería irregular
+    // Mampuestos de caliza/arenisca de tamaños variados, hiladas aproximadas,
+    // junta de mortero fina y rehundida, caras picadas con líquenes y hollín.
+    vec3 v = voronoi(uv * vec2(1.0, 1.0), vec2(7, 10), 71.0, 0.75);
+    float edge = v.y - v.x;
+    float mortar = smoothstep(0.07, 0.02, edge);
+    float n = fbm(uv, vec2(10), 5, 72.0);
+    float pits = fbm(uv, vec2(60), 3, 75.0);
+    float tone = v.z;
+    vec3 stoneA = vec3(0.42, 0.39, 0.34), stoneB = vec3(0.56, 0.51, 0.43), stoneC = vec3(0.47, 0.42, 0.35);
+    c = mix(stoneA, stoneB, tone);
+    c = mix(c, stoneC, step(0.66, fract(tone * 5.3)) * 0.6);
+    c *= 0.78 + 0.3 * n + 0.12 * (pits - 0.5);
+    // Caras más claras en el centro, más oscuras hacia la junta (volumen).
+    float bulge = sat(edge * 4.0);
+    c *= 0.85 + 0.2 * sqrt(bulge);
+    // Líquenes y verdín en la parte baja; hollín/suciedad general.
+    float lich = smoothstep(0.62, 0.8, fbm(uv, vec2(9), 4, 76.0)) * 0.5;
+    c = mix(c, vec3(0.44, 0.45, 0.33), lich * 0.5);
+    float grime = fbm(uv, vec2(3), 3, 74.0);
+    c *= 1.0 - smoothstep(0.4, 0.9, grime) * 0.25;
+    vec3 mortC = mix(vec3(0.46, 0.43, 0.38), vec3(0.36, 0.33, 0.29), pits);
+    c = mix(c, mortC, mortar);
+    h = mortar > 0.5 ? 0.08 + pits * 0.05 : 0.35 + sqrt(bulge) * 0.4 + n * 0.15 + pits * 0.08;
   } else if (uPainter == 7) { // revoque de cal
-    float n = fbm(uv, vec2(5), 5, 81.0);
-    float trowel = gnoise(uv * vec2(14, 9), vec2(14, 9), 82.0);
-    float dirtV = sat(uv.y * 1.3 - 0.35) * fbm(uv, vec2(3), 3, 83.0);
-    float chip = smoothstep(0.7, 0.8, fbm(uv, vec2(10), 3, 84.0));
-    c = mix(vec3(0.72, 0.66, 0.55), vec3(0.86, 0.81, 0.7), n * 0.7 + trowel * 0.3);
-    c = mix(c, vec3(0.45, 0.38, 0.28), dirtV * 0.7);
-    // Desconchón: asoma el zarzo/ladrillo.
-    c = mix(c, vec3(0.46, 0.34, 0.22), chip * 0.85);
-    // Churretes verticales.
-    float drip = smoothstep(0.6, 0.9, gnoise(uv * vec2(30, 2), vec2(30, 2), 85.0)) * sat(uv.y * 1.5 - 0.2);
-    c *= 1.0 - drip * 0.18;
-    h = n * 0.25 + trowel * 0.2 - chip * 0.45 + 0.4;
+    // Enlucido de cal sobre muro: blanco roto con variación suave, marcas de
+    // llana, pequeños desconchones con sombra en el borde, humedad que sube
+    // desde el suelo y churretes finos (sin manchones marrones).
+    float n = fbm(uv, vec2(4), 5, 81.0);
+    float fine = fbm(uv, vec2(40), 3, 86.0);
+    float trowel = gnoise(uv * vec2(9, 6) + vec2(n * 0.6, 0.0), vec2(9, 6), 82.0);
+    c = mix(vec3(0.66, 0.62, 0.54), vec3(0.8, 0.77, 0.69), n * 0.6 + trowel * 0.25 + fine * 0.15);
+    // Humedad capilar desde abajo (uv.y = 0 abajo) y polvo arriba.
+    float damp1 = sat(1.0 - uv.y * 3.2 + (fbm(uv, vec2(6, 2), 3, 83.0) - 0.5) * 0.9);
+    c = mix(c, c * vec3(0.72, 0.7, 0.64), damp1 * 0.6);
+    // Desconchones: pequeños, con el material de debajo y borde sombreado.
+    float chipN = fbm(uv, vec2(12), 4, 84.0);
+    float chip = smoothstep(0.73, 0.76, chipN);
+    float rim = smoothstep(0.69, 0.73, chipN) - chip;
+    vec3 under = mix(vec3(0.42, 0.36, 0.28), vec3(0.52, 0.46, 0.38), fine);
+    c = mix(c, c * 0.8, rim * 0.6);
+    c = mix(c, under, chip);
+    // Churretes: finos y claros/oscuros alternos, solo en la mitad alta.
+    float drip = smoothstep(0.72, 0.9, gnoise(uv * vec2(46, 1.5), vec2(46, 1.5), 85.0)) * sat(uv.y * 1.4 - 0.3);
+    c *= 1.0 - drip * 0.1;
+    h = 0.5 + n * 0.15 + trowel * 0.12 + fine * 0.08 - chip * 0.35 - rim * 0.1;
   } else if (uPainter == 8) { // zarzo con barro
+    // Manteado de barro y paja sobre el zarzo: el barro lo cubre casi todo;
+    // el entramado solo asoma en grietas finas y en algún desconchón pequeño.
     float rows = 14.0;
     float ri = floor(uv.y * rows);
     float weave = 0.5 + 0.5 * sin((uv.x * 10.0 + mod(ri, 2.0) * 0.5) * 6.2831);
     float rod = sin(fract(uv.y * rows) * 3.14159);
-    float daub = fbm(uv, vec2(3), 5, 91.0);
-    float edge = smoothstep(0.3, 0.42, daub);
-    vec3 mud = mix(vec3(0.46, 0.39, 0.3), vec3(0.63, 0.56, 0.45), fbm(uv, vec2(10), 3, 92.0));
-    mud *= 0.9 + 0.2 * fbm(uv, vec2(50), 2, 94.0);
-    mud = mix(mud, vec3(0.38, 0.33, 0.26), sat(uv.y * 1.1 - 0.5) * fbm(uv, vec2(2), 3, 93.0));
-    vec3 rodC = mix(vec3(0.28, 0.2, 0.12), vec3(0.46, 0.34, 0.2), rod * weave);
-    c = mix(rodC, mud, edge);
-    h = edge * (0.65 + daub * 0.35) + (1.0 - edge) * rod * weave * 0.4;
+    float daub = fbm(uv, vec2(4), 5, 91.0);
+    float fine = fbm(uv, vec2(36), 3, 94.0);
+    // Paja picada en el barro: trazos cortos claros.
+    float straw = smoothstep(0.78, 0.9, gnoise(uv * vec2(90, 12) + vec2(0.0, fine * 3.0), vec2(90, 12), 95.0));
+    vec3 mud = mix(vec3(0.5, 0.44, 0.35), vec3(0.62, 0.56, 0.46), daub * 0.7 + fine * 0.3);
+    mud = mix(mud, vec3(0.7, 0.63, 0.48), straw * 0.35);
+    // Humedad y salpicaduras desde el suelo (uv.y = 0 abajo).
+    mud = mix(mud, mud * vec3(0.78, 0.74, 0.68), sat(1.0 - uv.y * 3.0 + (fine - 0.5)) * 0.6);
+    // Grietas de retracción (Voronoi fino) y desconchones pequeños.
+    vec3 cr = voronoi(uv, vec2(16, 12), 96.0, 0.9);
+    float crack = smoothstep(0.012, 0.0, cr.y - cr.x) * smoothstep(0.6, 0.72, fbm(uv, vec2(5), 3, 97.0));
+    float hole = smoothstep(0.76, 0.79, fbm(uv, vec2(14), 4, 92.0));
+    vec3 rodC = mix(vec3(0.24, 0.18, 0.11), vec3(0.4, 0.3, 0.19), rod * weave);
+    c = mix(mud, mud * 0.72, crack);
+    c = mix(c, rodC, hole);
+    h = 0.55 + daub * 0.2 + fine * 0.1 + straw * 0.03 - crack * 0.25 - hole * (0.45 - rod * weave * 0.25);
   } else if (uPainter == 9) { // paja (techumbre): haces gruesos y desordenados
     float rows = 3.0;
     float warpY = (gnoise(uv * vec2(6, 3), vec2(6, 3), 106.0) - 0.5) * 0.12;

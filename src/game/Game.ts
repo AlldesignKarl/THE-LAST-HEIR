@@ -340,6 +340,9 @@ export class Game {
     this.discovered.add('robledo');
     this.quests.start('main_legacy');
     this.quests.start('side_home');
+    // La puerta de la choza empieza abierta: entra la luz de la mañana.
+    const hutDoor = this.settlement.buildings.get('player_hut')?.doors[0];
+    if (hutDoor && !hutDoor.open) this.actions.toggleDoor(hutDoor);
     this.bus.emit('notify', { text: 'Robledo, Valle de Arnós. Primavera de 1497.', kind: 'quest' });
     setTimeout(() => this.ui.say('Martín', 'Siete años sin noticias de padre... «Si un día no vuelvo, busca bajo mis pies».', 6), 1500);
     this.ui.setHint('');
@@ -421,6 +424,7 @@ export class Game {
     // En modo construcción el clic coloca y E desmonta; en la barca E baja;
     // con la caña, el clic lanza: en esos casos no hay combate ni uso normal.
     if (!this.build.active && !this.boats.riding) {
+      this.autoOpenDoors();
       this.interaction.update(dt);
       if (!this.fishing.holding) this.combat.update(dt);
     }
@@ -441,6 +445,38 @@ export class Game {
     this.physics.step(dt);
     this.worldItems.update(dt);
     this.input.endTick();
+  }
+
+  private doorT = 0;
+  /**
+   * Caminar contra una puerta sin llave la abre (con el hombro, como en la
+   * vida real): así nadie se queda "atascado" delante de una puerta cerrada.
+   */
+  private autoOpenDoors(): void {
+    this.doorT -= 1;
+    if (this.doorT > 0) return;
+    this.doorT = 3;
+    const inp = this.input;
+    const a = inp.analogMove();
+    const moving = inp.isDown('forward') || a.y > 0.3;
+    if (!moving) return;
+    const p = this.player.pos;
+    const f = this.player.forward(new THREE.Vector3());
+    const near = (x: number, z: number, r: number) => {
+      const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+      return d < r && (dx * f.x + dz * f.z) / Math.max(d, 1e-3) > 0.35;
+    };
+    for (const d of this.settlement.doors.values()) {
+      if (d.open || d.locked) continue;
+      if (Math.abs(d.worldPos.y - p.y) < 2.2 && near(d.worldPos.x, d.worldPos.z, 1.35)) this.actions.toggleDoor(d);
+    }
+    for (const b of this.build.pieces.values()) {
+      if (!b.door || b.piece.open) continue;
+      const pv = b.door.pivot.position;
+      // El centro de la hoja está a medio metro de la bisagra.
+      const cx = pv.x + Math.cos(b.door.pivot.rotation.y) * 0.5, cz = pv.z - Math.sin(b.door.pivot.rotation.y) * 0.5;
+      if (Math.abs(pv.y - p.y) < 2.2 && near(cx, cz, 1.35)) this.build.toggleDoor(b.piece.id);
+    }
   }
 
   private handleEquipKeys(): void {
@@ -484,7 +520,7 @@ export class Game {
     for (const b of this.settlement.buildings.values()) {
       if (b.def.enterable && !b.def.openFront && b.contains(p.x, p.z, 0.05) && p.y < b.floorY + 2.5) inside = b.def.id;
     }
-    this.env.interiorTarget = Math.max(depth, inside ? 0.5 : 0);
+    this.env.interiorTarget = Math.max(depth, inside ? 0.32 : 0);
     this.player.surfaceOverride = depth > 0.02 ? 'rock' : inside ? (inside === 'church' ? 'stone' : 'wood') : null;
     const areas = new Set<string>();
     if (depth > 0.3) areas.add('cave_crow_inside');

@@ -26,6 +26,8 @@ const scenes = {
   sierra: `__game.teleport(-40, -300, 0); __game.lookAt(-40, 60, -700); __game.setHour(13)`,
   tavern: `__game.teleport(9, -5, 0); __game.lookAt(21, 16, -17); __game.setHour(10)`,
   people: `__game.setHour(11); __game.lineup(-150, -40); __game.teleport(-150, -36.6, 0); __game.lookAt(-150, __game.game.hf.heightAt(-150, -40) + 1.1, -40)`,
+  bridge: `__game.setHour(10); __game.teleport(-84, 22, 0); __game.lookAt(-95, __game.game.hf.heightAt(-95, 15) + 1.2, 15)`,
+  hutin: `__game.setHour(10); { const t = __game.game.worldItems.items.get('hut_axe').body.translation(); __game.teleport(t.x + 1.3, t.z + 0.9, 0, __game.game.settlement.buildings.get('player_hut').floorY + 0.08); __game.lookAt(t.x, t.y - 0.2, t.z); }`,
   hutext: `__game.teleport(-47, 26, 0); __game.lookAt(-58, 15, 18); __game.setHour(16)`,
   coast: `__game.teleport(60, 5, 0); __game.lookAt(200, 6, -10); __game.setHour(10)`,
   beach: `__game.teleport(112, 20, 0); __game.lookAt(150, 5, 0); __game.setHour(17)`,

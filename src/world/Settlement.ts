@@ -237,7 +237,7 @@ export class Settlement {
     // Sobre la mesa: el hacha, pan, manzana, odre y cuchillo (fijos hasta agarrarlos).
     const onTable = (id: string, item: string, lx: number, lz: number, ry: number, rotX = 0) => {
       const p = this.inB(hut, lx, 0, lz);
-      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rotX, r + ry, 0));
+      const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(-rotX, r + ry, 0, 'YXZ')); // tumbado de plano
       const dy = item === 'axe' ? 0.045 : item === 'knife' ? 0.02 : item === 'waterskin' ? 0.1 : 0.05;
       g.worldItems.spawn(item, p.x, fy + 0.83 + dy, p.z, { uid: id, authored: true, rot: q, frozen: true });
     };
@@ -863,7 +863,7 @@ export class Settlement {
     }
     const rackX = c.x - 5, rackZ = c.z + 3;
     this.placeStatic('weapon_rack', rackX, this.ground(rackX, rackZ) + 0.9, rackZ, 0.6, 'camp');
-    g.worldItems.spawn('club', rackX, this.ground(rackX, rackZ) + 1.0, rackZ + 0.1, { uid: 'camp_club', authored: true, frozen: true, rotY: 0.6 });
+    g.worldItems.spawn('club', rackX, this.ground(rackX, rackZ) + 1.0, rackZ + 0.1, { uid: 'camp_club', authored: true, frozen: true, rotY: 0.6, upright: true });
     const chestX = c.x + 6, chestZ = c.z - 4;
     const chest = this.placeStatic('chest', chestX, this.ground(chestX, chestZ) + 0.3, chestZ, -0.8, 'camp');
     g.containers.create('bandit_chest', 'Botín de Los Cuervos', null, [{ id: 'arrow', count: 12 }, { id: 'bread', count: 2 }, { id: 'wine', count: 2 }, { id: 'torch', count: 2 }], 64);

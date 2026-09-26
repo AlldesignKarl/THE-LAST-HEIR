@@ -38,6 +38,28 @@ export interface SpawnOpts {
   velocity?: THREE.Vector3;
   /** Empieza dormido/fijo hasta que el jugador interactúe. */
   frozen?: boolean;
+  /** Mantener de pie (p. ej. apoyado en un astillero). */
+  upright?: boolean;
+}
+
+/**
+ * Postura de reposo: una herramienta o arma larga no se queda de pie, se
+ * tumba con la cara ancha hacia abajo (la hoja del hacha plana, no de canto).
+ * Devuelve el giro de "tumbado" y cuánto baja su centro.
+ */
+export function restPose(shape: Shape): { q: THREE.Quaternion; drop: number } | null {
+  if (shape.type === 'box') {
+    const thin = Math.min(shape.hx, shape.hz);
+    if (shape.hy < Math.max(shape.hx, shape.hz) * 1.8) return null;
+    const q = shape.hz <= shape.hx
+      ? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2) // Z (grosor) hacia arriba
+      : new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2); // X (grosor) hacia arriba
+    return { q, drop: shape.hy - thin };
+  }
+  if (shape.type === 'cyl' && shape.hh > shape.r * 2.5) {
+    return { q: new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), Math.PI / 2), drop: shape.hh - shape.r };
+  }
+  return null;
 }
 
 let uidCounter = 0;
@@ -70,7 +92,14 @@ export class WorldItems {
     if (this.items.has(uid)) return this.items.get(uid)!;
     const def = itemDef(itemId);
     const model = this.models.create(def.model);
-    const rot = opts.rot ?? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), opts.rotY ?? 0);
+    let rot = opts.rot ?? new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), opts.rotY ?? 0);
+    if (!opts.rot && !opts.upright) {
+      const rest = restPose(model.shape);
+      if (rest) {
+        rot = rot.clone().multiply(rest.q);
+        if (opts.frozen) y -= rest.drop;
+      }
+    }
     const bd = (opts.frozen ? RAPIER.RigidBodyDesc.fixed() : RAPIER.RigidBodyDesc.dynamic())
       .setTranslation(x, y, z)
       .setRotation(rot)

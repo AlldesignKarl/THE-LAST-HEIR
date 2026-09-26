@@ -35,6 +35,12 @@ Implementado sobre las capacidades de la página publicada en claude.ai (`src/ne
 
 **Lo que no se sincroniza** (cada cliente lo simula por su cuenta): vecinos y sus rutinas, animales, asaltos de bandidos, objetos sueltos en el suelo (troncos, tablones, flechas), el contenido de los arcones y la historia/misiones de cada jugador. Los otros jugadores no chocan físicamente contigo ni se puede combatir entre jugadores. La parcela es una sola y se comparte en cada servidor. Fuera de claude.ai (archivo local) el multijugador no está disponible y el menú lo dice.
 
+## Puertas, objetos y materiales
+
+- Las puertas sin llave se abren al caminar contra ellas (además de con E/Usar); la de la choza empieza abierta. Las cerradas con llave siguen cerradas.
+- Las herramientas y armas largas que se sueltan o están colocadas sobre muebles reposan tumbadas por su cara ancha (hoja plana), salvo las que cuelgan de un astillero.
+- Madera (suelos, mesas, puentes): veta fina y larga, tono por tabla, desgaste de paso, suciedad en juntas, clavos. Enlucido de cal con humedad desde el suelo y desconchones pequeños; zarzo con barro y paja casi continuo, con grietas finas; mampostería con piedras de varios tamaños, junta rehundida y líquenes. Dentro de casa la luz rebotada es cálida.
+
 ## Calidad visual (placeholders mejorados)
 
 Texturas generadas en GPU a 512–1024 px; terreno con mezcla por altura, normales de detalle, anti-repetición, suelo de bosque, roca triplanar, nieve en cumbres y charcos con lluvia; árboles con follaje de tarjetas y viento; hierba con variantes (espigas, seca, flores); rocas, arbustos, helechos y ramas caídas; edificios con entramado, marcos, contraventanas, cumbreras, tablas de remate y oclusión horneada; personas con rostro, pelo, tocados y tejidos; armas con perfiles biselados (lanza y maza con modelo propio); iluminación del cielo (IBL) regenerada según hora y nubes.
