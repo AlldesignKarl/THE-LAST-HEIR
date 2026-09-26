@@ -48,7 +48,7 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; }
 .toast .h { font-family: 'IM Fell English', serif; color: var(--gold); font-size: 20px; }
 .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at center, transparent 45%, rgba(120, 0, 0, .75) 100%); opacity: 0; transition: opacity .15s; }
 .fade { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity .35s; }
-.compass { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 14px; letter-spacing: .3em; color: var(--ink-dim); text-shadow: 0 1px 2px #000; opacity: 0; transition: opacity .6s; }
+.compass { position: absolute; left: 50%; top: 74px; transform: translateX(-50%); font-size: 14px; letter-spacing: .3em; color: var(--ink-dim); text-shadow: 0 1px 2px #000; opacity: 0; transition: opacity .6s; }
 .subtitle { position: absolute; left: 50%; bottom: 13%; transform: translateX(-50%); max-width: 60%; text-align: center; font-size: 19px; text-shadow: 0 1px 3px #000, 0 0 6px #000; opacity: 0; transition: opacity .3s; }
 .subtitle.show { opacity: 1; }
 .subtitle b { color: var(--gold); font-weight: 600; }
@@ -166,3 +166,12 @@ canvas.map { display: block; border: 1px solid var(--panel-edge); }
 .buildbar .bad { color: #ff9a80; font-size: 14px; }
 .buildbar .k { font-size: 13px; color: var(--ink-dim); }
 @media (max-height: 520px), (max-width: 700px) { .buildbar { bottom: 40px; min-width: 0; max-width: 60vw; font-size: 13px; } .buildbar .n { font-size: 15px; } }
+
+/* ---------- Guía de objetivos ---------- */
+.guide { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; opacity: 0; transition: opacity .3s; pointer-events: none; }
+.guide-arrow { width: 40px; height: 40px; filter: drop-shadow(0 1px 3px rgba(0,0,0,.8)); transition: transform .08s linear; }
+.guide-label { font-size: 15px; color: #f3e2b8; text-shadow: 0 1px 3px #000, 0 0 6px #000; max-width: 46vw; text-align: center; }
+.guide.near .guide-arrow { opacity: .35; }
+.touch-mode .guide { top: 50px; }
+@media (max-height: 520px), (max-width: 700px) { .guide { top: 48px; } .guide-arrow, .guide-arrow svg { width: 30px; height: 30px; } .guide-label { font-size: 13px; } }
+.btn.track { color: var(--gold); }

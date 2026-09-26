@@ -358,6 +358,10 @@ export class BuildSystem {
     this.g.bus.emit('sfx', { id: 'hammer', x: this.g.player.pos.x, y: this.g.player.pos.y + 1, z: this.g.player.pos.z });
     this.g.flags.set(`built_${piece.kind}`);
     this.g.flags.setNum(`built_count_${piece.kind}`, this.g.flags.num(`built_count_${piece.kind}`) + 1);
+    const kinds = [...this.pieces.values()].map((b) => b.piece.kind);
+    if (piece.kind === 'foundation' || piece.kind === 'floor') this.g.flags.set('built_base');
+    if (kinds.filter((k) => k.startsWith('wall')).length >= 4) this.g.flags.set('built_walls4');
+    if (piece.kind.startsWith('roof')) this.g.flags.set('built_roof');
     this.onChange?.('add', piece);
     return true;
   }

@@ -57,6 +57,7 @@ import { GroundScatter } from '../world/GroundScatter';
 import { Sea } from '../world/Sea';
 import { Resources } from '../world/Resources';
 import { BuildSystem } from '../world/BuildSystem';
+import { Guide } from '../ui/Guide';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -115,6 +116,7 @@ export class Game {
   readonly sea: Sea;
   readonly resources: Resources;
   readonly build: BuildSystem;
+  readonly guide: Guide;
   /** Id del jugador local (en multijugador, el del usuario). */
   localPlayerId = 'local';
   /** Controles en pantalla (solo en dispositivos táctiles). */
@@ -205,6 +207,7 @@ export class Game {
     this.economy = new Economy(this.bus, this.reputation, this.skills, this.inventory);
     this.dialogue = new DialogueSystem(this);
     this.ui = new UIManager(this);
+    this.guide = new Guide(this);
     this.input.touchMode = TouchControls.isTouchDevice();
     this.touch = this.input.touchMode ? new TouchControls(this) : null;
     this.save = new SaveSystem(this.bus);
@@ -285,7 +288,11 @@ export class Game {
     reg('director', () => this.director.serialize(), (d: Parameters<EventDirector['deserialize']>[0]) => this.director.deserialize(d));
     reg('dialogue', () => this.dialogue.serialize(), (d: Parameters<DialogueSystem['deserialize']>[0]) => this.dialogue.deserialize(d));
     reg('discovered', () => [...this.discovered], (d: string[]) => { this.discovered.clear(); for (const x of d) this.discovered.add(x); });
-    reg('post', () => 0, () => { this.settlement.applyFlags(); });
+    reg('post', () => 0, () => {
+      this.settlement.applyFlags();
+      // Partidas anteriores a la construcción: empezar la tarea de la casa.
+      if (this.quests.status('side_home') === 'inactive') this.quests.start('side_home');
+    });
     s.summary = () => `Día ${this.time.day}, ${this.time.formatClock()} · ${this.story.stage}/10`;
   }
 
@@ -318,6 +325,7 @@ export class Game {
     this.inventory.coins = 18;
     this.discovered.add('robledo');
     this.quests.start('main_legacy');
+    this.quests.start('side_home');
     this.bus.emit('notify', { text: 'Robledo, Valle de Arnós. Primavera de 1497.', kind: 'quest' });
     setTimeout(() => this.ui.say('Martín', 'Siete años sin noticias de padre... «Si un día no vuelvo, busca bajo mis pies».', 6), 1500);
     this.ui.setHint('');
@@ -564,6 +572,7 @@ export class Game {
     this.audio.updateAmbience(frameDt, this.ambienceState());
     this.ui.updateHUD(frameDt);
     this.touch?.update();
+    this.guide.update(frameDt);
     this.updatePerf();
     this.renderer.render();
     if (this.started) this.viewmodel.render(this.renderer.renderer);

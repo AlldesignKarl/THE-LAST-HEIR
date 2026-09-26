@@ -7,7 +7,7 @@ import type { Game } from '../game/Game';
 import { ITEMS, itemDef, type ItemCategory } from '../data/items';
 import type { DocumentDef } from '../data/documents';
 import { WEAPONS } from '../combat/WeaponDefs';
-import { POIS, WORLD_HALF, ROADS, STREAM, BUILDINGS, VILLAGES } from '../world/WorldLayout';
+import { POIS, WORLD_HALF, ROADS, STREAM, BUILDINGS, VILLAGES, SEA, PLAYER_PLOT } from '../world/WorldLayout';
 import { WEATHER_NAMES } from '../env/Weather';
 import { PIECES } from '../world/BuildSystem';
 
@@ -387,9 +387,13 @@ export class UIManager {
       vol.value = String(g.audio.volume);
       vol.oninput = () => { g.audio.setVolume(Number(vol.value)); g.saveSettings(); };
       a.append(vol);
+      const gd = h('div', '', '<h3>Flecha de objetivos</h3>');
+      const gb = h('button', 'btn inline', g.guide.enabled ? 'Activada (ocultar)' : 'Oculta (mostrar)');
+      gb.onclick = () => { g.guide.enabled = !g.guide.enabled; this.openOptions(); };
+      gd.append(gb);
       const back = h('button', 'btn', 'Volver');
       back.onclick = () => this.openPause();
-      p.append(q, s, a, back);
+      p.append(q, s, a, gd, back);
       el.append(p);
     });
   }
@@ -698,8 +702,14 @@ export class UIManager {
         const done = qs.filter((q) => q.status !== 'active');
         if (!active.length) p.append(h('div', 'muted', 'No tienes tareas pendientes.'));
         for (const q of active) {
-          const d = h('div', 'quest', `<div class="qt">${q.title}</div><div class="muted">${q.desc}</div>`);
+          const followed = g.guide.current?.questId === q.id;
+          const d = h('div', 'quest', `<div class="qt">${q.title}${followed ? ' <span class="gold">· en pantalla</span>' : ''}</div><div class="muted">${q.desc}</div>`);
           for (const o of q.objectives) d.append(h('div', `obj${o.done ? ' done' : ''}`, `· ${o.text}`));
+          if (!followed) {
+            const b = h('button', 'btn inline track', 'Seguir con la flecha');
+            b.onclick = () => { g.guide.tracked = q.id; g.guide.enabled = true; this.openJournal(); };
+            d.append(b);
+          }
           p.append(d);
         }
         if (done.length) {
@@ -753,6 +763,18 @@ export class UIManager {
         ctx.beginPath(); ctx.arc(px, pz, 4, 0, Math.PI * 2); ctx.fill();
         ctx.fillText(poi.name, px, pz - 9);
       }
+      // Parcela del jugador y objetivo actual.
+      {
+        const [a, b2] = toPx(PLAYER_PLOT.x - PLAYER_PLOT.size / 2, PLAYER_PLOT.z - PLAYER_PLOT.size / 2);
+        const w = (PLAYER_PLOT.size / (2 * R)) * size;
+        ctx.strokeStyle = '#8e1a10'; ctx.lineWidth = 1.5; ctx.strokeRect(a, b2, w, w);
+      }
+      const cur = g.guide.current;
+      if (cur) {
+        const [tx, tz] = toPx(cur.pos.x, cur.pos.z);
+        ctx.fillStyle = '#e8c36a'; ctx.strokeStyle = '#2a1d0c'; ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(tx, tz - 10); ctx.lineTo(tx + 7, tz); ctx.lineTo(tx, tz + 10); ctx.lineTo(tx - 7, tz); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
       const [ppx, ppz] = toPx(g.player.pos.x, g.player.pos.z);
       ctx.save();
       ctx.translate(ppx, ppz);
@@ -760,7 +782,7 @@ export class UIManager {
       ctx.fillStyle = '#8e1a10';
       ctx.beginPath(); ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3); ctx.lineTo(-6, 7); ctx.closePath(); ctx.fill();
       ctx.restore();
-      p.append(c, h('div', 'muted', 'Solo aparecen los lugares que has descubierto. Norte arriba.'));
+      p.append(c, h('div', 'muted', `Solo aparecen los lugares que has descubierto. Norte arriba.${cur ? ` Rombo dorado: ${cur.text}.` : ''} Recuadro rojo: tu parcela.`));
       el.append(p);
     });
   }
@@ -782,6 +804,11 @@ export class UIManager {
         let r = 222, gg = 205, b = 168;
         r -= forest * 50; gg -= forest * 25; b -= forest * 60;
         r -= Math.max(0, hgt - 40) * 0.5; gg -= Math.max(0, hgt - 40) * 0.5; b -= Math.max(0, hgt - 40) * 0.4;
+        if (hgt < SEA.level) {
+          // Mar: más oscuro cuanto más hondo.
+          const d = Math.min(1, (SEA.level - hgt) / 12);
+          r = 150 - d * 60; gg = 170 - d * 50; b = 165 - d * 30;
+        } else if (g.hf.beachWeight(x, z, hgt) > 0.5) { r = 226; gg = 210; b = 160; }
         const k = (j * S + i) * 4;
         img.data[k] = r * (1 + shade); img.data[k + 1] = gg * (1 + shade); img.data[k + 2] = b * (1 + shade); img.data[k + 3] = 255;
       }

@@ -5,14 +5,22 @@
  */
 import type { EventBus } from '../core/EventBus';
 
-export type ObjectiveDef =
-  | { kind: 'talk'; npc: string; text: string }
+/** Destino de la flecha guía para un objetivo. */
+export type GuideTarget =
+  | { npc: string }
+  | { pos: [number, number] }
+  | { item: string }
+  | { place: string }
+  | { near: 'tree' | 'rock' | 'log' };
+
+export type ObjectiveDef = ({
+  kind: 'talk'; npc: string; text: string }
   | { kind: 'collect'; item: string; count: number; text: string }
   | { kind: 'deliver'; item: string; count: number; npc: string; text: string }
   | { kind: 'goto'; area: string; text: string }
   | { kind: 'read'; doc: string; text: string }
   | { kind: 'kill'; victimKind: string; count: number; text: string }
-  | { kind: 'flag'; flag: string; text: string; count?: number };
+  | { kind: 'flag'; flag: string; text: string; count?: number }) & { target?: GuideTarget };
 
 export interface QuestContext {
   bus: EventBus;
@@ -217,6 +225,26 @@ export class QuestSystem {
       s.progress = d.stages[s.stage].objectives.map(() => 0);
       this.ctx.bus.emit('quest:updated', { questId: id, text: d.stages[s.stage].desc });
     }
+  }
+
+  /** Objetivos pendientes de la etapa actual (para la guía). */
+  pending(id: string): { text: string; target?: GuideTarget; kind: ObjectiveDef['kind']; npc?: string }[] {
+    const s = this.state.get(id);
+    const d = this.defs.get(id);
+    if (!s || !d || s.status !== 'active') return [];
+    const st = d.stages[s.stage];
+    const out: { text: string; target?: GuideTarget; kind: ObjectiveDef['kind']; npc?: string }[] = [];
+    st.objectives.forEach((o, i) => {
+      if (s.progress[i] >= this.target(o)) return;
+      const t = this.target(o);
+      out.push({ text: o.text + (t > 1 ? ` (${Math.min(s.progress[i], t)}/${t})` : ''), target: o.target, kind: o.kind, npc: 'npc' in o ? o.npc : undefined });
+    });
+    return out;
+  }
+
+  /** Ids de misiones activas en orden de definición. */
+  activeIds(): string[] {
+    return [...this.defs.keys()].filter((id) => this.isActive(id));
   }
 
   /** Vista para el diario. */
