@@ -6,7 +6,7 @@
 import { Simplex2 } from '../core/noise';
 import { clamp, lerp, pointSegmentDist, smoothstep, toLocalXZ } from '../core/math';
 import {
-  BANDIT_CAMP, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, ROADS, STREAM, VILLAGES,
+  BANDIT_CAMP, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
   WORLD_HALF, WORLD_SEED, WOLF_DEN, type P2,
 } from './WorldLayout';
 
@@ -19,7 +19,7 @@ interface Seg {
   la: number; lb: number;
 }
 
-export type Surface = 'grass' | 'dirt' | 'road' | 'rock' | 'mud' | 'wood' | 'stone' | 'water' | 'field';
+export type Surface = 'grass' | 'dirt' | 'road' | 'rock' | 'mud' | 'wood' | 'stone' | 'water' | 'field' | 'sand';
 
 export interface SurfaceWeights {
   road: number;
@@ -27,6 +27,8 @@ export interface SurfaceWeights {
   mud: number;
   field: number;
   camp: number;
+  /** Arena de playa (también el fondo marino). */
+  beach: number;
 }
 
 export class Heightfield {
@@ -42,6 +44,7 @@ export class Heightfield {
     for (const r of ROADS) this.addSegs(this.roadSegs, r.points, r.width / 2, r.kind, false);
     this.addSegs(this.streamSegs, STREAM.points, STREAM.width / 2, 'stream', true);
     this.villageBase = VILLAGES.map((v) => this.lowFreq(v.x, v.z) + 0.3);
+    this.plotBase = this.lowFreq(PLAYER_PLOT.x, PLAYER_PLOT.z) + 0.2;
   }
 
   private addSegs(out: Seg[], pts: P2[], halfW: number, kind: string, water: boolean): void {
@@ -113,7 +116,60 @@ export class Heightfield {
       const w = 1 - smoothstep(st.halfW + 1, st.halfW + 5, st.dist);
       h = Math.min(h, lerp(h, target, w));
     }
+
+    // Parcela del jugador: explanada suave.
+    {
+      const d = Math.max(Math.abs(x - PLAYER_PLOT.x), Math.abs(z - PLAYER_PLOT.z)) - PLAYER_PLOT.size / 2;
+      if (d < 10) h = lerp(h, this.plotBase + this.nd.noise(x / 14, z / 14) * 0.12, 1 - smoothstep(0, 10, d));
+    }
+    return this.applySea(x, z, h);
+  }
+
+  private plotBase = 0;
+
+  /** Línea de costa (x) a una z dada. */
+  coastX(z: number): number {
+    let c = 108 + Math.sin(z / 57) * 9 + this.n.noise(z / 140, 3.7) * 14;
+    if (z < -150) c += (-150 - z) * 0.85;
+    if (z > 240) c += (z - 240) * 0.55;
+    return c;
+  }
+
+  /** Playa, fondo marino e islas sobre la altura de tierra `h`. */
+  private applySea(x: number, z: number, h: number): number {
+    const L = SEA.level;
+    const d = x - this.coastX(z);
+    if (d > -60) {
+      const ripple = this.nd.noise(x / 3.1, z / 9.3) * 0.05;
+      let target: number;
+      if (d < 6) target = lerp(L + 1.6, L - 0.7, smoothstep(-14, 6, d)) + ripple;
+      else target = L - 0.7 - Math.min(22, (d - 6) * 0.11) + this.n.noise(x / 60, z / 60) * 1.2;
+      const t = d < 6 ? smoothstep(-60, -14, d) : 1;
+      // La tierra desciende hacia la playa (sin levantar zonas más bajas).
+      h = d < 6 ? lerp(h, Math.min(h, target + (d < -14 ? (-14 - d) * 0.12 : 0)), t) : target;
+    }
+    for (const is of SEA.islands) {
+      const dist = Math.hypot(x - is.x, z - is.z);
+      if (dist > is.r + 40) continue;
+      const k = Math.max(0, 1 - dist / is.r);
+      const bump = L - 5 + (is.peak + 5) * Math.pow(k, 0.9) * (0.85 + 0.3 * this.nd.noise(x / 18, z / 18));
+      const shelf = L - 3.2 + 2.2 * (1 - smoothstep(is.r, is.r + 40, dist));
+      h = Math.max(h, bump, dist < is.r + 40 ? Math.min(shelf, L - 0.9) : -1e9);
+    }
     return h;
+  }
+
+  /** ¿Zona de mar (costa o alrededor de una isla)? */
+  private inSeaZone(x: number, z: number): boolean {
+    if (x - this.coastX(z) > -30) return true;
+    for (const is of SEA.islands) if (Math.hypot(x - is.x, z - is.z) < is.r + 60) return true;
+    return false;
+  }
+
+  /** Peso de arena de playa en (x,z) [0,1]. */
+  beachWeight(x: number, z: number, h = this.heightAt(x, z)): number {
+    if (!this.inSeaZone(x, z)) return 0;
+    return 1 - smoothstep(SEA.level + 1.9, SEA.level + 3.4, h + this.nd.noise(x / 11, z / 11) * 0.5);
   }
 
   /** Información del arroyo más cercano (null si lejos). */
@@ -131,6 +187,7 @@ export class Heightfield {
   waterLevelAt(x: number, z: number): number | null {
     const st = this.streamInfo(x, z);
     if (st && st.dist < st.halfW + 0.6) return st.level;
+    if (this.inSeaZone(x, z) && this.heightAt(x, z) < SEA.level + 0.05) return SEA.level;
     return null;
   }
 
@@ -177,12 +234,14 @@ export class Heightfield {
       if (Math.abs(l.x) < f.w / 2 && Math.abs(l.z) < f.d / 2) field = 1;
     }
     const camp = 1 - smoothstep(BANDIT_CAMP.radius * 0.6, BANDIT_CAMP.radius, Math.hypot(x - BANDIT_CAMP.x, z - BANDIT_CAMP.z));
-    return { road, village, mud, field, camp };
+    const beach = this.beachWeight(x, z);
+    return { road, village, mud, field, camp, beach };
   }
 
   surfaceAt(x: number, z: number): Surface {
     if (this.waterLevelAt(x, z) !== null && this.heightAt(x, z) < (this.waterLevelAt(x, z) ?? -1e9)) return 'water';
     const w = this.surfaceWeights(x, z);
+    if (w.beach > 0.5) return 'sand';
     if (w.road > 0.5) return 'road';
     if (w.mud > 0.5) return 'mud';
     if (w.field > 0.5) return 'field';
@@ -219,7 +278,8 @@ export class Heightfield {
     const st = this.streamInfo(x, z);
     if (st && st.dist < st.halfW + 3) return 0;
     const sw = this.surfaceWeights(x, z);
-    if (sw.field > 0) return 0;
+    if (sw.field > 0 || sw.beach > 0.05) return 0;
+    if (Math.max(Math.abs(x - PLAYER_PLOT.x), Math.abs(z - PLAYER_PLOT.z)) < PLAYER_PLOT.size / 2 + 6) return 0;
     return clamp(d, 0, 1);
   }
 }

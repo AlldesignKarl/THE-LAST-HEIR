@@ -195,6 +195,7 @@ export class AudioEngine {
     switch (id) {
       case 'step_grass': case 'step_field': this.noiseBurst(dest, t, 0.09, 'bandpass', 2400 * r(), 0.8, 0.18); break;
       case 'step_dirt': case 'step_road': this.noiseBurst(dest, t, 0.07, 'lowpass', 1300 * r(), 1, 0.25); break;
+      case 'step_sand': this.noiseBurst(dest, t, 0.11, 'lowpass', 900 * r(), 0.7, 0.2, 400); break;
       case 'step_mud': this.noiseBurst(dest, t, 0.13, 'lowpass', 500 * r(), 3, 0.35, 250); break;
       case 'step_wood': this.tone(dest, t, 0.08, 140 * r(), 'sine', 0.35); this.noiseBurst(dest, t, 0.04, 'bandpass', 1800, 2, 0.12); break;
       case 'step_rock': case 'step_stone': this.noiseBurst(dest, t, 0.05, 'highpass', 2800 * r(), 0.8, 0.14); this.tone(dest, t, 0.05, 90, 'sine', 0.2); break;

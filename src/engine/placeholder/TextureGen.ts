@@ -14,7 +14,7 @@ import * as THREE from 'three';
 export const PAINTER_IDS = {
   grass: 0, dirt: 1, mud: 2, field: 3, rock: 4, planks: 5, stoneWall: 6, plaster: 7,
   wattle: 8, thatch: 9, tiles: 10, bark: 11, cloth: 12, metal: 13, forestFloor: 14,
-  cobble: 15, waterNormal: 16, pineBark: 17, leather: 18, roughWood: 19,
+  cobble: 15, waterNormal: 16, pineBark: 17, leather: 18, roughWood: 19, sand: 20, rope: 21,
 } as const;
 export type PainterName = keyof typeof PAINTER_IDS;
 
@@ -328,6 +328,23 @@ void main() {
     c = vec3(0.42, 0.29, 0.18) * (0.8 + 0.3 * n) * (0.9 + 0.1 * smoothstep(0.0, 0.2, v.y - v.x));
     c = mix(c, c * 0.7, smoothstep(0.6, 0.8, fbm(uv, vec2(3), 3, 203.0)) * 0.6);
     h = smoothstep(0.0, 0.15, v.y - v.x) * 0.4 + n * 0.3;
+  }
+  if (uPainter == 20) { // arena de playa: grano, ondas del viento, conchas y algas
+    float grain = gnoise(uv * 256.0, vec2(256), 211.0);
+    float n = fbm(uv, vec2(4), 5, 212.0);
+    float rip = 0.5 + 0.5 * sin((uv.y + (fbm(uv, vec2(3), 3, 213.0) - 0.5) * 0.08) * 6.2831 * 18.0);
+    c = mix(vec3(0.62, 0.55, 0.42), vec3(0.78, 0.71, 0.57), n * 0.6 + rip * 0.25 + grain * 0.15);
+    c *= 0.92 + 0.12 * grain;
+    vec3 sh = voronoi(uv, vec2(20), 214.0, 0.9);
+    float shell = smoothstep(0.1, 0.05, sh.x) * step(0.9, sh.z);
+    c = mix(c, vec3(0.9, 0.86, 0.8), shell);
+    float weed = smoothstep(0.72, 0.8, fbm(uv, vec2(6), 3, 215.0)) * step(0.6, gnoise(uv * 40.0, vec2(40), 216.0));
+    c = mix(c, vec3(0.2, 0.22, 0.12), weed * 0.7);
+    h = rip * 0.45 + n * 0.3 + grain * 0.15 + shell * 0.3;
+  } else if (uPainter == 21) { // cuerda de cáñamo
+    float tw = 0.5 + 0.5 * sin((uv.x * 3.0 + uv.y) * 6.2831 * 8.0);
+    c = vec3(0.55, 0.46, 0.3) * (0.75 + 0.3 * tw) * (0.9 + 0.2 * gnoise(uv * 64.0, vec2(64), 221.0));
+    h = tw;
   }
   outColor = vec4(lin(clamp(c, 0.0, 1.0)), clamp(h, 0.0, 1.0));
 }`;

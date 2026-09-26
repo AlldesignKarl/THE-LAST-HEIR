@@ -278,7 +278,7 @@ const metal = (size: number) => paint(size, (u, v) => {
 export type TexId =
   | 'grass' | 'dirt' | 'mud' | 'field' | 'rock' | 'planks' | 'stoneWall' | 'plaster'
   | 'wattle' | 'thatch' | 'tiles' | 'bark' | 'leaves' | 'pine' | 'cloth' | 'metal'
-  | 'forestFloor' | 'cobble' | 'waterNormal' | 'pineBark' | 'leather' | 'roughWood';
+  | 'forestFloor' | 'cobble' | 'waterNormal' | 'pineBark' | 'leather' | 'roughWood' | 'sand' | 'rope';
 
 /** Pintores CPU (respaldo si no hay renderer, p. ej. en tests). */
 const PAINTERS: Partial<Record<TexId, { fn: (s: number) => Painted; size: number; normal: number }>> = {
@@ -322,6 +322,8 @@ const GPU: Partial<Record<TexId, { painter: PainterName; scale: number; normal: 
   leather: { painter: 'leather', scale: 0.25, normal: 1.5 },
   metal: { painter: 'metal', scale: 0.25, normal: 0.6 },
   waterNormal: { painter: 'waterNormal', scale: 0.5, normal: 2 },
+  sand: { painter: 'sand', scale: 1, normal: 1.6 },
+  rope: { painter: 'rope', scale: 0.25, normal: 1.5 },
 };
 
 export class TextureLibrary {

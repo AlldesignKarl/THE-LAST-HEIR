@@ -54,6 +54,7 @@ import { AudioEngine } from '../audio/AudioEngine';
 import { UIManager } from '../ui/UIManager';
 import { TouchControls } from '../ui/TouchControls';
 import { GroundScatter } from '../world/GroundScatter';
+import { Sea } from '../world/Sea';
 import { SaveSystem } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { clamp, damp } from '../core/math';
@@ -109,6 +110,7 @@ export class Game {
   readonly audio = new AudioEngine();
   readonly ui: UIManager;
   readonly scatter: GroundScatter;
+  readonly sea: Sea;
   /** Controles en pantalla (solo en dispositivos táctiles). */
   readonly touch: TouchControls | null;
   readonly save: SaveSystem;
@@ -150,6 +152,7 @@ export class Game {
     this.vegetation = new Vegetation(this.hf, this.physics, scene, this.materials,
       this.qualityName === 'low' ? 0.35 : this.qualityName === 'medium' ? 0.7 : 1, this.quality.treeNear);
     this.water = new Water(this.hf, scene, this.textures);
+    this.sea = new Sea(this.hf, scene, this.textures);
     this.particles = new Particles(scene);
     this.lights = new LightPool(scene, 8);
     this.fires = new Fires(this.lights, this.particles);

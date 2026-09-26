@@ -180,4 +180,23 @@ export const POIS: POI[] = [
   { id: 'forest_bridge', name: 'Puente del arroyo', x: -95, z: 15, radius: 10, discoverable: true },
 ];
 
+/**
+ * Mar del Este: la costa corre de norte a sur al este de Robledo, con
+ * playa, fondo que se hunde mar adentro e islas que se pueden explorar.
+ */
+export const SEA = {
+  level: 5,
+  islands: [
+    { id: 'isla_gaviotas', name: 'Isla de las Gaviotas', x: 252, z: -34, r: 58, peak: 17 },
+    { id: 'penon', name: 'El Peñón', x: 336, z: 150, r: 28, peak: 24 },
+    { id: 'islote_naufrago', name: 'Islote del Náufrago', x: 206, z: 196, r: 17, peak: 4.5 },
+  ],
+};
+
+/** Muelle de Robledo (el embarcadero). */
+export const PIER = { x0: 0, z: 8, length: 34, width: 3.2 };
+
+/** Parcela del jugador: descampado propio para construir. */
+export const PLAYER_PLOT = { x: -76, z: 50, size: 21 };
+
 export const PLAYER_START = { x: -59.2, z: 18.4, yaw: -Math.PI * 0.5 };

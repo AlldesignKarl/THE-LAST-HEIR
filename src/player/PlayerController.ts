@@ -30,6 +30,9 @@ export class PlayerController {
   crouching = false;
   sprinting = false;
   inWater = false;
+  /** Nadando en agua profunda (mar). */
+  swimming = false;
+  private swimWarnT = 0;
   /** Multiplicador de velocidad externo (carga, heridas, transporte). */
   speedMul = 1;
   /** Bloquea el movimiento (menús, dormir, escalar). */
@@ -137,6 +140,20 @@ export class PlayerController {
       }
     }
     if (this.inWater) speed *= 0.6;
+    // Natación: el agua profunda sostiene al jugador; cansa y puede ahogar.
+    const wlNow = this.hf.waterLevelAt(this.pos.x, this.pos.z);
+    this.swimming = wlNow !== null && wlNow - this.pos.y > 1.25;
+    if (this.swimming) {
+      speed = this.sprinting ? 3.3 : 2.1;
+      if (!v.drainStamina(len > 0.1 ? 5 : 2, dt)) {
+        v.hurt(6 * dt);
+        this.swimWarnT -= dt;
+        if (this.swimWarnT <= 0) {
+          this.swimWarnT = 4;
+          this.bus.emit('notify', { text: 'Te faltan fuerzas para nadar: vuelve a tierra.', kind: 'warning' });
+        }
+      }
+    }
     speed *= this.speedMul;
 
     // Esquiva.
@@ -160,7 +177,11 @@ export class PlayerController {
     }
 
     // Salto y gravedad.
-    if (this.grounded) {
+    if (this.swimming && wlNow !== null) {
+      // Flotación: los ojos quedan justo sobre la superficie.
+      this.vel.y = clamp((wlNow - 1.35 - this.pos.y) * 3, -2.5, 2.5);
+      this.grounded = false;
+    } else if (this.grounded) {
       this.vel.y = -1;
       if (!this.frozen && inp.wasPressed('jump') && !this.crouching && v.useStamina(12)) {
         this.vel.y = 4.8;
@@ -168,8 +189,9 @@ export class PlayerController {
         this.bus.emit('sfx', { id: 'jump' });
       }
     } else {
-      this.vel.y -= 18 * dt;
+      this.vel.y -= (this.inWater ? 9 : 18) * dt;
       if (this.vel.y < -40) this.vel.y = -40;
+      if (this.inWater && this.vel.y < -3) this.vel.y = -3;
     }
 
     const desired = { x: this.vel.x * dt, y: this.vel.y * dt, z: this.vel.z * dt };
@@ -195,7 +217,7 @@ export class PlayerController {
       this.fallStartY = Math.max(this.fallStartY, this.pos.y);
     } else if (!wasGrounded) {
       const fall = this.fallStartY - this.pos.y;
-      if (fall > 4.5) {
+      if (fall > 4.5 && !this.inWater) {
         const dmg = (fall - 4.5) * 9;
         v.hurt(dmg);
         this.bus.emit('player:damaged', { amount: dmg, attackerId: null, blocked: false });

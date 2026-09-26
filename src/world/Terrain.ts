@@ -10,11 +10,11 @@ import type { Heightfield } from './Heightfield';
 import { Physics, RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 import type { TextureLibrary } from '../engine/placeholder/Textures';
 import { GlobalUniforms } from '../engine/placeholder/Materials';
-import { CAVE, WORLD_HALF } from './WorldLayout';
+import { CAVE, SEA, WORLD_HALF } from './WorldLayout';
 import { clamp, smoothstep } from '../core/math';
 
 export const CHUNK = 64;
-const LOD_SEGS = [32, 16, 8];
+const LOD_SEGS = [32, 20, 14];
 const COLLIDER_SEGS = 32;
 const SKIRT = 2.5;
 
@@ -180,6 +180,7 @@ export class Terrain {
         splat[idx * 4 + 3] = clamp(w.field * (1 - w.road), 0, 1);
         // Suelo de bosque (hojarasca bajo los árboles) y tinte macro.
         splat2[idx * 4] = hf.forestDensity(x, z);
+        splat2[idx * 4 + 2] = hf.beachWeight(x, z, h);
         splat2[idx * 4 + 1] = 0.9 + 0.2 * (Math.sin(x * 0.013 + z * 0.021) * 0.5 + 0.5) * (Math.cos(z * 0.017 - x * 0.009) * 0.5 + 0.5);
       }
     }
@@ -282,15 +283,17 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
   // envMapIntensity bajo: el suelo apenas refleja el cielo (evita el velo azulado en sombra).
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.95, metalness: 0, envMapIntensity: 0.45 });
   const grass = textures.get('grass'), dirt = textures.get('dirt'), rock = textures.get('rock');
-  const mud = textures.get('mud'), field = textures.get('field'), forest = textures.get('forestFloor');
+  const mud = textures.get('mud'), field = textures.get('field'), forest = textures.get('forestFloor'), sand = textures.get('sand');
   mat.onBeforeCompile = (shader) => {
     const u = shader.uniforms;
     u.tGrass = { value: grass.map }; u.tGrassN = { value: grass.normalMap };
     u.tForest = { value: forest.map }; u.tForestN = { value: forest.normalMap };
     u.tDirt = { value: dirt.map }; u.tDirtN = { value: dirt.normalMap };
     u.tRock = { value: rock.map }; u.tRockN = { value: rock.normalMap };
-    u.tMud = { value: mud.map }; u.tMudN = { value: mud.normalMap };
+    u.tMud = { value: mud.map };
     u.tField = { value: field.map }; u.tFieldN = { value: field.normalMap };
+    u.tSand = { value: sand.map }; u.tSandN = { value: sand.normalMap };
+    u.uSea = { value: SEA.level };
     u.uWetness = GlobalUniforms.uWetness;
     if (lowQuality) shader.defines = { ...(shader.defines ?? {}), TERRAIN_LQ: '' };
     shader.vertexShader = shader.vertexShader
@@ -300,7 +303,8 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
       .replace('#include <common>', `#include <common>
         uniform sampler2D tGrass; uniform sampler2D tGrassN; uniform sampler2D tForest; uniform sampler2D tForestN;
         uniform sampler2D tDirt; uniform sampler2D tDirtN; uniform sampler2D tRock; uniform sampler2D tRockN;
-        uniform sampler2D tMud; uniform sampler2D tMudN; uniform sampler2D tField; uniform sampler2D tFieldN;
+        uniform sampler2D tMud; uniform sampler2D tField; uniform sampler2D tFieldN;
+        uniform sampler2D tSand; uniform sampler2D tSandN; uniform float uSea;
         uniform float uWetness;
         varying vec4 vSplat; varying vec4 vSplat2; varying vec3 vWPos; varying vec3 vWN;
         vec2 rot2(vec2 p, float a) { float c = cos(a), s = sin(a); return vec2(c * p.x - s * p.y, s * p.x + c * p.y); }
@@ -360,10 +364,19 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
         float wm = smoothstep(0.2, 0.8, vSplat.z + nmod * 0.4);
         if (wm > 0.001) {
           vec2 mu = wp * 0.25;
-          cB = texture2D(tMud, mu); nB = texture2D(tMudN, mu).xy * 2.0 - 1.0;
+          cB = texture2D(tMud, mu); nB = vec2(0.0); // sin mapa de normales: límite de 16 texturas en móviles
           float k = hblend(wm, hh, cB.a);
           terr = mix(terr, cB.rgb, k); tn = mix(tn, nB, k); hh = mix(hh, cB.a, k);
         }
+        // Arena de playa y fondo marino (mojada junto al agua).
+        float wsa = smoothstep(0.15, 0.6, vSplat2.z + nmod * 0.3);
+        if (wsa > 0.001) {
+          sampleAT(tSand, tSandN, wp, 0.22, mixK, cB, nB);
+          float k = hblend(wsa, hh, cB.a);
+          terr = mix(terr, cB.rgb, k); tn = mix(tn, nB, k); hh = mix(hh, cB.a, k);
+        }
+        float shoreWet = 1.0 - smoothstep(uSea + 0.1, uSea + 0.9, vWPos.y);
+        float underwater = 1.0 - smoothstep(uSea - 0.4, uSea + 0.05, vWPos.y);
         // Roca en pendientes (triplanar).
         float wr = smoothstep(0.3, 0.7, vSplat.y + nmod * 0.3);
         vec3 rockWN = vec3(0.0, 1.0, 0.0);
@@ -393,7 +406,8 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
         terr = mix(terr, terr * vec3(1.08, 1.02, 0.86), smoothstep(0.55, 0.8, macro) * (1.0 - wr) * 0.6);
         terr *= vSplat2.y;
         // Humedad: oscurece y abrillanta; charcos en las zonas bajas del barro.
-        float wet = clamp(uWetness * (1.0 - wr * 0.6) + wm * 0.45, 0.0, 1.0);
+        float wet = clamp(uWetness * (1.0 - wr * 0.6) + wm * 0.45 + shoreWet * 0.8, 0.0, 1.0);
+        terr = mix(terr, terr * vec3(0.55, 0.7, 0.68), underwater * 0.8);
         float puddle = smoothstep(0.35, 0.15, hh) * clamp(uWetness * 1.4 + wm * 0.3, 0.0, 1.0);
         terr *= mix(1.0, 0.6, wet);
         terr = mix(terr, terr * 0.45, puddle);

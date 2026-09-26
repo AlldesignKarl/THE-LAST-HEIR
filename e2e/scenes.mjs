@@ -27,6 +27,8 @@ const scenes = {
   tavern: `__game.teleport(9, -5, 0); __game.lookAt(21, 16, -17); __game.setHour(10)`,
   people: `__game.setHour(11); __game.lineup(-150, -40); __game.teleport(-150, -36.6, 0); __game.lookAt(-150, __game.game.hf.heightAt(-150, -40) + 1.1, -40)`,
   hutext: `__game.teleport(-47, 26, 0); __game.lookAt(-58, 15, 18); __game.setHour(16)`,
+  coast: `__game.teleport(60, 5, 0); __game.lookAt(200, 6, -10); __game.setHour(10)`,
+  beach: `__game.teleport(112, 20, 0); __game.lookAt(150, 5, 0); __game.setHour(17)`,
   fog: `__game.weather('fog'); __game.teleport(-100, 12, 0); __game.lookAt(-150, 12, -20); __game.setHour(7)`,
 };
 for (const [name, script] of Object.entries(scenes)) {
