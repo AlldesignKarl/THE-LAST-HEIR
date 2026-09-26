@@ -416,14 +416,24 @@ export class Character implements Actor {
    */
   updateModel(dt: number, full: boolean): void {
     const r = this.model.root;
-    r.position.copy(this.pos);
-    r.rotation.y = this.yaw;
     this.model.update(dt, full);
+    if (this.carryPose) { r.position.copy(this.carryPose.pos); r.quaternion.copy(this.carryPose.q); return; }
+    r.position.copy(this.pos);
+    r.rotation.set(r.rotation.x, this.yaw, 0);
   }
+
+  /** Llevado al hombro por el jugador: transformación impuesta cada frame. */
+  carryPose: { pos: THREE.Vector3; q: THREE.Quaternion } | null = null;
 
   /** Sincroniza la malla (interpolada) y el collider. */
   syncVisual(alpha: number, dt: number): void {
     const r = this.model.root;
+    if (this.carryPose) {
+      r.position.copy(this.carryPose.pos);
+      r.quaternion.copy(this.carryPose.q);
+      r.visible = true;
+      return;
+    }
     r.position.lerpVectors(this.prevPos, this.pos, alpha);
     this.renderYaw = this.renderYaw + wrapAngle(this.yaw - this.renderYaw) * Math.min(1, dt * 12);
     r.rotation.y = this.renderYaw;

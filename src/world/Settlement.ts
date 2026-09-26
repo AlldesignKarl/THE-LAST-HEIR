@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { BuildingInstance, type Door } from './Buildings';
 import {
-  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, PLAYER_PLOT, SEA, WATCHTOWER, WELL, WOLF_DEN,
+  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
 } from './WorldLayout';
 import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
@@ -41,6 +41,26 @@ export interface Gate {
 export class Settlement {
   readonly buildings = new Map<string, BuildingInstance>();
   readonly doors = new Map<string, Door>();
+  /** Tableros de los puentes (para que la gente camine por encima). */
+  readonly bridgeDecks: { a: THREE.Vector3; c: THREE.Vector3; top: number; width: number }[] = [];
+
+  /**
+   * Altura de una superficie transitable construida (embarcadero, puente)
+   * en (x, z), o null si no hay ninguna.
+   */
+  deckY(x: number, z: number): number | null {
+    const p = this.pier;
+    if (p && x > p.x0 - 0.1 && x < p.x1 + 0.1 && Math.abs(z - p.z) < p.w / 2 + 0.1) return p.y;
+    for (const d of this.bridgeDecks) {
+      const dx = d.c.x - d.a.x, dz = d.c.z - d.a.z, L2 = dx * dx + dz * dz;
+      const t = ((x - d.a.x) * dx + (z - d.a.z) * dz) / L2;
+      if (t < 0 || t > 1) continue;
+      const lat = Math.abs((x - d.a.x) * dz - (z - d.a.z) * dx) / Math.sqrt(L2);
+      if (lat > d.width / 2 + 0.1) continue;
+      return t < 0.3 ? d.a.y + (d.top - d.a.y) * (t / 0.3) : t > 0.7 ? d.top + (d.c.y - d.top) * ((t - 0.7) / 0.3) : d.top;
+    }
+    return null;
+  }
   readonly places = new Map<string, Place>();
   readonly cave: Cave;
   gate!: Gate;
@@ -78,7 +98,6 @@ export class Settlement {
     this.buildFields();
     this.buildBridges();
     this.buildHarbor();
-    this.buildPlotStart();
     this.buildIslands();
     this.cave = new Cave(g.hf, g.physics, g.renderer.scene, g.materials);
     this.buildCaveContent();
@@ -753,6 +772,7 @@ export class Settlement {
       const water = g.hf.waterLevelAt(b.x, b.z) ?? this.ground(b.x, b.z);
       const top = Math.max(water + 0.9, (a.y + c.y) / 2 + 0.25);
       const pts = [a.clone().setY(a.y + 0.02), new THREE.Vector3().lerpVectors(a, c, 0.3).setY(top), new THREE.Vector3().lerpVectors(a, c, 0.7).setY(top), c.clone().setY(c.y + 0.02)];
+      this.bridgeDecks.push({ a: a.clone(), c: c.clone(), top, width: b.width });
       for (let i = 0; i < 3; i++) {
         const p0 = pts[i], p1 = pts[i + 1];
         const mid = new THREE.Vector3().lerpVectors(p0, p1, 0.5);
@@ -1077,26 +1097,6 @@ export class Settlement {
       g.fires.add({ id: 'penon_candle', kind: 'candle', pos: new THREE.Vector3(torch.x, base + 0.9, torch.z), policy: 'night', canCook: false, heat: 0 });
       this.places.set('penon_cave', { id: 'penon_cave', x: cpos.x, y: base, z: cpos.z, yaw: 0 });
     }
-  }
-
-  // ------------------------------------------------------------ parcela del jugador
-
-  private buildPlotStart(): void {
-    const g = this.g;
-    const half = PLAYER_PLOT.size / 2;
-    const cx = PLAYER_PLOT.x - half - 1.3, cz = PLAYER_PLOT.z - half + 2;
-    const chest = this.placeStatic('chest', cx, this.ground(cx, cz) + 0.3, cz, Math.PI / 2, 'plot');
-    g.containers.create('plot_chest', 'Arcón de la parcela', null, [
-      { id: 'pickaxe', count: 1 }, { id: 'plank', count: 10 }, { id: 'thatch', count: 4 },
-    ], 0);
-    g.interactables.register(chest.handle, {
-      id: 'plot_chest', kind: 'container', pos: new THREE.Vector3(cx, this.ground(cx, cz) + 0.5, cz),
-      label: () => 'Arcón de la parcela (los materiales de aquí cuentan para construir)',
-      interact: (game) => game.ui.openContainer('plot_chest'),
-    });
-    // Caballete y leñera junto al arcón.
-    const wx = cx, wz = cz + 3;
-    this.placeStatic('woodpile', wx, this.ground(wx, wz) + 0.45, wz, Math.PI / 2, 'plot');
   }
 
   // ------------------------------------------------------------ lugares (IA)

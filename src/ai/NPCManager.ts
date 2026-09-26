@@ -247,7 +247,10 @@ export class NPCManager {
     for (const b of this.g.settlement.buildings.values()) {
       if (b.def.enterable && b.contains(x, z, 0.1)) return b.floorY;
     }
-    return this.g.hf.heightAt(x, z);
+    // Embarcadero y puentes: se camina sobre las tablas, no por el fondo.
+    const t = this.g.hf.heightAt(x, z);
+    const deck = this.g.settlement.deckY(x, z);
+    return deck !== null && deck > t ? deck : t;
   }
 
   private avoidTmp: import('../actors/Actor').Actor[] = [];

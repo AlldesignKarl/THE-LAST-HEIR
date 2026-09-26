@@ -9,7 +9,7 @@ import type { Game } from '../game/Game';
 import type { GuideTarget } from '../quests/QuestSystem';
 
 /** Orden de preferencia cuando no se ha elegido misión. */
-const PRIORITY = ['defense_robledo', 'main_legacy', 'side_home', 'side_fishing', 'side_islands', 'side_palisade', 'hunt_gil'];
+const PRIORITY = ['defense_robledo', 'main_legacy', 'side_fishing', 'side_islands', 'side_palisade', 'hunt_gil'];
 
 export class Guide {
   /** Misión seguida (elegida en el diario); null = automática. */

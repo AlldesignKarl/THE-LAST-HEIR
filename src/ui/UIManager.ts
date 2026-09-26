@@ -7,9 +7,8 @@ import type { Game } from '../game/Game';
 import { ITEMS, itemDef, type ItemCategory } from '../data/items';
 import type { DocumentDef } from '../data/documents';
 import { WEAPONS } from '../combat/WeaponDefs';
-import { POIS, WORLD_HALF, ROADS, STREAM, BUILDINGS, VILLAGES, SEA, PLAYER_PLOT } from '../world/WorldLayout';
+import { POIS, WORLD_HALF, ROADS, STREAM, BUILDINGS, VILLAGES, SEA } from '../world/WorldLayout';
 import { WEATHER_NAMES } from '../env/Weather';
-import { PIECES } from '../world/BuildSystem';
 
 export interface DialogueOption { text: string; onSelect: () => void; disabled?: boolean }
 export interface DialogueView { name: string; role: string; text: string; options: DialogueOption[] }
@@ -32,10 +31,10 @@ export class UIManager {
   readonly root: HTMLElement;
   private crosshair = h('div', 'crosshair');
   private prompt = h('div', 'prompt');
-  private buildBar = h('div', 'buildbar');
   private vitals = h('div', 'vitals');
   private hpBar = h('div', 'bar');
   private stBar = h('div', 'bar st');
+  private brBar = h('div', 'bar br');
   private needs = h('div', 'needs');
   private weapon = h('div', 'weapon');
   private notes = h('div', 'notes');
@@ -68,12 +67,13 @@ export class UIManager {
 
   constructor(private readonly g: Game) {
     this.root = document.getElementById('ui-root')!;
-    this.vitals.append(this.hpBar, this.stBar);
+    this.vitals.append(this.hpBar, this.stBar, this.brBar);
+    this.brBar.innerHTML = '<i></i>';
     this.hpBar.innerHTML = '<i></i>';
     this.stBar.innerHTML = '<i></i>';
     this.dialogueEl.style.display = 'none';
     this.dialogueEl.style.pointerEvents = 'auto';
-    this.root.append(this.vignette, this.crosshair, this.prompt, this.buildBar, this.vitals, this.needs, this.weapon, this.notes, this.banner,
+    this.root.append(this.vignette, this.crosshair, this.prompt, this.vitals, this.needs, this.weapon, this.notes, this.banner,
       this.toast, this.compass, this.subtitle, this.hint, this.dialogueEl, this.fadeEl, this.perf);
     for (const id of ['menu', 'pause', 'inventory', 'document', 'journal', 'map', 'sleep', 'death', 'trade', 'controls', 'options', 'load', 'mp'] as ScreenId[]) {
       const s = h('div', 'screen');
@@ -148,16 +148,19 @@ export class UIManager {
         : `<div class="s">[R] Soltar · [Clic] Lanzar${canStore ? ' · [E] Guardar' : ''}</div>`;
       this.prompt.classList.add('show');
     } else this.prompt.classList.remove('show');
-    this.updateBuildBar(inGame);
     // Barras: solo visibles al cambiar o si no están llenas.
     if (Math.abs(v.health - this.lastHp) > 0.05 || Math.abs(v.stamina - this.lastSt) > 0.05) this.vitalsShowT = 3;
     this.lastHp = v.health;
     this.lastSt = v.stamina;
-    const needShow = v.health < v.maxHealth * 0.99 || v.stamina < v.staminaMax - 1;
+    const needShow = v.health < v.maxHealth * 0.99 || v.stamina < v.staminaMax - 1 || this.g.player.breath < 99.5;
     this.vitalsShowT = Math.max(0, this.vitalsShowT - dt);
     this.vitals.style.opacity = inGame && (needShow || this.vitalsShowT > 0) ? '1' : '0';
     (this.hpBar.firstChild as HTMLElement).style.width = `${(v.health / v.maxHealth) * 100}%`;
     (this.stBar.firstChild as HTMLElement).style.width = `${v.stamina}%`;
+    // Aire: solo se ve bajo el agua o mientras se recupera.
+    const br = this.g.player.breath;
+    (this.brBar.firstChild as HTMLElement).style.width = `${br}%`;
+    this.brBar.style.display = br < 99.5 ? 'block' : 'none';
     // Necesidades: solo cuando bajan.
     const parts: string[] = [];
     if (v.hunger < 40) parts.push(`<span class="${v.hunger < 15 ? 'bad' : 'warn'}">${v.hunger < 15 ? 'Hambriento' : 'Con hambre'}</span>`);
@@ -194,30 +197,6 @@ export class UIManager {
       const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SO', 'O', 'NO'];
       this.compass.textContent = `· ${dirs[Math.round(yaw / 45) % 8]} ·`;
     } else this.compass.style.opacity = '0';
-  }
-
-  private lastBuildHtml = '';
-  private updateBuildBar(inGame: boolean): void {
-    const g = this.g;
-    const b = g.build;
-    let html = '';
-    if (inGame && b.active) {
-      const def = PIECES[b.kind];
-      const cost = Object.entries(def.cost).map(([id, n]) => {
-        const have = b.available(id);
-        return `<span class="${have >= n ? 'ok' : 'bad'}">${n} ${itemDef(id).name.toLowerCase()} (${have})</span>`;
-      }).join(' · ');
-      const keys = g.input.touchMode ? '' : `<div class="k">[Z] [X] o rueda: pieza · [Clic] colocar · [E] desmontar · [Q] girar · [B] salir</div>`;
-      const why = b.slot && !b.slot.ok ? `<div class="bad">${b.slot.reason}</div>` : '';
-      html = `<div class="n">◀ ${def.name}${def.rot ? ` · orientación ${b.rot + 1}` : ''} ▶</div><div class="c">${cost}</div>${why}${keys}`;
-    } else if (inGame && b.nearPlot(g.player.pos.x, g.player.pos.z, 2)) {
-      html = `<div class="k">Tu parcela · ${g.input.touchMode ? 'toca «Construir»' : 'pulsa [B] para construir'}</div>`;
-    }
-    if (html !== this.lastBuildHtml) {
-      this.lastBuildHtml = html;
-      this.buildBar.innerHTML = html;
-      this.buildBar.classList.toggle('show', !!html);
-    }
   }
 
   // ------------------------------------------------------------ gestión de pantallas
@@ -370,7 +349,6 @@ export class UIManager {
         <div><b>Clic der.</b> Bloquear · <b>C</b> Esquivar · <b>F</b> Patada</div>
         <div><b>T</b> Antorcha en la mano izquierda · <b>1–4</b> Armas rápidas</div>
         <div><b>Tab / I</b> Inventario · <b>J</b> Diario · <b>M</b> Mapa · <b>Esc</b> Pausa · <b>F3</b> Rendimiento</div>
-        <div><b>B</b> Construir en tu parcela · <b>Z / X</b> o rueda: pieza · <b>Q</b> Girar · <b>Clic</b> Colocar · <b>E</b> Desmontar</div>
         <h3>Pantalla táctil</h3>
         <div><b>Pulgar izq.</b> Joystick (aparece donde tocas) · <b>Arrastrar a la derecha</b> Mirar</div>
         <div><b>Atacar</b> tocar: ligero · mantener: fuerte / tensar arco (arrastra para apuntar)</div>
@@ -786,12 +764,7 @@ export class UIManager {
         ctx.beginPath(); ctx.arc(px, pz, 4, 0, Math.PI * 2); ctx.fill();
         ctx.fillText(poi.name, px, pz - 9);
       }
-      // Parcela del jugador y objetivo actual.
-      {
-        const [a, b2] = toPx(PLAYER_PLOT.x - PLAYER_PLOT.size / 2, PLAYER_PLOT.z - PLAYER_PLOT.size / 2);
-        const w = (PLAYER_PLOT.size / (2 * R)) * size;
-        ctx.strokeStyle = '#8e1a10'; ctx.lineWidth = 1.5; ctx.strokeRect(a, b2, w, w);
-      }
+      // Objetivo actual.
       const cur = g.guide.current;
       if (cur) {
         const [tx, tz] = toPx(cur.pos.x, cur.pos.z);

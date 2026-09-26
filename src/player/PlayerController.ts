@@ -28,11 +28,20 @@ export class PlayerController {
   pitch = 0;
   grounded = false;
   crouching = false;
+  /** Agachado forzado (p. ej. al recoger un cuerpo del suelo). */
+  forceCrouch = false;
   sprinting = false;
   inWater = false;
   /** Nadando en agua profunda (mar). */
   swimming = false;
   private swimWarnT = 0;
+  /** Sin fuerzas nadando (se hunde). */
+  exhausted = false;
+  /** Aire (0–100): se gasta con los ojos bajo el agua. */
+  breath = 100;
+  underwaterEyes = false;
+  private strokeT = 0;
+  private drownT = 0;
   /** Multiplicador de velocidad externo (carga, heridas, transporte). */
   speedMul = 1;
   /** Bloquea el movimiento (menús, dormir, escalar). */
@@ -148,7 +157,7 @@ export class PlayerController {
     const wx = mx * cos + mz * sin;
     const wz = -mx * sin + mz * cos;
 
-    this.crouching = !this.frozen && inp.isDown('crouch');
+    this.crouching = !this.frozen && (inp.isDown('crouch') || this.forceCrouch);
     const wantsSprint = !this.frozen && inp.isDown('sprint') && mz < -0.5 && !this.crouching && !this.combatBusy;
     this.sprinting = false;
     let speed = 3.3;
@@ -162,18 +171,38 @@ export class PlayerController {
     if (this.inWater) speed *= 0.6;
     // Natación: el agua profunda sostiene al jugador; cansa y puede ahogar.
     const wlNow = this.hf.waterLevelAt(this.pos.x, this.pos.z);
-    this.swimming = wlNow !== null && wlNow - this.pos.y > 1.25;
+    // Con el agua por el pecho ya no se hace pie: se nada.
+    this.swimming = wlNow !== null && wlNow - this.pos.y > (this.swimming ? 0.95 : 1.05);
+    this.exhausted = false;
     if (this.swimming) {
-      speed = this.sprinting ? 3.3 : 2.1;
-      if (!v.drainStamina(len > 0.1 ? 5 : 2, dt)) {
-        v.hurt(6 * dt);
+      speed = this.sprinting ? 3.1 : 1.9;
+      if (!v.drainStamina(len > 0.1 ? 5 : 2.2, dt)) {
+        // Sin fuerzas no se sostiene a flote: se hunde y traga agua.
+        this.exhausted = true;
+        speed = 0.7;
         this.swimWarnT -= dt;
         if (this.swimWarnT <= 0) {
           this.swimWarnT = 4;
-          this.bus.emit('notify', { text: 'Te faltan fuerzas para nadar: vuelve a tierra.', kind: 'warning' });
+          this.bus.emit('notify', { text: 'No puedes más: te hundes. ¡Vuelve a tierra!', kind: 'warning' });
         }
       }
+      // Brazada: chapoteo al ritmo del nado.
+      if (len > 0.1) {
+        this.strokeT -= dt;
+        if (this.strokeT <= 0) { this.strokeT = this.sprinting ? 0.55 : 0.8; this.bus.emit('sfx', { id: 'step_water', volume: 0.55 }); }
+      }
     }
+    // Aire: bajo el agua se gasta (≈11 s) y al acabarse te ahogas.
+    const eyeY = this.pos.y + this.eyeHeight;
+    this.underwaterEyes = wlNow !== null && eyeY < wlNow - 0.05;
+    if (this.underwaterEyes) {
+      this.breath = Math.max(0, this.breath - 9 * dt);
+      if (this.breath <= 0) {
+        v.hurt(14 * dt);
+        this.drownT -= dt;
+        if (this.drownT <= 0) { this.drownT = 1.1; this.bus.emit('sfx', { id: 'pain', volume: 0.7 }); }
+      }
+    } else this.breath = Math.min(100, this.breath + 30 * dt);
     speed *= this.speedMul;
 
     // Esquiva.
@@ -198,8 +227,11 @@ export class PlayerController {
 
     // Salto y gravedad.
     if (this.swimming && wlNow !== null) {
-      // Flotación: los ojos quedan justo sobre la superficie.
-      this.vel.y = clamp((wlNow - 1.35 - this.pos.y) * 3, -2.5, 2.5);
+      // Flotación: los ojos quedan justo sobre la superficie. Agachado se
+      // bucea; agotado, el cuerpo se va hundiendo.
+      const diving = inp.isDown('crouch') && !this.exhausted;
+      const target = this.exhausted ? wlNow - this.eyeHeight - 0.9 : diving ? wlNow - this.eyeHeight - 1.6 : wlNow - 1.45;
+      this.vel.y = clamp((target - this.pos.y) * (this.exhausted ? 0.6 : 3), -2.5, 2.5);
       this.grounded = false;
     } else if (this.grounded) {
       this.vel.y = -1;

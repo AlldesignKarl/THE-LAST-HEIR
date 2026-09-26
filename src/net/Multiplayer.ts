@@ -5,12 +5,12 @@
  *  - Sala en tiempo real `s-<sid>` (capacidad `room` de claude.ai): cada
  *    jugador publica su presencia ~10 veces por segundo (posición, mirada,
  *    animación, herramienta, antorcha, barca) y en ella una cola corta de
- *    ACCIONES numeradas (construir, desmontar, puerta, talar, picar) y el
+ *    ACCIONES numeradas (talar, picar) y el
  *    último mensaje de chat. La presencia la puede fijar cualquiera que
  *    esté en la sala (también invitados de solo lectura), así que todos
  *    ven lo que hacen los demás.
  *  - Documento `worlds/<sid>` (capacidad `db`): el estado compartido que
- *    persiste (construcciones de la parcela, árboles talados, rocas,
+ *    persiste (árboles talados, rocas,
  *    barcas, hora y tiempo). Lo escribe un único "guardián" (el jugador
  *    con permiso de escritura de menor id de conexión) para no pisarse.
  *  - Partida personal (inventario, misiones, salud…) en
@@ -24,7 +24,6 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { openTransport, type NetTransport, type NetRoom, type NetPeer } from './Net';
 import { HumanoidModel, type Appearance, type AnimState } from '../actors/HumanoidModel';
-import type { Piece } from '../world/BuildSystem';
 import type { SaveDoc } from '../save/SaveSystem';
 import { itemDef } from '../data/items';
 import { WEAPONS } from '../combat/WeaponDefs';
@@ -34,14 +33,11 @@ export const MAX_PLAYERS = 5;
 /** Dirección pública del juego publicado (para los enlaces de invitación). */
 export const ARTIFACT_URL = 'https://claude.ai/artifact/GzFDGhFYs8k2mdVn115mby';
 /** Sistemas del guardado que pertenecen al mundo compartido, no al jugador. */
-const WORLD_SYSTEMS = ['build', 'vegetation', 'resources', 'boats', 'time', 'weather'];
+const WORLD_SYSTEMS = ['vegetation', 'resources', 'boats', 'time', 'weather'];
 const ACT_KEEP = 12;
 
 /** Acciones que viajan en la presencia: [tipo, nº de secuencia, ...datos]. */
 export type Act =
-  | ['b', number, Piece]
-  | ['u', number, string]
-  | ['d', number, string, boolean]
   | ['f', number, string, number, number]
   | ['m', number, string, number, number];
 
@@ -57,7 +53,6 @@ export interface WorldDoc {
   felled: [string, number][];
   rocks: Record<string, [number, number]>;
   boats: Record<string, [number, number, number]>;
-  pieces: Piece[];
 }
 
 interface Remote {
@@ -208,7 +203,7 @@ export class Multiplayer {
     const uid = t.userId ?? 'anon';
     const doc: WorldDoc = {
       v: 1, name: name.trim().slice(0, 40) || 'Robledo', owner: uid, members: [uid], created: Date.now(), savedAt: Date.now(),
-      clock: 0, weather: null, felled: [], rocks: {}, boats: {}, pieces: [],
+      clock: 0, weather: null, felled: [], rocks: {}, boats: {},
     };
     if (t.db && t.canWrite !== false) {
       try { await t.db.set(`worlds/${sid}`, doc as unknown as Record<string, unknown>); }
@@ -267,7 +262,7 @@ export class Multiplayer {
     } catch { /* sin base de datos: mundo solo en memoria */ }
     const fresh = !world;
     if (!world) {
-      world = { v: 1, name: 'Robledo', owner: uid, members: [uid], created: Date.now(), savedAt: 0, clock: 0, weather: null, felled: [], rocks: {}, boats: {}, pieces: [] };
+      world = { v: 1, name: 'Robledo', owner: uid, members: [uid], created: Date.now(), savedAt: 0, clock: 0, weather: null, felled: [], rocks: {}, boats: {} };
     }
     if (!world.members.includes(uid)) world.members = [...world.members, uid];
     this.world = world;
@@ -326,7 +321,6 @@ export class Multiplayer {
     g.vegetation.deserialize({ felled: w.felled ?? [] });
     g.resources.deserialize(w.rocks ?? {});
     g.boats.deserialize(w.boats ?? {});
-    g.build.deserialize(w.pieces ?? []);
   }
 
   private snapshotWorld(): WorldDoc {
@@ -344,7 +338,6 @@ export class Multiplayer {
       felled: (g.vegetation.serialize() as { felled: [string, number][] }).felled,
       rocks: g.resources.serialize() as Record<string, [number, number]>,
       boats: g.boats.serialize() as Record<string, [number, number, number]>,
-      pieces: g.build.serialize(),
     };
   }
 
@@ -392,11 +385,6 @@ export class Multiplayer {
 
   private wire(): void {
     const g = this.g;
-    g.build.onChange = (kind, piece) => {
-      if (kind === 'add') this.push(['b', 0, { ...piece }]);
-      else if (kind === 'remove') this.push(['u', 0, piece.id]);
-      else this.push(['d', 0, piece.id, !!piece.open]);
-    };
     g.resources.onChange = (id, stones, day) => this.push(['m', 0, id, stones, day]);
     g.bus.on('tree:felled', (e) => this.push(['f', 0, e.treeId, e.fromX ?? 0, e.fromZ ?? 0]));
   }
@@ -545,13 +533,6 @@ export class Multiplayer {
       r.lastSeq = a[1];
       try {
         switch (a[0]) {
-          case 'b': {
-            const p = a[2];
-            if (p && typeof p.id === 'string' && typeof p.kind === 'string') g.build.addPiece({ ...p });
-            break;
-          }
-          case 'u': g.build.removePiece(String(a[2])); break;
-          case 'd': g.build.toggleDoor(String(a[2]), !!a[3]); break;
           case 'f': g.treeFelling.fellRemote(String(a[2]), Number(a[3]) || 0, Number(a[4]) || 0); break;
           case 'm': g.resources.setRock(String(a[2]), Number(a[3]) || 0, Number(a[4]) || 0); break;
         }

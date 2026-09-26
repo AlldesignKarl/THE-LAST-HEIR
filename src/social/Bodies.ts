@@ -33,6 +33,7 @@ export class Bodies {
   }
 
   update(dt: number): void {
+    this.updateSinking(dt);
     this.now += dt;
     this.t -= dt;
     if (this.t > 0) return;
@@ -68,21 +69,47 @@ export class Bodies {
     return null;
   }
 
-  /** En agua honda el cuerpo se hunde y ya no se encontrará. */
+  /** Cuerpos que flotan o se están hundiendo. */
+  private sinking = new Map<Character, { t: number; lvl: number; bottom: number }>();
+
+  /**
+   * En agua honda: primero flota unos segundos, luego se va hundiendo poco a
+   * poco hasta el fondo. Una vez bajo el agua ya no se encontrará.
+   */
   checkWater(c: Character): void {
-    if (c.hiddenBody) return;
+    if (c.hiddenBody || this.sinking.has(c)) return;
     const g = this.g;
     const lvl = g.hf.waterLevelAt(c.pos.x, c.pos.z);
     if (lvl === null) return;
     const bottom = g.hf.heightAt(c.pos.x, c.pos.z);
-    if (lvl - bottom < 0.6) return;
-    c.hiddenBody = true;
-    c.pos.y = bottom + 0.1;
-    c.prevPos.copy(c.pos);
+    if (lvl - bottom < 0.8) return;
     if (c.alive) c.die('player');
+    c.pos.y = lvl - 0.15;
+    c.prevPos.copy(c.pos);
+    this.sinking.set(c, { t: 0, lvl, bottom });
     g.bus.emit('sfx', { id: 'step_water', x: c.pos.x, y: lvl, z: c.pos.z });
     g.particles.burst('dust', c.pos.x, lvl, c.pos.z, 14, 1.5, undefined, 0.8);
-    if (this.pending.has(c.id)) g.bus.emit('notify', { text: `El cuerpo de ${c.name} se hunde en el agua.`, kind: 'info' });
+  }
+
+  /** Cada tick: flotar y hundirse. */
+  updateSinking(dt: number): void {
+    const g = this.g;
+    for (const [c, s] of this.sinking) {
+      s.t += dt;
+      const float = 4 + (c.id.length % 3); // 4–6 s a flote
+      let y: number;
+      if (s.t < float) y = s.lvl - 0.15 + Math.sin(s.t * 1.7) * 0.05; // a flote, meciéndose
+      else y = Math.max(s.bottom + 0.1, c.pos.y - dt * (0.18 + Math.min(0.25, (s.t - float) * 0.03)));
+      c.pos.y = y;
+      c.prevPos.copy(c.pos);
+      // Se deriva un poco con la corriente/oleaje mientras flota.
+      if (s.t < float) { c.pos.x += Math.sin(s.t * 0.5) * dt * 0.08; c.prevPos.x = c.pos.x; }
+      if (!c.hiddenBody && y < s.lvl - 1.0) {
+        c.hiddenBody = true;
+        if (this.pending.has(c.id)) g.bus.emit('notify', { text: `El cuerpo de ${c.name} se hunde en el agua.`, kind: 'info' });
+      }
+      if (y <= s.bottom + 0.11) this.sinking.delete(c);
+    }
   }
 
   /**

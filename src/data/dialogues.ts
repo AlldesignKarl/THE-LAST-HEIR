@@ -267,10 +267,9 @@ export const DIALOGUES: Record<string, NpcDialogue> = {
     topics: [rumor('aldonza', ['Mateo presta barcas, pero cobra hasta el aire que respiras.', 'Mi Nuño dice que en el Peñón hay una cueva con un muro de piedra que no es natural.'])],
   },
   gonzalo: {
-    greet: (c) => afterRaid(c) ?? `${hello(c)} ¿Vienes a por madera o a mirar cómo trabajo?`,
+    greet: (c) => afterRaid(c) ?? `${hello(c)} ¿Vienes a por madera o a mirar cómo calafateo?`,
     topics: [
       trade,
-      { id: 'build', text: 'Quiero construirme una casa.', effect: (c) => c.g.flags.set('asked_build'), reply: 'Para una casa hacen falta tablones, piedra para el zócalo y paja o tablas para el tejado. Tablones te vendo, o tala tú y parte los troncos con el hacha. La piedra, con un pico en la peña de la cantera.' },
       rumor('gonzalo', ['La barca buena es la de roble; la de pino se pudre en tres inviernos.', 'Mateo tiene dos barcas amarradas al muelle.']),
     ],
   },
@@ -301,7 +300,7 @@ export const DIALOGUES: Record<string, NpcDialogue> = {
   },
   diego: {
     greet: (c) => afterRaid(c) ?? `${hello(c)} La tierra no se trabaja sola.`,
-    topics: [trade, rumor('diego', ['La paja buena para techar es la de centeno.', 'Si te haces casa en tu parcela, planta un huerto detrás.'])],
+    topics: [trade, rumor('diego', ['La paja buena para techar es la de centeno.', 'Si el invierno viene largo, guarda nabos en arena.'])],
   },
   fortun: {
     greet: (c) => afterRaid(c) ?? `${hello(c)} Aparta, que ruedan barriles.`,

@@ -56,7 +56,6 @@ import { TouchControls } from '../ui/TouchControls';
 import { GroundScatter } from '../world/GroundScatter';
 import { Sea } from '../world/Sea';
 import { Resources } from '../world/Resources';
-import { BuildSystem } from '../world/BuildSystem';
 import { Guide } from '../ui/Guide';
 import { Boats } from '../world/Boats';
 import { Fishing } from '../player/Fishing';
@@ -121,7 +120,6 @@ export class Game {
   readonly scatter: GroundScatter;
   readonly sea: Sea;
   readonly resources: Resources;
-  readonly build: BuildSystem;
   readonly guide: Guide;
   readonly boats: Boats;
   readonly fishing: Fishing;
@@ -192,7 +190,6 @@ export class Game {
     this.treeFelling = new TreeFelling(this);
     this.settlement = new Settlement(this);
     this.resources = new Resources(this);
-    this.build = new BuildSystem(this);
     this.boats = new Boats(this);
     this.fishing = new Fishing(this);
     this.wounds = new Wounds(this);
@@ -306,7 +303,6 @@ export class Game {
     });
     reg('worldItems', () => this.worldItems.serialize(), (d: Parameters<WorldItems['deserialize']>[0]) => this.worldItems.deserialize(d));
     reg('boats', () => this.boats.serialize(), (d: Parameters<Boats['deserialize']>[0]) => this.boats.deserialize(d));
-    reg('build', () => this.build.serialize(), (d: Parameters<BuildSystem['deserialize']>[0]) => this.build.deserialize(d));
     reg('resources', () => this.resources.serialize(), (d: Parameters<Resources['deserialize']>[0]) => this.resources.deserialize(d));
     reg('fires', () => this.fires.serialize(), (d: Parameters<Fires['deserialize']>[0]) => this.fires.deserialize(d));
     reg('reputation', () => this.reputation.serialize(), (d: Parameters<Reputation['deserialize']>[0]) => this.reputation.deserialize(d));
@@ -321,8 +317,6 @@ export class Game {
     reg('discovered', () => [...this.discovered], (d: string[]) => { this.discovered.clear(); for (const x of d) this.discovered.add(x); });
     reg('post', () => 0, () => {
       this.settlement.applyFlags();
-      // Partidas anteriores a la construcción: empezar la tarea de la casa.
-      if (this.quests.status('side_home') === 'inactive') this.quests.start('side_home');
     });
     s.summary = () => `Día ${this.time.day}, ${this.time.formatClock()} · ${this.story.stage}/10`;
   }
@@ -356,7 +350,6 @@ export class Game {
     this.inventory.coins = 18;
     this.discovered.add('robledo');
     this.quests.start('main_legacy');
-    this.quests.start('side_home');
     // La puerta de la choza empieza abierta: entra la luz de la mañana.
     const hutDoor = this.settlement.buildings.get('player_hut')?.doors[0];
     if (hutDoor && !hutDoor.open) this.actions.toggleDoor(hutDoor);
@@ -436,14 +429,13 @@ export class Game {
     this.player.speedMul = this.inventory.overEncumbered ? 0.6 : 1;
     if (this.vitals.health < 25) this.player.speedMul *= 0.85;
     this.player.frozen = this.vitals.dead;
-    this.build.update();
     this.fishing.update(dt);
     // En modo construcción el clic coloca y E desmonta; en la barca E baja;
     // con la caña, el clic lanza: en esos casos no hay combate ni uso normal.
-    if (!this.build.active && !this.boats.riding) {
+    if (!this.boats.riding) {
       this.autoOpenDoors();
       this.interaction.update(dt);
-      if (!this.fishing.holding) this.combat.update(dt);
+      if (!this.fishing.holding && !this.interaction.dragging) this.combat.update(dt);
     }
     // Antes de mover: dentro de la cueva el jugador está legítimamente bajo el terreno.
     const pp = this.player.pos;
@@ -488,13 +480,6 @@ export class Game {
     for (const d of this.settlement.doors.values()) {
       if (d.open || d.locked) continue;
       if (Math.abs(d.worldPos.y - p.y) < 2.2 && near(d.worldPos.x, d.worldPos.z, 1.35)) this.actions.toggleDoor(d);
-    }
-    for (const b of this.build.pieces.values()) {
-      if (!b.door || b.piece.open) continue;
-      const pv = b.door.pivot.position;
-      // El centro de la hoja está a medio metro de la bisagra.
-      const cx = pv.x + Math.cos(b.door.pivot.rotation.y) * 0.5, cz = pv.z - Math.sin(b.door.pivot.rotation.y) * 0.5;
-      if (Math.abs(pv.y - p.y) < 2.2 && near(cx, cz, 1.35)) this.build.toggleDoor(b.piece.id);
     }
   }
 
@@ -584,7 +569,7 @@ export class Game {
     }
     if (this.vitals.dead && !this.deathShown) {
       this.deathShown = true;
-      const cause = this.vitals.hunger <= 0 ? 'Muerto de hambre.' : this.vitals.thirst <= 0 ? 'Muerto de sed.' : this.vitals.isFreezing ? 'Muerto de frío.' : 'Caíste en combate.';
+      const cause = this.player.breath <= 0 ? 'Te has ahogado.' : this.vitals.hunger <= 0 ? 'Muerto de hambre.' : this.vitals.thirst <= 0 ? 'Muerto de sed.' : this.vitals.isFreezing ? 'Muerto de frío.' : 'Caíste en combate.';
       this.bus.emit('player:died', { cause });
       setTimeout(() => this.ui.openDeath(cause), 1500);
     }
@@ -629,13 +614,13 @@ export class Game {
     this.grass.update(this.camPos);
     this.scatter.update(this.camPos);
     this.boats.syncVisual(this.paused ? 1 : alpha);
-    this.build.updateGhost();
     this.fishing.updateVisual();
     this.water.update(frameDt);
     const wlCam = this.hf.waterLevelAt(this.camPos.x, this.camPos.z);
     this.env.underwater = wlCam !== null && this.camPos.y < wlCam - 0.05;
     this.env.update(frameDt, this.time, this.weather, this.camPos);
     this.settlement.updateWindows(this.time.hourFloat);
+    this.interaction.updateCarriedVisual(this.camPos, this.player.yaw);
     this.npcs.syncVisuals(alpha, frameDt);
     this.animals.syncVisuals(alpha, frameDt);
     this.viewmodel.update(frameDt, cam);

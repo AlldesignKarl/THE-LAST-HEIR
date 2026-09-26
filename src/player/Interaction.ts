@@ -45,8 +45,10 @@ const tmpE = new THREE.Vector3();
 export class Interaction {
   focus: FocusTarget = { kind: 'none', text: '' };
   carried: Carried | null = null;
-  /** Cuerpo que se va arrastrando. */
+  /** Cuerpo que se lleva al hombro. */
   dragging: Character | null = null;
+  private carryT = 0;
+  private pickFrom = new THREE.Vector3();
 
   constructor(private readonly g: Game) {}
 
@@ -59,8 +61,8 @@ export class Interaction {
 
     const inp = g.input;
     if (this.dragging) {
-      this.updateDrag(dt);
-      if (inp.wasPressed('grab') || inp.wasPressed('interact')) this.releaseDrag();
+      this.updateCarryBody(dt);
+      if (this.carryT > 0.8 && (inp.wasPressed('grab') || inp.wasPressed('interact'))) this.releaseDrag();
       return;
     }
     if (this.carried) {
@@ -132,10 +134,10 @@ export class Interaction {
         }
       }
     }
-    // Cuerpos en el suelo delante (muertos o desangrándose): arrastrar.
-    const corpse = this.corpseInFront(fwd);
+    // Cuerpos en el suelo delante (muertos o desangrándose): cargar.
+    const corpse = this.dragging ? null : this.corpseInFront(fwd);
     if (corpse) {
-      this.focus = { kind: 'interactable', corpse, text: corpse.alive ? `${corpse.name} (se desangra)` : `Cuerpo de ${corpse.name}`, sub: '[R] Arrastrar' };
+      this.focus = { kind: 'interactable', corpse, text: corpse.alive ? `${corpse.name} (se desangra)` : `Cuerpo de ${corpse.name}`, sub: '[R] Cargar al hombro' };
       return;
     }
     // Agua: mirando hacia abajo estando dentro o al borde.
@@ -223,39 +225,77 @@ export class Interaction {
     return best;
   }
 
-  private startDrag(c: Character): void {
+  /** Cargar un cuerpo al hombro: agacharse, levantarlo y echárselo encima. */
+  private startCarry(c: Character): void {
+    const g = this.g;
     this.dragging = c;
-    this.g.bus.emit('sfx', { id: 'grab_heavy' });
-    this.g.bus.emit('notify', { text: 'Arrastras el cuerpo. [R] para soltarlo. En agua honda se hunde.', kind: 'info' });
+    this.carryT = 0;
+    c.model.setState('carried');
+    g.bus.emit('sfx', { id: 'grab_heavy' });
+    g.bus.emit('notify', { text: 'Te cargas el cuerpo al hombro. [R] para dejarlo. En agua honda se hunde.', kind: 'info' });
   }
 
-  private updateDrag(dt: number): void {
+  private updateCarryBody(dt: number): void {
     const g = this.g;
     const c = this.dragging!;
-    if (c.hiddenBody) { this.releaseDrag(); return; }
-    const p = g.player.pos;
-    // Se arrastra delante de ti, tirando de él por los hombros.
-    const fx = -Math.sin(g.player.yaw), fz = -Math.cos(g.player.yaw);
-    const tx = p.x + fx * 0.9, tz = p.z + fz * 0.9;
-    const y = dragGround(g, tx, tz, p.y);
-    c.pos.set(tx, y, tz);
+    this.carryT += dt;
+    // El cuerpo va con el jugador (para las comprobaciones de agua y testigos).
+    c.pos.copy(g.player.pos);
     c.prevPos.copy(c.pos);
     c.yaw = g.player.yaw;
-    g.player.speedMul = Math.min(g.player.speedMul, 0.5);
-    g.vitals.drainStamina(3, dt);
-    g.bodies.checkWater(c);
+    g.player.speedMul = Math.min(g.player.speedMul, 0.62);
+    g.player.forceCrouch = this.carryT < 0.7; // agacharse a recogerlo
+    g.vitals.drainStamina(2.5, dt);
+  }
+
+  /**
+   * Cada frame: posición visual sobre el hombro derecho (tras la animación
+   * de recogida, que lo sube desde el suelo).
+   */
+  updateCarriedVisual(eye: THREE.Vector3, yaw: number): void {
+    const c = this.dragging;
+    if (!c) return;
+    const F = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const U = new THREE.Vector3(0, 1, 0);
+    const R = new THREE.Vector3().crossVectors(F, U).normalize();
+    const b = c.model.app.build;
+    // Carga de bombero: la cadera sobre el hombro derecho, boca abajo, con
+    // las piernas colgando por delante (se ven al borde de la vista) y el
+    // torso por la espalda.
+    const shoulder = eye.clone().addScaledVector(U, -0.32).addScaledVector(R, 0.32).addScaledVector(F, -0.08);
+    const q = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(R, F.clone().negate(), U.clone().negate()));
+    const pos = shoulder.addScaledVector(F, 0.94 * b);
+    const k = Math.min(1, this.carryT / 0.7);
+    if (k < 1) {
+      // Recogida: del suelo al hombro.
+      pos.lerpVectors(this.pickFrom, pos, k * k * (3 - 2 * k));
+    }
+    c.carryPose = { pos, q };
   }
 
   releaseDrag(): void {
-    if (!this.dragging) return;
+    const c = this.dragging;
+    if (!c) return;
+    const g = this.g;
     this.dragging = null;
-    this.g.bus.emit('sfx', { id: 'land', volume: 0.5 });
+    g.player.forceCrouch = false;
+    c.carryPose = null;
+    // Se deja en el suelo delante.
+    const fx = -Math.sin(g.player.yaw), fz = -Math.cos(g.player.yaw);
+    const tx = g.player.pos.x + fx * 0.9, tz = g.player.pos.z + fz * 0.9;
+    c.pos.set(tx, dragGround(g, tx, tz, g.player.pos.y), tz);
+    c.prevPos.copy(c.pos);
+    c.yaw = g.player.yaw + Math.PI / 2;
+    c.model.root.rotation.set(0, c.yaw, 0);
+    c.model.setState(c.alive ? c.woundAnim : 'dead');
+    g.bus.emit('sfx', { id: 'land', volume: 0.6 });
+    g.bodies.checkWater(c);
   }
 
   private tryGrab(): void {
     const f = this.focus;
     const g = this.g;
-    if (f.corpse) { this.startDrag(f.corpse); return; }
+    if (f.corpse) { this.pickFrom.copy(f.corpse.model.root.position); this.startCarry(f.corpse); return; }
     let body: RAPIER.RigidBody | undefined;
     let collider: RAPIER.Collider | undefined;
     let item: WorldItem | null = null;

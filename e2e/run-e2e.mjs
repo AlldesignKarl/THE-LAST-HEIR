@@ -651,7 +651,7 @@ await test('guardado y carga persistente (recarga completa de la página)', asyn
   assert(after.axeGone && after.letterGone && after.board, 'objetos recogidos no reaparecen');
 });
 
-await test('heridas: hachazo a un vecino sin testigos, se desangra, arrastrar el cuerpo al mar sin castigo', async () => {
+await test('heridas: hachazo a un vecino sin testigos, se desangra, cargarlo al hombro y tirarlo al mar sin castigo', async () => {
   // Tras la prueba de carga el juego espera un clic: reanudarlo.
   await ev(() => { const g = __game.game; g.ui.close(); g.ui.setHint(''); g.started = true; g.paused = false; g.input.gameplayEnabled = true; });
   const r = await ev(() => {
@@ -684,15 +684,20 @@ await test('heridas: hachazo a un vecino sin testigos, se desangra, arrastrar el
     let sx = 0;
     for (let xx = 60; xx < 300; xx += 2) if (g.hf.isSeaWater(xx, 10) && g.hf.waterLevelAt(xx, 10) - g.hf.heightAt(xx, 10) > 1.2) { sx = xx; break; }
     api.teleport(sx - 1.2, 10, -Math.PI / 2); api.step(0.5);
+    // Llevarlo al agua honda y soltarlo: flota unos segundos y se hunde.
+    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.3);
+    const floatY = n.c.pos.y - g.hf.waterLevelAt(n.c.pos.x, n.c.pos.z);
+    api.step(16);
     const hidden = n.c.hiddenBody;
-    return { swings, downed, bleeding, dead, pending, focus, dragging, hidden, rep0, rep1: g.reputation.get('robledo') };
+    return { swings, downed, bleeding, dead, pending, focus, dragging, hidden, floatY, rep0, rep1: g.reputation.get('robledo') };
   });
   assert(r.downed, `cae a la primera o segunda (golpes ${r.swings})`);
   assert(r.bleeding, 'se desangra');
   assert(r.dead, 'muere desangrado');
   assert(r.pending, 'crimen sin testigos pendiente');
   assert(r.focus.startsWith('Cuerpo de'), `foco ${r.focus}`);
-  assert(r.dragging, 'arrastra el cuerpo');
+  assert(r.dragging, 'se carga el cuerpo al hombro');
+  assert(r.floatY > -0.5, `al soltarlo en el agua primero flota (${r.floatY.toFixed(2)})`);
   assert(r.hidden, 'el cuerpo se hunde en el mar');
   assert(r.rep1 === r.rep0, `sin castigo de reputación (${r.rep0} → ${r.rep1})`);
 });

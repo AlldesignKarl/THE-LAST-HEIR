@@ -197,7 +197,6 @@ export const POIS: POI[] = [
   { id: 'bandit_camp', name: 'Campamento de Los Cuervos', x: BANDIT_CAMP.x, z: BANDIT_CAMP.z, radius: 40, discoverable: true },
   { id: 'deer_meadow', name: 'Prado de los ciervos', x: DEER_MEADOW.x, z: DEER_MEADOW.z, radius: 30, discoverable: true },
   { id: 'forest_bridge', name: 'Puente del arroyo', x: -95, z: 15, radius: 10, discoverable: true },
-  { id: 'player_plot', name: 'Tu parcela', x: -76, z: 50, radius: 14, discoverable: true },
   { id: 'quarry', name: 'Cantera', x: -62, z: 86, radius: 12, discoverable: true },
   { id: 'harbor', name: 'Embarcadero', x: 112, z: 10, radius: 20, discoverable: true },
   { id: 'isla_gaviotas', name: 'Isla de las Gaviotas', x: 252, z: -34, radius: 60, discoverable: true },
@@ -221,7 +220,7 @@ export const SEA = {
 /** Muelle de Robledo (el embarcadero). */
 export const PIER = { x0: 0, z: 8, length: 34, width: 3.2 };
 
-/** Parcela del jugador: descampado propio para construir. */
+/** Descampado (claro sin árboles) al sur del pueblo. */
 export const PLAYER_PLOT = { x: -76, z: 50, size: 21 };
 
 /** Cantera junto al barrio sur: rocas que se pican con el pico. */

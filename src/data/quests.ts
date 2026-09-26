@@ -2,9 +2,8 @@
  * Misiones del vertical slice.
  */
 import type { QuestDef } from '../quests/QuestSystem';
-import { CAVE, DEER_MEADOW, PLAYER_PLOT, QUARRY } from '../world/WorldLayout';
+import { CAVE, DEER_MEADOW } from '../world/WorldLayout';
 
-const PLOT: [number, number] = [PLAYER_PLOT.x, PLAYER_PLOT.z];
 
 export const LOGS_REQUIRED = 6;
 
@@ -59,52 +58,6 @@ export const QUESTS: QuestDef[] = [
         objectives: [{ kind: 'flag', flag: 'valdeolmo_mill_found', text: 'Viaja a Valdeolmo y busca al molinero (próximamente)' }],
       },
     ],
-  },
-  {
-    id: 'side_home',
-    title: 'Un techo propio',
-    type: 'side',
-    giver: 'gonzalo',
-    stages: [
-      {
-        id: 'ask',
-        desc: 'La choza de tu padre se cae a pedazos. Al sur tienes un descampado que es tuyo: tu parcela. Gonzalo el Calafate, en la atarazana junto al embarcadero, sabe de madera y de obras.',
-        objectives: [{ kind: 'flag', flag: 'asked_build', text: 'Pregunta a Gonzalo cómo construir una casa', target: { npc: 'gonzalo' } }],
-      },
-      {
-        id: 'tools',
-        desc: 'Necesitas un hacha para la madera y un pico para la piedra. El hacha está en la mesa de tu choza; el pico viejo de tu padre, en el arcón de la parcela.',
-        objectives: [
-          { kind: 'collect', item: 'axe', count: 1, text: 'Coge el hacha', target: { item: 'axe' } },
-          { kind: 'collect', item: 'pickaxe', count: 1, text: 'Coge el pico del arcón de la parcela', target: { pos: [PLAYER_PLOT.x - PLAYER_PLOT.size / 2 - 1.3, PLAYER_PLOT.z - PLAYER_PLOT.size / 2 + 2] } },
-        ],
-      },
-      {
-        id: 'gather',
-        desc: 'Tala un árbol con el hacha y, ya en el suelo, parte cada tronco a hachazos: salen tablones. Luego ve a la cantera, al sur de tu parcela, y pica las rocas con el pico.',
-        objectives: [
-          { kind: 'collect', item: 'plank', count: 16, text: 'Consigue tablones', target: { near: 'log' } },
-          { kind: 'collect', item: 'stone', count: 8, text: 'Saca piedra en la cantera', target: { pos: [QUARRY.x, QUARRY.z] } },
-        ],
-      },
-      {
-        id: 'build',
-        desc: 'Ve a tu parcela y pulsa B (o «Construir» en el móvil). Elige la pieza, apunta y coloca. Primero el suelo o los cimientos, luego las paredes, una con puerta, el tejado y una cama.',
-        objectives: [
-          { kind: 'flag', flag: 'built_base', text: 'Pon el suelo o los cimientos', target: { pos: PLOT } },
-          { kind: 'flag', flag: 'built_walls4', text: 'Levanta al menos cuatro paredes', target: { pos: PLOT } },
-          { kind: 'flag', flag: 'built_wall_door', text: 'Pon una pared con puerta', target: { pos: PLOT } },
-          { kind: 'flag', flag: 'built_roof', text: 'Cubre la casa con un tejado', target: { pos: PLOT } },
-          { kind: 'flag', flag: 'built_bed', text: 'Hazte una cama', target: { pos: PLOT } },
-        ],
-      },
-    ],
-    onComplete: (c) => {
-      c.giveCoins(30);
-      c.changeRep('robledo', 6, 'casa propia');
-      c.setFlag('has_home');
-      c.bus.emit('notify', { text: 'Ya tienes casa propia. Puedes dormir en tu cama y guardar tus cosas en tus arcones. +30 mrv', kind: 'quest' });
-    },
   },
   {
     id: 'side_fishing',

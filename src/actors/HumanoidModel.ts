@@ -28,7 +28,9 @@ export type AnimState =
   | 'idle' | 'walk' | 'run' | 'windup' | 'strike' | 'recover' | 'block' | 'hit' | 'dead'
   | 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'cower' | 'aim' | 'talk' | 'fish'
   /** Herido de muerte: de rodillas sujetándose (kneel) o tendido retorciéndose (downed). */
-  | 'kneel' | 'downed';
+  | 'kneel' | 'downed'
+  /** Cargado al hombro: doblado por la cintura, brazos y piernas colgando. */
+  | 'carried';
 
 /** Miembros que se pueden cercenar. */
 export type Limb = 'head' | 'armL' | 'armR' | 'legL' | 'legR';
@@ -431,6 +433,11 @@ export class HumanoidModel {
       shLx = -0.5 + wr * 0.4; shRx = -1.2 - wr * 0.3; elL = -1.2; elR = -0.6 + wr * 0.5; shRz = -0.3;
       knL = 0.5 + Math.max(0, wr) * 0.6; knR = 0.2; hipLx = -0.4 - Math.max(0, wr) * 0.3;
       headX = -0.2 + wr * 0.15;
+    } else if (s === 'carried') {
+      const sw2 = Math.sin(this.stateT * 3) * 0.06;
+      spineX = 1.25; headX = 0.45;
+      shLx = shRx = -1.35 + sw2; shLz = 0.15; shRz = -0.15; elL = elR = -0.25;
+      hipLx = hipRx = -1.25 - sw2; knL = knR = 0.35;
     } else if (s === 'dead') {
       this.deadT += dt;
       const k = Math.min(1, this.deadT / 0.7);
@@ -440,7 +447,8 @@ export class HumanoidModel {
     }
     if (this.hitT > 0 && s !== 'dead') { spineX -= this.hitT * 1.2; headX -= this.hitT; }
     const sp = s === 'dead' ? 20 : s === 'strike' ? 30 : 14;
-    this.root.rotation.x = this.target('rootX', rootX, dt, 8);
+    if (s !== 'carried') this.root.rotation.x = this.target('rootX', rootX, dt, 8);
+    else this.cur.rootX = 0;
     this.hips.position.y = 0.94 * this.app.build + this.target('hipsY', hipsY, dt, sp);
     this.hips.rotation.y = this.target('hipsYaw', hipsYaw, dt);
     this.spine.rotation.x = this.target('spineX', spineX, dt, sp);

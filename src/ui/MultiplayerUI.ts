@@ -101,7 +101,7 @@ export class MultiplayerUI {
           p.append(back);
           return;
         }
-        p.append(h('p', 'muted', `Un servidor es un mundo compartido para hasta ${MAX_PLAYERS} personas a la vez. Lo que construís en la parcela, los árboles talados, la piedra de la cantera, las barcas, la hora y el tiempo son comunes; tu inventario y tu historia son tuyos. Todo se guarda solo.`));
+        p.append(h('p', 'muted', `Un servidor es un mundo compartido para hasta ${MAX_PLAYERS} personas a la vez. Los árboles talados, la piedra de la cantera, las barcas, la hora y el tiempo son comunes; tu inventario y tu historia son tuyos. Todo se guarda solo.`));
         // Crear
         p.append(h('h3', '', 'Crear un servidor'));
         const row = h('div', 'mp-row');
