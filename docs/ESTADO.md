@@ -47,11 +47,18 @@ Implementado sobre las capacidades de la página publicada en claude.ai (`src/ne
 - **Heridas por zonas** (golpes del jugador con armas de filo o punta a personas; `combat/Wounds.ts`): cabeza → decapitación (con cuchillo en golpe ligero, degüello); brazo → se cercena, cae de rodillas apretándose el muñón y se desangra vivo unos 25–30 s; pierna → se cercena y cae; torso → cae herido de muerte. El miembro cortado es un cuerpo físico con la ropa y la piel de esa persona (rueda, se agarra), el muñón gotea y crece un charco que se amolda al suelo. Rematar a un herido lo mata. Las armas contundentes siguen con el daño normal.
 - **Esconder cuerpos** (`social/Bodies.ts`): los cuerpos (y los moribundos) se arrastran con R. Si nadie te ve (testigo o la víctima en pie para contarlo), el crimen queda pendiente y **no baja la reputación**; solo se castiga si un vecino o guardia llega a ver el cuerpo (distancia según la luz y línea de vista real) o si al dormir quedó cerca de donde vive y trabaja la gente. En agua honda el cuerpo se hunde y ya no se encuentra. La posición del cuerpo, los miembros cortados y el crimen pendiente se guardan.
 
+## Accesos, puertas y objetos soltados
+
+- **Escalones de piedra** delante de la entrada de toda casa o cobertizo cuyo suelo quede alto respecto al terreno (casas en ladera, barrio del puerto): peldaños de ≤ 18 cm con colisión que bajan hasta tocar el suelo (hasta 26 en las laderas más fuertes). En cobertizos abiertos, a lo ancho del frente. 23 edificios los tienen.
+- Las puertas se abren **hacia el lado contrario de quien entra** (antes se abrían siempre hacia fuera y desviaban al jugador en el umbral).
+- Soltar un objeto desde el inventario lo deja delante de la pared (no al otro lado) y alineado con la mirada; y si algo acaba bajo el suelo o el terreno (colisión atravesada), vuelve a su último sitio válido.
+- La resolución dinámica viene activada solo en móviles/tabletas y no baja del 70 % (en PC se veía borroso).
+
 ## Barca y rendimiento
 
 - La barca se dibuja interpolada entre pasos de la simulación (antes se movía a 30 pasos/s y la cámara no: temblaba al remar).
 - Calidad baja (móviles): sin MSAA, terreno lejano y mar con menos polígonos, la mitad de matas de cereal (ahora más ligeras en todas las calidades) y personas dibujadas hasta 85 m. Medido en el bosque: de ~984 000 a ~640 000 triángulos.
-- **Resolución dinámica** (Opciones): si la imagen baja de ~28 FPS la resolución interna baja en pasos hasta el 55 %, y se recupera cuando sobra.
+- **Resolución dinámica** (Opciones; activada por defecto en móviles): si la imagen baja de ~26 FPS la resolución interna baja en pasos hasta el 70 %, y se recupera cuando sobra.
 
 ## Calidad visual (placeholders mejorados)
 

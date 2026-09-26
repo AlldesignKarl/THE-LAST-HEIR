@@ -48,6 +48,8 @@ export class BuildingInstance {
   readonly hearthPos: THREE.Vector3 | null = null;
   /** Hacia dónde mira la boca del hogar (giro local en Y). */
   readonly hearthFacing = 0;
+  /** Peldaños construidos delante de la entrada (0 = a ras). */
+  readonly entrySteps = 0;
   readonly body: RAPIER.RigidBody;
   /** Puntos donde puede haber fuego (mundo). */
   readonly firePoints: THREE.Vector3[] = [];
@@ -113,6 +115,36 @@ export class BuildingInstance {
     const frontOpen: Opening[] = [];
     const doorX = def.openFront ? 0 : (def.w > 6 ? -def.w * 0.18 : 0);
     if (!def.openFront) frontOpen.push({ x: doorX, w: doorW, y0: 0, y1: doorH });
+
+    // Escalones de piedra delante de la entrada si el suelo queda alto
+    // respecto al terreno (casas en ladera): peldaños de ≤ 18 cm que el
+    // jugador y los vecinos suben sin saltar. En cobertizos abiertos, a lo
+    // ancho del frente.
+    {
+      const stairW = def.openFront ? Math.min(def.w - 0.6, 3.2) : doorW + 0.5;
+      const sx = def.openFront ? 0 : doorX;
+      const worldY = (lx: number, lz: number) => hf.heightAt(def.x + lx * cos + lz * sin, def.z - lx * sin + lz * cos);
+      const front = hd + 0.15;
+      const dh = this.floorY - worldY(sx, front + 0.3);
+      if (dh > 0.22) {
+        const rise = dh / Math.ceil(dh / 0.18);
+        const run = 0.32;
+        let n = 0;
+        // Se siguen poniendo peldaños hasta tocar el terreno (en ladera, el
+        // suelo baja a medida que la escalera avanza).
+        for (let i = 0; i < 26; i++) {
+          const top = -(i + 1) * rise; // relativo al suelo interior
+          const lz = front + (i + 0.5) * run;
+          const g0 = Math.min(worldY(sx - stairW / 2, lz), worldY(sx + stairW / 2, lz), worldY(sx, lz)) - this.floorY;
+          if (top < g0 + 0.03) break; // ya se llega al terreno
+          const bottom = g0 - 0.3;
+          const h = top - bottom;
+          solid(stairW, h, run, sx, bottom + h / 2, lz, 'stoneWall');
+          n++;
+        }
+        (this as { entrySteps: number }).entrySteps = n;
+      }
+    }
     const winY0 = 1.05, winY1 = 1.85;
     if (!def.openFront && def.w > 5) frontOpen.push({ x: def.w * 0.25, w: 0.8, y0: winY0, y1: winY1 });
     if (def.id === 'tavern') frontOpen.push({ x: def.w * 0.4, w: 0.8, y0: winY0, y1: winY1 });

@@ -412,7 +412,7 @@ export class UIManager {
       gd.append(gb);
       const dr = h('div', '', `<h3>Resolución dinámica</h3><div class="muted">Baja la resolución si el juego va lento (ahora al ${Math.round(g.renderer.renderScale * 100)} %).</div>`);
       const db = h('button', 'btn inline', g.dynamicRes ? 'Activada (desactivar)' : 'Desactivada (activar)');
-      db.onclick = () => { g.dynamicRes = !g.dynamicRes; if (!g.dynamicRes) { g.renderer.renderScale = 1; g.renderer.applyPixelRatio(); } this.openOptions(); };
+      db.onclick = () => { g.dynamicRes = !g.dynamicRes; if (!g.dynamicRes) { g.renderer.renderScale = 1; g.renderer.applyPixelRatio(); } g.saveSettings(); this.openOptions(); };
       dr.append(db);
       const back = h('button', 'btn', 'Volver');
       back.onclick = () => this.openPause();

@@ -3,6 +3,7 @@
  * puertas, portón, dormir, agua, fuego/cocina, escaleras, comer, soltar.
  */
 import * as THREE from 'three';
+import { GROUP } from '../engine/Physics';
 import type { Game } from '../game/Game';
 import type { Door } from '../world/Buildings';
 import { itemDef } from '../data/items';
@@ -18,6 +19,14 @@ export class Actions {
       return;
     }
     d.open = !d.open;
+    // La hoja se abre hacia el lado contrario de quien la empuja (así no
+    // golpea ni desvía al jugador al entrar o salir).
+    if (d.open) {
+      const p = this.g.player.pos;
+      const nx = d.outside.x - d.worldPos.x, nz = d.outside.z - d.worldPos.z;
+      const outsideSide = (p.x - d.worldPos.x) * nx + (p.z - d.worldPos.z) * nz > 0;
+      d.swing = outsideSide ? 1 : -1;
+    }
     this.g.bus.emit('sfx', { id: d.open ? 'door_open' : 'door_close', x: d.worldPos.x, y: d.worldPos.y, z: d.worldPos.z });
   }
 
@@ -215,9 +224,14 @@ export class Actions {
     if (n <= 0) return;
     g.equipment.validate();
     const f = g.player.forward(new THREE.Vector3());
+    f.setY(Math.max(-0.2, f.y)).normalize();
     const e = g.player.eyePosition(1, new THREE.Vector3());
-    const p = e.addScaledVector(f.setY(Math.max(-0.2, f.y)), 0.8);
-    g.worldItems.spawn(id, p.x, p.y - 0.2, p.z, { count: n, rotY: g.player.yaw, velocity: new THREE.Vector3(f.x * 1.5, 0.5, f.z * 1.5) });
+    // No soltarlo al otro lado de una pared: se deja delante del obstáculo.
+    const hit = g.physics.raycast(e.x, e.y, e.z, f.x, f.y, f.z, 1.4, GROUP.STATIC | GROUP.TERRAIN, g.player.collider);
+    const dist = hit ? Math.max(0.25, Math.min(0.8, hit.toi - 0.5)) : 0.8;
+    const p = e.addScaledVector(f, dist);
+    // Lo largo (tablones, troncos, armas) cae alineado con la mirada.
+    g.worldItems.spawn(id, p.x, p.y - 0.2, p.z, { count: n, rotY: g.player.yaw + Math.PI / 2, velocity: new THREE.Vector3(f.x * (hit ? 0.3 : 1.5), 0.5, f.z * (hit ? 0.3 : 1.5)) });
     g.bus.emit('item:removed', { itemId: id, count: n, reason: 'drop' });
   }
 }

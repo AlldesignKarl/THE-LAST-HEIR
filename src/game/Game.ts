@@ -157,6 +157,7 @@ export class Game {
     this.input = new Input(canvas);
     if (settings.sensitivity) this.input.sensitivity = settings.sensitivity;
     if (settings.volume !== undefined) this.audio.volume = settings.volume;
+    if (settings.dynamicRes !== undefined) this.dynamicRes = settings.dynamicRes;
     this.renderer = new Renderer(canvas, this.quality);
     // Texturas procedurales en GPU (la resolución no cambia en caliente).
     this.textures.init(this.renderer.renderer, this.quality.textureSize);
@@ -206,6 +207,13 @@ export class Game {
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -1.5)) return true;
       return false;
     }, this.qualityName === 'low' ? 40 : this.qualityName === 'medium' ? 70 : 95);
+    this.worldItems.groundAt = (x, z) => {
+      if (this.hf.isHole(x, z)) return null;
+      const t = this.hf.heightAt(x, z);
+      if (this.settlement.cave.depthAt(x, t - 0.5, z) > 0.001) return null;
+      for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.2)) return b.floorY;
+      return t;
+    };
     this.npcs = new NPCManager(this, buildWorldNav(this.settlement));
     this.animals = new AnimalManager(this);
     this.raids = new RaidSystem(this);
@@ -245,13 +253,13 @@ export class Game {
 
   // ------------------------------------------------------------ ajustes
 
-  static loadSettings(): { quality?: string; sensitivity?: number; volume?: number } {
+  static loadSettings(): { quality?: string; sensitivity?: number; volume?: number; dynamicRes?: boolean } {
     try { return JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? '{}'); } catch { return {}; }
   }
 
   saveSettings(): void {
     try {
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ quality: this.qualityName, sensitivity: this.input.sensitivity, volume: this.audio.volume }));
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ quality: this.qualityName, sensitivity: this.input.sensitivity, volume: this.audio.volume, dynamicRes: this.dynamicRes }));
     } catch { /* sin almacenamiento */ }
   }
 
@@ -680,8 +688,8 @@ export class Game {
     };
   }
 
-  /** Resolución dinámica activada (Opciones). */
-  dynamicRes = true;
+  /** Resolución dinámica (Opciones): por defecto solo en móviles/tabletas. */
+  dynamicRes = TouchControls.isTouchDevice();
   private resT = 0;
   /**
    * Si la imagen va a menos de ~28 FPS se baja la resolución interna poco a
@@ -695,7 +703,7 @@ export class Game {
     const fps = this.loop.fps;
     let s = r.renderScale;
     if (!this.dynamicRes) s = 1;
-    else if (fps < 28 && s > 0.55) s = Math.max(0.55, s - 0.1);
+    else if (fps < 26 && s > 0.7) s = Math.max(0.7, s - 0.1);
     else if (fps > 50 && s < 1) s = Math.min(1, s + 0.1);
     if (s !== r.renderScale) { r.renderScale = s; r.applyPixelRatio(); }
   }

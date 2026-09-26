@@ -26,6 +26,8 @@ export interface WorldItem {
   collecting: number;
   /** Fijo (sin física hasta que se toca): objetos sobre mesas o expositores. */
   frozen: boolean;
+  /** Última posición válida (apoyado sobre algo) para rescatarlo si se hunde. */
+  safe?: THREE.Vector3;
 }
 
 export interface SpawnOpts {
@@ -161,6 +163,12 @@ export class WorldItems {
   private collecting: WorldItem[] = [];
 
   /** Sincroniza mallas con cuerpos y anima recogidas. */
+  /**
+   * Suelo mínimo en un punto (suelo de la casa o terreno); null donde se
+   * puede estar legítimamente por debajo (cueva, agujeros). Lo fija el juego.
+   */
+  groundAt: ((x: number, z: number) => number | null) | null = null;
+
   update(dt: number): void {
     for (const wi of this.items.values()) {
       if (wi.frozen) continue;
@@ -171,6 +179,21 @@ export class WorldItems {
       wi.mesh.quaternion.set(r.x, r.y, r.z, r.w);
       // Caída fuera del mundo: recolocar.
       if (t.y < -200) wi.body.setTranslation({ x: t.x, y: 50, z: t.z }, true);
+      // Un objeto nunca debe quedar bajo el suelo (colisión atravesada):
+      // vuelve a su último sitio válido.
+      if (this.groundAt && !wi.carried) {
+        const gy = this.groundAt(t.x, t.z);
+        if (gy !== null) {
+          const v = wi.body.linvel();
+          if (t.y >= gy - 0.05 && Math.hypot(v.x, v.y, v.z) < 0.6) (wi.safe ??= new THREE.Vector3()).set(t.x, t.y, t.z);
+          else if (t.y < gy - 0.35) {
+            const s = wi.safe ?? new THREE.Vector3(t.x, gy + 0.3, t.z);
+            wi.body.setTranslation({ x: s.x, y: Math.max(s.y, gy) + 0.25, z: s.z }, true);
+            wi.body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+            wi.body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+          }
+        }
+      }
     }
     for (let i = this.collecting.length - 1; i >= 0; i--) {
       const wi = this.collecting[i];
