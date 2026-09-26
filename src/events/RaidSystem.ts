@@ -111,7 +111,7 @@ export class RaidSystem {
   }
 
   private alive(): Raider[] {
-    return this.raiders.filter((r) => r.c.alive);
+    return this.raiders.filter((r) => r.c.alive && !r.c.downed);
   }
 
   // ------------------------------------------------------------ actualización
@@ -144,7 +144,7 @@ export class RaidSystem {
     if (!this.spotted && alive.length && (distToVillage < 95 || center.distanceTo(g.player.pos) < 35)) this.spot(center);
 
     // Moral: retirada.
-    const leaderDead = !this.raiders[0].c.alive;
+    const leaderDead = !this.raiders[0].c.alive || this.raiders[0].c.downed;
     const casualties = this.raiders.length - alive.length;
     if (this.phase !== 'retreat' && (leaderDead || casualties >= Math.ceil(this.startCount / 2) || (this.phase === 'assault' && this.phaseT > 170))) {
       this.retreat(leaderDead || casualties >= Math.ceil(this.startCount / 2));
@@ -210,10 +210,20 @@ export class RaidSystem {
     const lod = d < 60 ? 0 : d < 160 ? 1 : 2;
     c.lod = lod;
     c.setShadow(d < 35);
-    c.ensureCollider(g.physics, lod === 0 && c.alive);
+    c.ensureCollider(g.physics, lod === 0 && c.alive && !c.downed);
     if (!c.alive) {
       c.updateModel(dt, false);
       c.hitboxesValid = false;
+      return;
+    }
+    if (c.updateWounds(dt)) {
+      // Herido de muerte: en el suelo, desangrándose.
+      c.chooseAnim(0, 'idle');
+      c.updateModel(dt, lod === 0);
+      c.hitboxesValid = lod === 0;
+      c.visible = lod < 2;
+      c.setTorch(false);
+      this.updateTorch(c);
       return;
     }
     c.updateCombat(dt);

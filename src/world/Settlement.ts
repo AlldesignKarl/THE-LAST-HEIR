@@ -715,7 +715,7 @@ export class Settlement {
       const rng = new Rng(31);
       for (let lx = -f.w / 2 + 1; lx < f.w / 2 - 1; lx += 1.1) {
         for (let lz = -f.d / 2 + 1; lz < f.d / 2 - 1; lz += 0.7) {
-          if (rng.chance(0.08)) continue;
+          if (rng.chance(g.qualityName === 'low' ? 0.5 : 0.08)) continue; // en calidad baja, la mitad de matas
           const w = toWorldXZ(lx + rng.range(-0.2, 0.2), lz, f.rot);
           const x = f.x + w.x, z = f.z + w.z;
           mats.push(new THREE.Matrix4().compose(new THREE.Vector3(x, this.ground(x, z) - 0.05, z), new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.range(0, 6)), new THREE.Vector3(1, rng.range(0.7, 1.15), 1)));

@@ -26,9 +26,16 @@ export interface Appearance {
 
 export type AnimState =
   | 'idle' | 'walk' | 'run' | 'windup' | 'strike' | 'recover' | 'block' | 'hit' | 'dead'
-  | 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'cower' | 'aim' | 'talk' | 'fish';
+  | 'work' | 'hammer' | 'pray' | 'sit' | 'guard' | 'farm' | 'sell' | 'drink' | 'chop' | 'cower' | 'aim' | 'talk' | 'fish'
+  /** Herido de muerte: de rodillas sujetándose (kneel) o tendido retorciéndose (downed). */
+  | 'kneel' | 'downed';
 
-export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number }
+/** Miembros que se pueden cercenar. */
+export type Limb = 'head' | 'armL' | 'armR' | 'legL' | 'legR';
+export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number; limb?: Limb }
+
+const FLESH = new THREE.MeshStandardMaterial({ color: 0x6e0c0c, roughness: 0.35, metalness: 0 });
+const BONE = new THREE.MeshStandardMaterial({ color: 0xd9cdb4, roughness: 0.6 });
 
 /** Torso (torno): de la cintura (y=0) a los hombros (y≈0.6), radio unitario aprox. */
 function torsoGeometry(): THREE.BufferGeometry {
@@ -92,6 +99,13 @@ export class HumanoidModel {
   attackProgress = 0;
   heavy = false;
   private deadT = 0;
+  /** Variación personal del reposo (postura, ritmo, mirada, pierna de apoyo). */
+  idleStyle = Math.floor(Math.random() * 4);
+  private tempo = 0.8 + Math.random() * 0.45;
+  private idleT = Math.random() * 4;
+  private lookYaw = 0;
+  private lookPitch = 0;
+  private weight = Math.random() < 0.5 ? 1 : -1;
   private hitT = 0;
   private cur: Record<string, number> = {};
   readonly hitboxes: Hitbox[];
@@ -238,13 +252,13 @@ export class HumanoidModel {
     this.mesh = sk.build(this.hips, characterMaterial());
     this.root.add(this.mesh);
     this.hitboxes = [
-      { zone: 'head', pos: new THREE.Vector3(), r: 0.14 },
+      { zone: 'head', pos: new THREE.Vector3(), r: 0.14, limb: 'head' },
       { zone: 'torso', pos: new THREE.Vector3(), r: 0.24 },
       { zone: 'torso', pos: new THREE.Vector3(), r: 0.22 },
-      { zone: 'arm', pos: new THREE.Vector3(), r: 0.1 },
-      { zone: 'arm', pos: new THREE.Vector3(), r: 0.1 },
-      { zone: 'leg', pos: new THREE.Vector3(), r: 0.12 },
-      { zone: 'leg', pos: new THREE.Vector3(), r: 0.12 },
+      { zone: 'arm', pos: new THREE.Vector3(), r: 0.1, limb: 'armL' },
+      { zone: 'arm', pos: new THREE.Vector3(), r: 0.1, limb: 'armR' },
+      { zone: 'leg', pos: new THREE.Vector3(), r: 0.12, limb: 'legL' },
+      { zone: 'leg', pos: new THREE.Vector3(), r: 0.12, limb: 'legR' },
     ];
     void mats;
   }
@@ -323,6 +337,7 @@ export class HumanoidModel {
     this.hitT = Math.max(0, this.hitT - dt);
     const s = this.state;
     // Poses objetivo (radianes).
+    let headY = 0;
     let hipsY = 0, spineX = 0, spineY = 0, headX = 0, shLx = 0, shRx = 0, shLz = 0.08, shRz = -0.08, elL = -0.15, elR = -0.15;
     let hipLx = 0, hipRx = 0, knL = 0, knR = 0, rootX = 0, hipsYaw = 0;
     const sw = Math.sin(this.phase);
@@ -336,10 +351,32 @@ export class HumanoidModel {
       spineX = s === 'run' ? 0.18 : 0.04;
       hipsY = Math.abs(Math.cos(this.phase)) * (s === 'run' ? 0.06 : 0.03);
     } else if (s === 'idle' || s === 'talk' || s === 'guard' || s === 'sell') {
-      const br = Math.sin(this.stateT * 1.6) * 0.02;
+      const br = Math.sin(this.stateT * 1.6 * this.tempo) * 0.02;
       spineX = br;
+      // Reposo con personalidad: cada cual tiene su postura y cambia de vez
+      // en cuando; carga el peso en una pierna y mira alrededor.
+      this.idleT -= dt;
+      if (this.idleT <= 0) {
+        this.idleT = 3 + Math.random() * 6;
+        this.lookYaw = Math.random() < 0.35 ? 0 : (Math.random() - 0.5) * 1.3;
+        this.lookPitch = (Math.random() - 0.4) * 0.25;
+        if (Math.random() < 0.25) this.idleStyle = Math.floor(Math.random() * 4);
+        if (Math.random() < 0.4) this.weight = -this.weight;
+      }
+      headY = this.lookYaw; headX = this.lookPitch;
+      hipsYaw = this.weight * 0.06; spineY = -this.weight * 0.05 + this.lookYaw * 0.15;
+      if (this.weight > 0) { hipLx = 0.08; knL = 0.18; hipRx = -0.04; } else { hipRx = 0.08; knR = 0.18; hipLx = -0.04; }
+      hipsY = -0.015;
+      if (s === 'idle') {
+        switch (this.idleStyle) {
+          case 1: shLx = shRx = -0.55; elL = elR = -1.95; shLz = 0.35; shRz = -0.35; break; // brazos cruzados
+          case 2: shLx = shRx = 0.35; elL = elR = -0.9; shLz = 0.12; shRz = -0.12; break; // manos a la espalda
+          case 3: shRz = -0.65; shRx = 0.15; elR = -1.7; break; // mano en la cadera
+          default: shLz = 0.1 + Math.sin(this.stateT * 0.9) * 0.02; shRz = -0.1; break;
+        }
+      }
       if (s === 'guard') { shRx = -0.3; elR = -0.6; shLx = -0.2; elL = -0.5; }
-      if (s === 'talk') { shRx = -0.3 + Math.sin(this.stateT * 2.3) * 0.2; elR = -0.9; headX = Math.sin(this.stateT * 1.3) * 0.08; }
+      if (s === 'talk') { shRx = -0.3 + Math.sin(this.stateT * 2.3 * this.tempo) * 0.2; elR = -0.9; headX = Math.sin(this.stateT * 1.3) * 0.08; shLx = -0.15 + Math.max(0, Math.sin(this.stateT * 1.1 * this.tempo + 1)) * -0.35; elL = -0.5; }
       if (s === 'sell') { shRx = -0.2; elR = -0.4 + Math.sin(this.stateT * 1.8) * 0.3; }
     } else if (s === 'windup' || s === 'strike' || s === 'recover') {
       const p = this.attackProgress;
@@ -366,18 +403,34 @@ export class HumanoidModel {
     } else if (s === 'hit') {
       spineX = -0.35; headX = -0.3; shLx = 0.3; shRx = 0.3;
     } else if (s === 'work' || s === 'hammer' || s === 'chop') {
-      const hc = Math.sin(this.stateT * (s === 'hammer' ? 5 : 3.2));
+      const hc = Math.sin(this.stateT * (s === 'hammer' ? 5 : 3.2) * this.tempo);
       shRx = -1.6 - hc * 0.9; elR = -0.6 - Math.max(0, hc) * 0.6; spineX = 0.25; shLx = -0.6; elL = -0.8;
     } else if (s === 'farm') {
-      const fc = Math.sin(this.stateT * 2.4);
+      const fc = Math.sin(this.stateT * 2.4 * this.tempo);
       spineX = 0.75 + fc * 0.1; shRx = -0.9 - fc * 0.5; shLx = -0.9 - fc * 0.5; elL = elR = -0.4; knL = knR = 0.35; hipLx = hipRx = -0.3;
     } else if (s === 'pray') {
       hipLx = hipRx = -1.4; knL = knR = 1.5; hipsY = -0.42; shLx = shRx = -0.9; shLz = -0.35; shRz = 0.35; elL = elR = -1.2; headX = 0.35;
     } else if (s === 'sit' || s === 'drink') {
       hipLx = hipRx = -1.5; knL = knR = 1.5; hipsY = -0.45; spineX = 0.1;
-      if (s === 'drink') { const dc = Math.max(0, Math.sin(this.stateT * 0.8)); shRx = -0.6 - dc * 1.4; elR = -1.4 - dc * 0.6; headX = -dc * 0.35; }
+      if (s === 'drink') { const dc = Math.max(0, Math.sin(this.stateT * 0.8 * this.tempo)); shRx = -0.6 - dc * 1.4; elR = -1.4 - dc * 0.6; headX = -dc * 0.35; }
     } else if (s === 'cower') {
       spineX = 0.7; headX = 0.4; shLx = shRx = -2.2; elL = elR = -1.8; knL = knR = 0.9; hipLx = hipRx = -0.8; hipsY = -0.3;
+    } else if (s === 'kneel') {
+      // De rodillas, encogido, apretándose la herida; tiembla.
+      const tr = Math.sin(this.stateT * 9) * 0.03 + Math.sin(this.stateT * 0.9) * 0.08;
+      hipsY = -0.47; hipLx = hipRx = 0.05; knL = knR = 1.55;
+      spineX = 0.55 + tr; headX = 0.35 + tr;
+      const clutchL = !this.severed.has('armL');
+      if (clutchL) { shLx = -0.9; shLz = 0.55; elL = -1.9; } // aprieta el muñón o la herida
+      shRx = -0.7 + tr; shRz = -0.4; elR = -1.7;
+    } else if (s === 'downed') {
+      // Tendido en el suelo, retorciéndose cada vez más débil.
+      const weak = Math.max(0.15, 1 - this.stateT / 30);
+      const wr = Math.sin(this.stateT * 2.2) * weak;
+      rootX = -1.42; hipsY = -0.75; hipsYaw = 0.25;
+      shLx = -0.5 + wr * 0.4; shRx = -1.2 - wr * 0.3; elL = -1.2; elR = -0.6 + wr * 0.5; shRz = -0.3;
+      knL = 0.5 + Math.max(0, wr) * 0.6; knR = 0.2; hipLx = -0.4 - Math.max(0, wr) * 0.3;
+      headX = -0.2 + wr * 0.15;
     } else if (s === 'dead') {
       this.deadT += dt;
       const k = Math.min(1, this.deadT / 0.7);
@@ -392,7 +445,8 @@ export class HumanoidModel {
     this.hips.rotation.y = this.target('hipsYaw', hipsYaw, dt);
     this.spine.rotation.x = this.target('spineX', spineX, dt, sp);
     this.spine.rotation.y = this.target('spineY', spineY, dt, sp);
-    this.head.rotation.x = this.target('headX', headX, dt);
+    this.head.rotation.x = this.target('headX', headX, dt, 4);
+    this.head.rotation.y = this.target('headY', headY, dt, 3);
     this.shL.rotation.x = this.target('shLx', shLx, dt, sp);
     this.shR.rotation.x = this.target('shRx', shRx, dt, sp);
     this.shL.rotation.z = this.target('shLz', shLz, dt, sp);
@@ -404,6 +458,43 @@ export class HumanoidModel {
     this.knL.rotation.x = this.target('knL', knL, dt, sp);
     this.knR.rotation.x = this.target('knR', knR, dt, sp);
     if (full) this.updateHitboxes();
+  }
+
+  /** Miembros perdidos. */
+  readonly severed = new Set<Limb>();
+  /** Muñones (para seguirlos con el goteo de sangre). */
+  readonly stumps = new Map<Limb, THREE.Object3D>();
+
+  /**
+   * Corta un miembro: el hueso (y todo lo que cuelga de él, arma incluida)
+   * se colapsa en la malla y en su lugar queda un muñón de carne y hueso.
+   */
+  sever(limb: Limb): void {
+    if (this.severed.has(limb)) return;
+    this.severed.add(limb);
+    const b = this.app.build;
+    const bone = { head: this.head, armL: this.shL, armR: this.shR, legL: this.hipL, legR: this.hipR }[limb];
+    bone.scale.setScalar(1e-4);
+    const stump = new THREE.Group();
+    const r = limb === 'head' ? 0.055 : limb.startsWith('arm') ? 0.05 : 0.075;
+    const flesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, 0.03, 12), FLESH);
+    const bn = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.28, r * 0.28, 0.036, 8), BONE);
+    stump.add(flesh, bn);
+    if (limb === 'head') {
+      stump.position.set(0, 0.1, 0);
+      this.neck.add(stump);
+    } else if (limb.startsWith('arm')) {
+      const sx = limb === 'armL' ? -1 : 1;
+      stump.position.set(sx * 0.25 * b, 0.47, 0);
+      stump.rotation.z = sx * Math.PI / 2;
+      this.spine.add(stump);
+    } else {
+      const sx = limb === 'legL' ? -1 : 1;
+      stump.position.set(sx * 0.1 * b, -0.1, 0);
+      this.hips.add(stump);
+    }
+    this.stumps.set(limb, stump);
+    for (const h of this.hitboxes) if (h.limb === limb) h.r = 0;
   }
 
   updateHitboxes(): void {

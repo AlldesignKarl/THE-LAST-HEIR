@@ -27,18 +27,26 @@ export class Renderer {
 
   constructor(canvas: HTMLCanvasElement, quality: QualitySettings) {
     this.quality = quality;
-    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+    // Sin MSAA en calidad baja (móviles): ahorra mucho ancho de banda.
+    this.renderer = new THREE.WebGLRenderer({ canvas, antialias: quality.pixelRatio > 1 || quality.shadows, powerPreference: 'high-performance' });
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.0;
     this.renderer.info.autoReset = false;
     this.renderer.shadowMap.enabled = quality.shadows;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, quality.pixelRatio));
+    this.applyPixelRatio();
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.05, 2200);
     this.scene.add(this.camera);
     this.resize();
     window.addEventListener('resize', () => this.resize());
+  }
+
+  /** Escala dinámica de resolución (1 = nativa). */
+  renderScale = 1;
+
+  applyPixelRatio(): void {
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatio) * this.renderScale);
   }
 
   resize(): void {

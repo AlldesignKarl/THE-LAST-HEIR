@@ -16,7 +16,7 @@ export class Sea {
   readonly mesh: THREE.Mesh;
   private depthTex: THREE.DataTexture;
 
-  constructor(private readonly hf: Heightfield, scene: THREE.Scene, textures: TextureLibrary) {
+  constructor(private readonly hf: Heightfield, scene: THREE.Scene, textures: TextureLibrary, lowQuality = false) {
     const W = Math.round(REGION.w / REGION.texel), H = Math.round(REGION.h / REGION.texel);
     const data = new Uint8Array(W * H * 4);
     for (let j = 0; j < H; j++) {
@@ -35,7 +35,7 @@ export class Sea {
     this.depthTex.magFilter = this.depthTex.minFilter = THREE.LinearFilter;
     this.depthTex.needsUpdate = true;
 
-    const geo = new THREE.PlaneGeometry(3000, 3600, 200, 240).rotateX(-Math.PI / 2);
+    const geo = new THREE.PlaneGeometry(3000, 3600, lowQuality ? 100 : 200, lowQuality ? 120 : 240).rotateX(-Math.PI / 2);
     geo.translate(40 + 1500, 0, 0);
     const normal = textures.get('waterNormal').normalMap!;
     const mat = new THREE.MeshStandardMaterial({

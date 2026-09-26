@@ -8,7 +8,7 @@ Resumen honesto de lo que funciona, cómo se ha verificado y qué falta.
 |---|---|---|
 | Tipos | `npm run typecheck` (TS estricto) | Sin errores |
 | Unitarias | `npm test` (Vitest): terreno, transformaciones, inventario, necesidades, misiones, reputación, guardado, navegación, trazado del pueblo y la costa, multijugador | 31/31 |
-| E2E | `npm run e2e`: el juego real en Chromium (WebGL por software) dirigido por `window.__game` | 21/21 |
+| E2E | `npm run e2e`: el juego real en Chromium (WebGL por software) dirigido por `window.__game` | 25/25 |
 | E2E multijugador | `node e2e/mp.mjs <url>`: dos jugadores en dos pestañas | 25/25 |
 | Build | `npm run build` | Correcto (JS ~3,7 MB, 1,3 MB gzip; incluye el WASM de Rapier) |
 
@@ -40,6 +40,18 @@ Implementado sobre las capacidades de la página publicada en claude.ai (`src/ne
 - Las puertas sin llave se abren al caminar contra ellas (además de con E/Usar); la de la choza empieza abierta. Las cerradas con llave siguen cerradas.
 - Las herramientas y armas largas que se sueltan o están colocadas sobre muebles reposan tumbadas por su cara ancha (hoja plana), salvo las que cuelgan de un astillero.
 - Madera (suelos, mesas, puentes): veta fina y larga, tono por tabla, desgaste de paso, suciedad en juntas, clavos. Enlucido de cal con humedad desde el suelo y desconchones pequeños; zarzo con barro y paja casi continuo, con grietas finas; mampostería con piedras de varios tamaños, junta rehundida y líquenes. Dentro de casa la luz rebotada es cálida.
+
+## Vecinos, heridas y cuerpos
+
+- **Vecinos con vida propia**: cada uno tiene su postura de reposo (brazos cruzados, manos a la espalda, mano en la cadera…), su ritmo, carga el peso en una pierna, mira alrededor, se gira hacia quien tiene cerca y da paseos cortos alrededor de su sitio antes de volver.
+- **Heridas por zonas** (golpes del jugador con armas de filo o punta a personas; `combat/Wounds.ts`): cabeza → decapitación (con cuchillo en golpe ligero, degüello); brazo → se cercena, cae de rodillas apretándose el muñón y se desangra vivo unos 25–30 s; pierna → se cercena y cae; torso → cae herido de muerte. El miembro cortado es un cuerpo físico con la ropa y la piel de esa persona (rueda, se agarra), el muñón gotea y crece un charco que se amolda al suelo. Rematar a un herido lo mata. Las armas contundentes siguen con el daño normal.
+- **Esconder cuerpos** (`social/Bodies.ts`): los cuerpos (y los moribundos) se arrastran con R. Si nadie te ve (testigo o la víctima en pie para contarlo), el crimen queda pendiente y **no baja la reputación**; solo se castiga si un vecino o guardia llega a ver el cuerpo (distancia según la luz y línea de vista real) o si al dormir quedó cerca de donde vive y trabaja la gente. En agua honda el cuerpo se hunde y ya no se encuentra. La posición del cuerpo, los miembros cortados y el crimen pendiente se guardan.
+
+## Barca y rendimiento
+
+- La barca se dibuja interpolada entre pasos de la simulación (antes se movía a 30 pasos/s y la cámara no: temblaba al remar).
+- Calidad baja (móviles): sin MSAA, terreno lejano y mar con menos polígonos, la mitad de matas de cereal (ahora más ligeras en todas las calidades) y personas dibujadas hasta 85 m. Medido en el bosque: de ~984 000 a ~640 000 triángulos.
+- **Resolución dinámica** (Opciones): si la imagen baja de ~28 FPS la resolución interna baja en pasos hasta el 55 %, y se recupera cuando sobra.
 
 ## Calidad visual (placeholders mejorados)
 

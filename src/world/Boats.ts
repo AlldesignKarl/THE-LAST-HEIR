@@ -22,6 +22,11 @@ export interface Boat {
   stroke: number;
   /** Id del jugador que la lleva en multijugador (null = libre). */
   rider: string | null;
+  /** Transformación del tick anterior y del actual (se interpola al dibujar). */
+  prevPos: THREE.Vector3;
+  curPos: THREE.Vector3;
+  prevQ: THREE.Quaternion;
+  curQ: THREE.Quaternion;
 }
 
 const MAX_SPEED = 3.4;
@@ -61,7 +66,10 @@ export class Boats {
       RAPIER.ColliderDesc.cuboid(2.0, 0.35, 0.62).setTranslation(0, 0.35, 0).setCollisionGroups(groups(GROUP.STATIC, ALL)), body,
     );
     g.physics.tag(col, { kind: 'boat', id });
-    const boat: Boat = { id, x, z, heading, speed: 0, turn: 0, object, oars, body, col, stroke: 0, rider: null };
+    const boat: Boat = {
+      id, x, z, heading, speed: 0, turn: 0, object, oars, body, col, stroke: 0, rider: null,
+      prevPos: new THREE.Vector3(), curPos: new THREE.Vector3(), prevQ: new THREE.Quaternion(), curQ: new THREE.Quaternion(),
+    };
     this.boats.set(id, boat);
     g.interactables.register(col.handle, {
       id: `boat:${id}`, kind: 'boat', pos: object.position,
@@ -70,7 +78,7 @@ export class Boats {
       interact: (game) => this.board(boat, game),
       range: 4,
     });
-    this.place(boat);
+    this.place(boat, true);
   }
 
   private board(boat: Boat, g: Game): void {
@@ -158,7 +166,7 @@ export class Boats {
       }
       this.place(boat);
       if (boat === this.riding) {
-        const seat = new THREE.Vector3(-0.35, 0.45, 0).applyEuler(boat.object.rotation).add(boat.object.position);
+        const seat = new THREE.Vector3(-0.35, 0.45, 0).applyQuaternion(boat.curQ).add(boat.curPos);
         g.player.mountTo(seat.x, seat.y - 0.55, seat.z);
       }
       // Remos: palada al remar, en reposo al parar.
@@ -171,8 +179,19 @@ export class Boats {
     }
   }
 
-  /** Posición visual y física con el oleaje. */
-  place(b: Boat): void {
+  /**
+   * Cada frame: la barca se dibuja interpolada entre ticks, igual que la
+   * cámara del jugador (si no, a 30 pasos por segundo "tiembla" al remar).
+   */
+  syncVisual(alpha: number): void {
+    for (const b of this.boats.values()) {
+      b.object.position.lerpVectors(b.prevPos, b.curPos, alpha);
+      b.object.quaternion.slerpQuaternions(b.prevQ, b.curQ, alpha);
+    }
+  }
+
+  /** Posición física con el oleaje (la malla se interpola en syncVisual). */
+  place(b: Boat, snap = false): void {
     const g = this.g;
     const wind = g.weather.wind ?? 0.3;
     const t = this.t;
@@ -181,9 +200,17 @@ export class Boats {
     const sideY = g.sea.surfaceAt(b.x + Math.cos(b.heading) * 0.8, b.z - Math.sin(b.heading) * 0.8, t, wind);
     const pitch = Math.atan2(fwdY - y - 0.28, 1.5) * 0.8;
     const roll = Math.atan2(sideY - y - 0.28, 0.8) * 0.8;
-    b.object.position.set(b.x, y, b.z);
+    b.prevPos.copy(b.curPos);
+    b.prevQ.copy(b.curQ);
+    b.curPos.set(b.x, y, b.z);
     // El casco se modela a lo largo de X: girar para que X apunte al rumbo.
-    b.object.rotation.set(roll, b.heading - Math.PI / 2, -pitch, 'YXZ');
+    b.curQ.setFromEuler(new THREE.Euler(roll, b.heading - Math.PI / 2, -pitch, 'YXZ'));
+    if (snap) {
+      b.prevPos.copy(b.curPos);
+      b.prevQ.copy(b.curQ);
+      b.object.position.copy(b.curPos);
+      b.object.quaternion.copy(b.curQ);
+    }
     const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(0, b.heading - Math.PI / 2, 0));
     b.body.setNextKinematicTranslation({ x: b.x, y, z: b.z });
     b.body.setNextKinematicRotation(q);
@@ -202,7 +229,7 @@ export class Boats {
       if (!b) continue;
       [b.x, b.z, b.heading] = v;
       b.speed = 0;
-      this.place(b);
+      this.place(b, true);
     }
   }
 }

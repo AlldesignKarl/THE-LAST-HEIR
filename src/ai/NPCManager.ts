@@ -28,10 +28,19 @@ export class NPC {
   idleAnim: AnimState = 'idle';
   talking = false;
   lastTarget: string | null = null;
+  /** Paseíllo cerca de su sitio: 'out' yendo, 'back' volviendo. */
+  wander: 'none' | 'out' | 'back' = 'none';
+  fidgetT = 4 + Math.random() * 14;
+  /** Ya se colocó en su sitio (postura y orientación aplicadas). */
+  settled = false;
+  /** Enterrado (ya no se ve el cuerpo). */
+  buried = false;
   constructor(readonly def: NpcDef, c: Character) {
     this.c = c;
   }
 }
+
+interface NpcSave { alive: boolean; health: number; deadDay: number; pos?: number[]; buried?: boolean; hidden?: boolean; severed?: string[] }
 
 const PATROL = ['patrol_1', 'patrol_2', 'patrol_3', 'patrol_4'];
 
@@ -40,6 +49,8 @@ export class NPCManager {
   private tick = 0;
   private now = 0;
   private doorTimers = new Map<Door, number>();
+  /** Distancia a la que se dibujan las personas (menor en calidad baja). */
+  get viewDist(): number { return this.g.qualityName === 'low' ? 85 : 150; }
   private group = new THREE.Group();
 
   constructor(private readonly g: Game, readonly nav: NavGraph) {
@@ -100,10 +111,12 @@ export class NPCManager {
   }
 
   onTimeSkip(): void {
+    // Quien se desangraba no llega al amanecer.
+    for (const n of this.npcs.values()) if (n.c.alive && n.c.downed) n.c.die(n.c.lastAttacker);
     this.snapAll();
     // Cadáveres de más de un día: enterrados.
     for (const n of this.npcs.values()) {
-      if (!n.c.alive && n.deadDay >= 0 && this.g.time.day > n.deadDay) n.c.model.root.visible = false;
+      if (!n.c.alive && n.deadDay >= 0 && this.g.time.day > n.deadDay) { n.buried = true; n.c.model.root.visible = false; }
     }
   }
 
@@ -147,6 +160,8 @@ export class NPCManager {
     const path = this.nav.findPath(c.pos.x, c.pos.z, tx, tz);
     c.setPath(path, speed);
     c.indoors = false;
+    n.settled = false;
+    n.wander = 'none';
     n.placeId = placeId;
     c.faceYaw = p.yaw;
   }
@@ -171,25 +186,38 @@ export class NPCManager {
       const every = lod === 0 ? 1 : lod === 1 ? 6 : 30;
       const step = (this.tick + n.def.id.length) % every === 0;
       const prevHandle = c.collider?.handle;
-      c.ensureCollider(g.physics, lod === 0 && !c.indoors && c.alive);
+      c.ensureCollider(g.physics, lod === 0 && !c.indoors && c.alive && !c.downed);
       // Los handles de Rapier se reutilizan: desregistrar al destruir el collider.
       if (prevHandle !== undefined && c.collider?.handle !== prevHandle) g.interactables.unregisterCollider(prevHandle);
       if (c.collider && !g.interactables.forCollider(c.collider.handle)) this.registerTalk(n);
       if (!c.alive) {
-        c.visible = lod < 2;
+        c.visible = d < this.viewDist && !n.buried;
         if (step) c.updateModel(dt * every, false);
         c.hitboxesValid = false;
         continue;
       }
       if (!step) continue;
       const sdt = dt * every;
+      if (c.updateWounds(sdt)) {
+        // Herido de muerte: en el suelo, gime y se desangra.
+        n.talking = false;
+        n.barkT -= sdt;
+        if (n.barkT <= 0) { n.barkT = 3 + Math.random() * 4; g.bus.emit('sfx', { id: 'pain', x: c.pos.x, y: c.pos.y + 0.5, z: c.pos.z, volume: 0.45 }); }
+        c.chooseAnim(0, 'idle');
+        c.visible = d < this.viewDist;
+        c.updateModel(sdt, lod === 0);
+        c.hitboxesValid = lod === 0 && c.visible && !c.indoors;
+        c.setTorch(false);
+        this.updateTorchLight(n);
+        continue;
+      }
       this.think(n, sdt, hour, raid, night);
       c.updateCombat(sdt);
       const speed = c.move(sdt, (x, z) => this.groundFor(n, x, z), (ch, out) => this.avoid(ch, out));
       // Llegada a destino.
       if (c.arrived && n.state === 'routine' && !c.indoors) this.onArrive(n);
       c.chooseAnim(speed, n.talking ? 'talk' : n.state === 'shelter' ? 'cower' : n.idleAnim);
-      c.visible = lod < 2;
+      c.visible = d < this.viewDist;
       c.updateModel(sdt, lod === 0);
       c.hitboxesValid = lod === 0 && c.visible && !c.indoors;
       // Antorcha de noche al andar por fuera.
@@ -363,28 +391,94 @@ export class NPCManager {
     const e = scheduleAt(n.def.schedule, hour);
     if (e !== n.entry) {
       n.entry = e;
+      n.wander = 'none';
       const pid = this.resolvePlaceId(n, e);
-      this.goTo(n, pid, e.activity === 'patrol' ? 1.25 : 1.4);
+      // Cada uno con su paso.
+      const pace = 0.9 + ((n.def.id.charCodeAt(0) * 7 + n.def.id.length * 13) % 30) / 100;
+      this.goTo(n, pid, (e.activity === 'patrol' ? 1.25 : 1.4) * pace);
       n.idleAnim = 'idle';
     }
+    this.fidget(n, dt);
     void night;
+  }
+
+  /**
+   * Vida en reposo: quien está de charla, de guardia, vendiendo o sin nada
+   * que hacer no se queda clavado: da unos pasos, se gira hacia alguien
+   * cercano, cambia de postura y vuelve a su sitio.
+   */
+  private fidget(n: NPC, dt: number): void {
+    const c = n.c;
+    if (n.state !== 'routine' || n.talking || c.indoors || n.onTower || !n.entry) return;
+    if (n.wander === 'out' && c.arrived) {
+      // Llegó al punto del paseo: se queda un rato y luego vuelve.
+      n.wander = 'back';
+      n.fidgetT = 3 + Math.random() * 6;
+      n.idleAnim = 'idle';
+      c.faceYaw = c.yaw + (Math.random() - 0.5) * 2;
+      return;
+    }
+    n.fidgetT -= dt;
+    if (n.fidgetT > 0 || !c.arrived) return;
+    const p = this.place(n.placeId);
+    if (!p) return;
+    if (n.wander === 'back') {
+      n.wander = 'none';
+      n.settled = false;
+      c.setPath(this.nav.clear(c.pos.x, c.pos.z, p.x, p.z) ? [{ x: p.x, z: p.z }] : this.nav.findPath(c.pos.x, c.pos.z, p.x, p.z), 1.0 + Math.random() * 0.3);
+      n.fidgetT = 8 + Math.random() * 16;
+      return;
+    }
+    n.fidgetT = 6 + Math.random() * 14;
+    const act = n.entry.activity;
+    const fixedPose = ['hammer', 'fish', 'pray', 'sit', 'drink', 'farm', 'work'].includes(n.idleAnim);
+    const canWalk = !fixedPose && (act === 'social' || act === 'wander' || act === 'guard' || act === 'sell' || act === 'eat' || act === 'hunt' || act === 'work' || act === 'tavern');
+    const r = Math.random();
+    if (canWalk && r < 0.45) {
+      // Paseíllo de 2–5 m por un sitio despejado.
+      for (let k = 0; k < 6; k++) {
+        const a = Math.random() * Math.PI * 2, dist = 2 + Math.random() * 3;
+        const x = p.x + Math.cos(a) * dist, z = p.z + Math.sin(a) * dist;
+        if (!this.nav.clear(c.pos.x, c.pos.z, x, z)) continue;
+        if (Math.abs(this.g.hf.heightAt(x, z) - c.pos.y) > 0.8 || this.g.hf.waterLevelAt(x, z) !== null) continue;
+        n.wander = 'out';
+        c.setPath([{ x, z }], 0.85 + Math.random() * 0.35);
+        return;
+      }
+    }
+    if (!fixedPose && r < 0.8) {
+      // Girarse hacia alguien cercano (conversación) o mirar a otro lado.
+      let best: NPC | null = null, bd = 6;
+      for (const o of this.npcs.values()) {
+        if (o === n || !o.c.alive || o.c.indoors) continue;
+        const d = o.c.pos.distanceTo(c.pos);
+        if (d < bd) { bd = d; best = o; }
+      }
+      c.faceYaw = best ? Math.atan2(best.c.pos.x - c.pos.x, best.c.pos.z - c.pos.z) : p.yaw + (Math.random() - 0.5) * 2.2;
+      if (best && act === 'social') n.idleAnim = Math.random() < 0.6 ? 'talk' : 'idle';
+      c.model.idleStyle = Math.floor(Math.random() * 4);
+    }
   }
 
   private onArrive(n: NPC): void {
     const c = n.c;
+    if (n.wander !== 'none') return; // de paseo cerca de su sitio
     const p = this.place(n.placeId);
     if (!p || !n.entry) return;
     if (n.placeId === 'tower_top' && !n.onTower) { this.climbTower(n); return; }
     if (n.placeId.startsWith('in:')) { c.indoors = true; return; }
-    n.idleAnim = this.animFor(n.entry, p);
-    c.faceYaw = p.yaw;
+    if (!n.settled) {
+      n.settled = true;
+      n.idleAnim = this.animFor(n.entry, p);
+      c.faceYaw = p.yaw;
+    }
     // Patrulla: siguiente punto.
     if (n.entry.activity === 'patrol') {
       n.patrolIdx++;
       this.goTo(n, PATROL[n.patrolIdx % PATROL.length], 1.25);
     }
     // Sonido de trabajo del herrero.
-    if (n.idleAnim === 'hammer' && Math.random() < 0.5) this.g.bus.emit('sfx', { id: 'hammer', x: c.pos.x, y: c.pos.y + 1, z: c.pos.z, volume: 0.7 });
+    if (n.idleAnim === 'hammer' && Math.random() < 0.02) this.g.bus.emit('sfx', { id: 'hammer', x: c.pos.x, y: c.pos.y + 1, z: c.pos.z, volume: 0.7 });
   }
 
   private climbTower(n: NPC): void {
@@ -478,12 +572,12 @@ export class NPCManager {
   }
 
   /** ¿Alguien despierto ve al jugador cometer un delito? */
-  witnessesCrime(pos: THREE.Vector3): boolean {
+  witnessesCrime(pos: THREE.Vector3, victim: Character | null = null): boolean {
     const g = this.g;
     const range = sightRange(g, true) * 0.6;
     for (const n of this.npcs.values()) {
       const c = n.c;
-      if (!c.alive || c.indoors) continue;
+      if (!c.alive || c.indoors || c.downed || c === victim) continue;
       const d = c.pos.distanceTo(pos);
       if (d > Math.max(6, range)) continue;
       // Campo de visión ~220º, o muy cerca.
@@ -514,23 +608,42 @@ export class NPCManager {
   }
 
   serialize(): object {
-    const out: Record<string, { alive: boolean; health: number; deadDay: number }> = {};
-    for (const [id, n] of this.npcs) out[id] = { alive: n.c.alive, health: n.c.health, deadDay: n.deadDay };
+    const out: Record<string, NpcSave> = {};
+    for (const [id, n] of this.npcs) {
+      const c = n.c;
+      out[id] = { alive: c.alive && !c.downed, health: c.health, deadDay: n.deadDay };
+      if (!c.alive || c.downed) {
+        // El cuerpo se queda donde lo dejaron (arrastrado, escondido, hundido).
+        out[id].pos = [c.pos.x, c.pos.y, c.pos.z];
+        out[id].buried = n.buried;
+        out[id].hidden = c.hiddenBody;
+        out[id].severed = [...c.model.severed];
+      }
+    }
     return out;
   }
 
-  deserialize(d: Record<string, { alive: boolean; health: number; deadDay: number }>): void {
+  deserialize(d: Record<string, NpcSave>): void {
     for (const [id, s] of Object.entries(d)) {
       const n = this.npcs.get(id);
       if (!n) continue;
       n.deadDay = s.deadDay;
       if (!s.alive) {
-        n.c.alive = false;
-        n.c.health = 0;
-        n.c.model.setState('dead');
-        // Enterrado: no se muestra.
-        n.c.model.root.visible = false;
-        n.c.visible = false;
+        const c = n.c;
+        c.alive = false;
+        c.health = 0;
+        c.model.setState('dead');
+        n.buried = s.buried ?? true;
+        if (s.pos && !n.buried && this.g.time.day <= n.deadDay) {
+          c.place(s.pos[0], s.pos[1], s.pos[2]);
+          c.hiddenBody = !!s.hidden;
+          for (const l of s.severed ?? []) c.model.sever(l as import('../actors/HumanoidModel').Limb);
+        } else {
+          // Enterrado: no se muestra.
+          n.buried = true;
+          c.model.root.visible = false;
+          c.visible = false;
+        }
         this.g.registry.remove(id);
       } else n.c.health = s.health;
     }

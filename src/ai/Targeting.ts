@@ -50,7 +50,7 @@ export function findTarget(g: Game, c: Character, range: number, now: number): C
     }
   }
   for (const a of g.registry.near(c.pos, range, tmp)) {
-    if (a === c || !a.alive || !hostile(c.faction, a.faction, false)) continue;
+    if (a === c || !a.alive || (a as { downed?: boolean }).downed || !hostile(c.faction, a.faction, false)) continue;
     const d = c.pos.distanceTo(a.pos);
     if (d >= bestD) continue;
     if (d > 4 && !canSee(g, c.pos, a.pos, `${c.id}>${a.id}`, now)) continue;

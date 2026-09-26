@@ -47,7 +47,7 @@ export class Terrain {
     this.viewChunks = viewChunks;
     this.material = createTerrainMaterial(textures, lowQuality);
     scene.add(this.group);
-    this.far = this.buildFarMesh();
+    this.far = this.buildFarMesh(lowQuality ? 128 : 256);
     scene.add(this.far);
   }
 
@@ -267,9 +267,9 @@ export class Terrain {
     this.physics.tag(c.collider, { kind: 'terrain', id: `${c.cx},${c.cz}` });
   }
 
-  private buildFarMesh(): THREE.Mesh {
+  private buildFarMesh(segs: number): THREE.Mesh {
     const size = WORLD_HALF * 2;
-    const g = this.buildGeometry(-WORLD_HALF, -WORLD_HALF, size, 256, false, false, 1.6);
+    const g = this.buildGeometry(-WORLD_HALF, -WORLD_HALF, size, segs, false, false, 1.6);
     const m = new THREE.Mesh(g, this.material);
     m.receiveShadow = false;
     m.castShadow = false;

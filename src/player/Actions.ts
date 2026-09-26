@@ -47,6 +47,8 @@ export class Actions {
     g.time.advanceHours(hours);
     g.vitals.timeSkip(hours, sleeping);
     g.npcs?.onTimeSkip();
+    g.bodies?.onTimeSkip();
+    g.wounds?.clear();
     g.animals?.onTimeSkip();
     g.bus.emit('player:slept', { hours });
     g.bus.emit('notify', { text: sleeping ? `Duermes. Despiertas: ${g.time.periodName().toLowerCase()}, día ${g.time.day}.` : `Descansas ${hours} h.`, kind: 'info' });

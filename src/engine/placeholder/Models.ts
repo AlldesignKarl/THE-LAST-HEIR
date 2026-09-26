@@ -306,7 +306,14 @@ const D: Record<string, ModelDef> = {
   } },
   stalagmite: { shape: { type: 'cyl', hh: 0.8, r: 0.3 }, mass: 0, build: (b) => b.add(new THREE.ConeGeometry(0.35, 1.6, 7), 'caveRock') },
   boulder: { shape: { type: 'ball', r: 1.0 }, mass: 0, build: (b) => b.add(new THREE.DodecahedronGeometry(1.0, 1), 'rock') },
-  crops: { shape: { type: 'box', hx: 0.1, hy: 0.4, hz: 0.1 }, mass: 0, build: (b) => { for (let i = 0; i < 6; i++) b.cyl(0.006, 0.01, 0.9, 'straw', Math.cos(i) * 0.08, 0.45, Math.sin(i * 1.7) * 0.08, Math.cos(i * 2) * 0.1, 0, Math.sin(i * 3) * 0.1, 3); } },
+  // Mata de cereal: tallos abiertos de 3 caras con espiga (ligero: miles de instancias).
+  crops: { shape: { type: 'box', hx: 0.1, hy: 0.4, hz: 0.1 }, mass: 0, build: (b) => {
+    for (let i = 0; i < 5; i++) {
+      const x = Math.cos(i * 1.3) * 0.08, z = Math.sin(i * 1.7) * 0.08, rx = Math.cos(i * 2) * 0.12, rz = Math.sin(i * 3) * 0.12;
+      b.add(new THREE.CylinderGeometry(0.005, 0.009, 0.9, 3, 1, true), 'straw', x, 0.45, z, rx, 0, rz);
+      b.add(new THREE.ConeGeometry(0.018, 0.13, 3, 1, true), 'straw', x + rz * -0.45, 0.92, z + rx * 0.45, rx + Math.PI, 0, rz);
+    }
+  } },
   cauldron: { shape: { type: 'cyl', hh: 0.25, r: 0.35 }, mass: 0, build: (b) => b.add(new THREE.SphereGeometry(0.35, 12, 8, 0, Math.PI * 2, Math.PI * 0.35, Math.PI * 0.65), 'iron', 0, 0.2, 0).cyl(0.3, 0.3, 0.02, 'meatCooked', 0, 0.12, 0) },
   ladder: { shape: { type: 'box', hx: 0.3, hy: 4, hz: 0.06 }, mass: 0, build: (b) => { for (const sx of [-1, 1]) b.box(0.07, 8, 0.07, 'darkWood', sx * 0.25, 0, 0); for (let i = 0; i < 16; i++) b.cyl(0.025, 0.025, 0.5, 'darkWood', 0, -3.8 + i * 0.5, 0, 0, 0, Math.PI / 2, 5); } },
   candle: { shape: { type: 'cyl', hh: 0.08, r: 0.03 }, mass: 0, build: (b) => b.cyl(0.025, 0.025, 0.16, 'paper', 0, 0, 0).cyl(0.05, 0.06, 0.02, 'iron', 0, -0.08, 0) },

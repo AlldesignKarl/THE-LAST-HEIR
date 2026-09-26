@@ -5,9 +5,10 @@
 import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { WEAPONS, BOW, HIT_ZONES, applyArmor, type WeaponDef, type HitZone } from './WeaponDefs';
+import { Character } from '../ai/Character';
+import type { Limb } from '../actors/HumanoidModel';
 import type { Actor, Faction } from '../actors/Actor';
 import { facingDot, hostile } from '../actors/Actor';
-import type { Character } from '../ai/Character';
 import { GROUP } from '../engine/Physics';
 import { itemDef } from '../data/items';
 import { segmentSegmentDist3 } from '../core/math';
@@ -243,17 +244,20 @@ export class Combat {
         if (this.hitThisSwing.has(a.id) || !a.alive) continue;
         if (!a.hitboxesValid) continue;
         let bestZone: HitZone | null = null;
+        let bestLimb: Limb | null = null;
         let bestD = Infinity;
         for (const hb of a.hitboxes) {
+          if (hb.r <= 0) continue; // miembro ya cortado
           const d = segmentSegmentDist3(inner, outer, hb.pos, hb.pos);
           if (d < hb.r + 0.06 && d < bestD && hb.pos.distanceTo(shoulder) <= limit + 0.1) {
             bestD = d;
             bestZone = hb.zone;
+            bestLimb = hb.limb ?? null;
           }
         }
         if (bestZone) {
           this.hitThisSwing.add(a.id);
-          this.playerHitsActor(a, bestZone, baseDmg, w);
+          this.playerHitsActor(a, bestZone, baseDmg, w, bestLimb);
           if (this.hitThisSwing.size >= 3) return;
         }
       }
@@ -306,8 +310,9 @@ export class Combat {
     this.hitStop = 0.06;
   }
 
-  private playerHitsActor(a: Actor, zone: HitZone, baseDmg: number, w: WeaponDef): void {
+  private playerHitsActor(a: Actor, zone: HitZone, baseDmg: number, w: WeaponDef, limb: Limb | null = null): void {
     const g = this.g;
+    const wasAlive = a.alive;
     const dmg = baseDmg * g.skills.mul('combat') * (0.9 + Math.random() * 0.2);
     const res = a.takeHit({
       amount: dmg, type: w.type, zone, attackerId: 'player', attackerFaction: 'player',
@@ -322,6 +327,8 @@ export class Combat {
     } else {
       g.bus.emit('sfx', { id: 'hit_flesh', x: hp.x, y: hp.y, z: hp.z });
       g.particles.burst('blood', hp.x, hp.y, hp.z, 12, 2.5);
+      // Personas: heridas graves según la zona (cortes, decapitación, desangrado).
+      if (a instanceof Character && (wasAlive || limb)) g.wounds.onPlayerHit(a, limb, w, this.heavy, g.player.pos);
       g.skills.add('combat', 1);
       this.shake = Math.max(this.shake, this.heavy ? 0.35 : 0.2);
     }
@@ -334,8 +341,15 @@ export class Combat {
   onPlayerAggression(a: Actor): void {
     const g = this.g;
     if ((a.faction === 'villager' || a.faction === 'guard') && a.village) {
-      const witnessed = g.npcs ? g.npcs.witnessesCrime(g.player.pos) || true : true;
-      g.bus.emit('crime', { type: a.alive ? 'assault' : 'murder', village: a.village, witnessed });
+      // Solo hay castigo si alguien lo ve: un testigo, o la propia víctima si
+      // sigue en pie para contarlo. Si muere (o queda desangrándose) sin
+      // testigos, el crimen se sabrá solo si encuentran el cuerpo.
+      const c = a instanceof Character ? a : null;
+      const incapacitated = !a.alive || !!c?.downed;
+      const witnessed = g.npcs ? g.npcs.witnessesCrime(g.player.pos, c) : true;
+      if (witnessed || !incapacitated) {
+        g.bus.emit('crime', { type: incapacitated ? 'murder' : 'assault', village: a.village, witnessed: true });
+      } else if (c) g.bodies.registerMurder(c, a.village);
     }
     if (a.faction === 'livestock' && a.village) g.bus.emit('crime', { type: 'livestock', village: a.village, witnessed: true });
   }

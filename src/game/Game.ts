@@ -60,6 +60,8 @@ import { BuildSystem } from '../world/BuildSystem';
 import { Guide } from '../ui/Guide';
 import { Boats } from '../world/Boats';
 import { Fishing } from '../player/Fishing';
+import { Wounds } from '../combat/Wounds';
+import { Bodies } from '../social/Bodies';
 import { SaveSystem } from '../save/SaveSystem';
 import { Multiplayer } from '../net/Multiplayer';
 import { MultiplayerUI } from '../ui/MultiplayerUI';
@@ -123,6 +125,8 @@ export class Game {
   readonly guide: Guide;
   readonly boats: Boats;
   readonly fishing: Fishing;
+  readonly wounds: Wounds;
+  readonly bodies: Bodies;
   /** Id del jugador local (en multijugador, el del usuario). */
   localPlayerId = 'local';
   /** Multijugador (servidor compartido); inactivo en partida individual. */
@@ -169,7 +173,7 @@ export class Game {
     this.vegetation = new Vegetation(this.hf, this.physics, scene, this.materials,
       this.qualityName === 'low' ? 0.35 : this.qualityName === 'medium' ? 0.7 : 1, this.quality.treeNear);
     this.water = new Water(this.hf, scene, this.textures);
-    this.sea = new Sea(this.hf, scene, this.textures);
+    this.sea = new Sea(this.hf, scene, this.textures, this.qualityName === 'low');
     this.particles = new Particles(scene);
     this.lights = new LightPool(scene, 8);
     this.fires = new Fires(this.lights, this.particles);
@@ -190,6 +194,8 @@ export class Game {
     this.build = new BuildSystem(this);
     this.boats = new Boats(this);
     this.fishing = new Fishing(this);
+    this.wounds = new Wounds(this);
+    this.bodies = new Bodies(this);
     this.grass = new Grass(this.hf, scene, (x, z) => {
       if (this.hf.isHole(x, z)) return true;
       for (const b of this.settlement.buildings.values()) if (b.contains(x, z, -0.6)) return true;
@@ -253,7 +259,8 @@ export class Game {
     this.qualityName = name;
     this.quality = { ...QUALITY_PRESETS[name] };
     const r = this.renderer.renderer;
-    r.setPixelRatio(Math.min(window.devicePixelRatio, this.quality.pixelRatio));
+    this.renderer.quality = this.quality;
+    this.renderer.applyPixelRatio();
     r.shadowMap.enabled = this.quality.shadows;
     this.env.setShadowQuality(this.quality.shadowMapSize, this.quality.shadows);
     this.terrain.viewChunks = this.quality.viewChunks;
@@ -297,6 +304,7 @@ export class Game {
     reg('quests', () => this.quests.serialize(), (d: Parameters<QuestSystem['deserialize']>[0]) => this.quests.deserialize(d));
     reg('economy', () => this.economy.serialize(), (d: Parameters<Economy['deserialize']>[0]) => this.economy.deserialize(d));
     reg('npcs', () => this.npcs.serialize(), (d: Parameters<NPCManager['deserialize']>[0]) => this.npcs.deserialize(d));
+    reg('bodies', () => this.bodies.serialize(), (d: Parameters<Bodies['deserialize']>[0]) => this.bodies.deserialize(d));
     reg('animals', () => this.animals.serialize(), (d: Parameters<AnimalManager['deserialize']>[0]) => this.animals.deserialize(d));
     reg('raids', () => this.raids.serialize(), (d: Parameters<RaidSystem['deserialize']>[0]) => this.raids.deserialize(d));
     reg('director', () => this.director.serialize(), (d: Parameters<EventDirector['deserialize']>[0]) => this.director.deserialize(d));
@@ -438,6 +446,8 @@ export class Game {
     this.animals.update(dt);
     this.raids.update(dt);
     this.treeFelling.update(dt);
+    this.wounds.update(dt);
+    this.bodies.update(dt);
     this.fires.update(this.time.hourFloat, gameMinutes);
     this.updateAreas(dt);
     this.updateSurvival(dt, gameMinutes);
@@ -609,6 +619,7 @@ export class Game {
     this.vegetation.update(this.camPos.x, this.camPos.z);
     this.grass.update(this.camPos);
     this.scatter.update(this.camPos);
+    this.boats.syncVisual(this.paused ? 1 : alpha);
     this.build.updateGhost();
     this.fishing.updateVisual();
     this.water.update(frameDt);
@@ -631,6 +642,7 @@ export class Game {
     this.guide.update(frameDt);
     this.mp.frame(frameDt);
     this.updatePerf();
+    this.adaptResolution(frameDt);
     this.renderer.render();
     if (this.started) this.viewmodel.render(this.renderer.renderer);
   }
@@ -666,6 +678,26 @@ export class Game {
       village: 1 - clamp(Math.hypot(p.x - v.x, p.z - v.z) / 100, 0, 1),
       storm: this.weather.state === 'storm',
     };
+  }
+
+  /** Resolución dinámica activada (Opciones). */
+  dynamicRes = true;
+  private resT = 0;
+  /**
+   * Si la imagen va a menos de ~28 FPS se baja la resolución interna poco a
+   * poco (hasta el 55 %); si sobra, se recupera. Mantiene fluidez en móviles.
+   */
+  private adaptResolution(dt: number): void {
+    this.resT += dt;
+    if (this.resT < 2 || !this.started || this.paused) return;
+    this.resT = 0;
+    const r = this.renderer;
+    const fps = this.loop.fps;
+    let s = r.renderScale;
+    if (!this.dynamicRes) s = 1;
+    else if (fps < 28 && s > 0.55) s = Math.max(0.55, s - 0.1);
+    else if (fps > 50 && s < 1) s = Math.min(1, s + 0.1);
+    if (s !== r.renderScale) { r.renderScale = s; r.applyPixelRatio(); }
   }
 
   private perfT = 0;

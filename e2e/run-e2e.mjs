@@ -644,6 +644,119 @@ await test('guardado y carga persistente (recarga completa de la página)', asyn
   assert(after.axeGone && after.letterGone && after.board, 'objetos recogidos no reaparecen');
 });
 
+await test('heridas: hachazo a un vecino sin testigos, se desangra, arrastrar el cuerpo al mar sin castigo', async () => {
+  // Tras la prueba de carga el juego espera un clic: reanudarlo.
+  await ev(() => { const g = __game.game; g.ui.close(); g.ui.setHint(''); g.started = true; g.paused = false; g.input.gameplayEnabled = true; });
+  const r = await ev(() => {
+    const api = __game, g = api.game;
+    api.setHour(11);
+    api.give('axe'); g.equipment.equip('axe');
+    const n = [...g.npcs.npcs.values()].find((x) => x.c.alive && x.c.faction === 'villager' && !x.c.downed);
+    const x = -130, z = 20, y = g.hf.heightAt(x, z);
+    n.c.place(x, y, z, Math.PI); n.c.stop(); n.c.indoors = false;
+    api.teleport(x, z + 1.6, 0); api.step(0.2);
+    n.c.place(x, y, z, Math.PI); n.c.stop();
+    const rep0 = g.reputation.get('robledo');
+    let swings = 0;
+    for (; swings < 6 && n.c.alive && !n.c.downed; swings++) {
+      api.lookAt(n.c.pos.x, n.c.pos.y + 1.2, n.c.pos.z);
+      g.vitals.stamina = 100;
+      api.press('attack', true); api.step(1 / 30); api.press('attack', false); api.step(1.2);
+    }
+    const downed = n.c.downed || !n.c.alive;
+    const h0 = n.c.health; api.step(2);
+    const bleeding = !n.c.alive || n.c.health < h0;
+    for (let i = 0; i < 45 && n.c.alive; i++) api.step(1);
+    const dead = !n.c.alive;
+    const pending = g.bodies.isPending(n.def.id);
+    api.teleport(n.c.pos.x, n.c.pos.z + 1.5, 0);
+    api.lookAt(n.c.pos.x, n.c.pos.y, n.c.pos.z); api.step(0.1);
+    const focus = g.interaction.focus.text;
+    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.1);
+    const dragging = !!g.interaction.dragging;
+    let sx = 0;
+    for (let xx = 60; xx < 300; xx += 2) if (g.hf.isSeaWater(xx, 10) && g.hf.waterLevelAt(xx, 10) - g.hf.heightAt(xx, 10) > 1.2) { sx = xx; break; }
+    api.teleport(sx - 1.2, 10, -Math.PI / 2); api.step(0.5);
+    const hidden = n.c.hiddenBody;
+    return { swings, downed, bleeding, dead, pending, focus, dragging, hidden, rep0, rep1: g.reputation.get('robledo') };
+  });
+  assert(r.downed, `cae a la primera o segunda (golpes ${r.swings})`);
+  assert(r.bleeding, 'se desangra');
+  assert(r.dead, 'muere desangrado');
+  assert(r.pending, 'crimen sin testigos pendiente');
+  assert(r.focus.startsWith('Cuerpo de'), `foco ${r.focus}`);
+  assert(r.dragging, 'arrastra el cuerpo');
+  assert(r.hidden, 'el cuerpo se hunde en el mar');
+  assert(r.rep1 === r.rep0, `sin castigo de reputación (${r.rep0} → ${r.rep1})`);
+});
+
+await test('heridas: brazo, pierna y cabeza cortados; el cuerpo encontrado sí castiga', async () => {
+  const r = await ev(() => {
+    const api = __game, g = api.game;
+    const alive = [...g.npcs.npcs.values()].filter((x) => x.c.alive && !x.c.downed && x.c.faction === 'villager').slice(0, 3);
+    const W = { id: 'axe', type: 'slash' };
+    alive.forEach((n, i) => { const x = -150 + i * 1.8, z = -40; n.c.place(x, g.hf.heightAt(x, z), z, 0); n.c.stop(); n.c.indoors = false; });
+    api.teleport(-148, -36, 0); api.step(0.2);
+    const from = g.player.pos.clone();
+    g.wounds.onPlayerHit(alive[0].c, 'armR', W, true, from);
+    g.wounds.onPlayerHit(alive[1].c, 'legL', W, true, from);
+    g.wounds.onPlayerHit(alive[2].c, 'head', W, true, from);
+    api.step(1);
+    const res = alive.map((n) => ({ sev: [...n.c.model.severed], anim: n.c.model.state, alive: n.c.alive }));
+    // Crimen sin testigos y un vecino que llega y ve el cuerpo.
+    g.combat.onPlayerAggression(alive[2].c);
+    const rep0 = g.reputation.get('robledo');
+    const w = [...g.npcs.npcs.values()].find((x) => x.c.alive && !x.c.downed && !alive.includes(x));
+    w.c.place(-140, g.hf.heightAt(-140, -40), -40, -Math.PI / 2); w.c.stop(); w.c.indoors = false;
+    api.teleport(-190, -40, 0);
+    api.step(3);
+    return { res, rep0, rep1: g.reputation.get('robledo') };
+  });
+  assert(r.res[0].sev.includes('armR') && r.res[0].anim === 'kneel' && r.res[0].alive, `brazo: ${JSON.stringify(r.res[0])}`);
+  assert(r.res[1].sev.includes('legL') && r.res[1].anim === 'downed', `pierna: ${JSON.stringify(r.res[1])}`);
+  assert(r.res[2].sev.includes('head') && !r.res[2].alive, `cabeza: ${JSON.stringify(r.res[2])}`);
+  assert(r.rep1 < r.rep0, `al encontrar el cuerpo baja la reputación (${r.rep0} → ${r.rep1})`);
+});
+
+await test('barca: subir, remar, girar y bajarse', async () => {
+  const r = await ev(() => {
+    const api = __game, g = api.game;
+    g.flags.set('boat_permit');
+    const b = g.boats.boats.get('boat_1');
+    api.teleport(b.x - 2.5, b.z, 0, g.settlement.pier.y + 0.05);
+    api.lookAt(b.x, b.curPos.y + 0.4, b.z); api.step(0.2);
+    api.press('interact', true); api.step(1 / 30); api.press('interact', false); api.step(0.3);
+    const riding = !!g.boats.riding;
+    const p0 = { x: b.x, z: b.z };
+    api.press('forward', true); api.step(5); api.press('forward', false);
+    const moved = Math.hypot(b.x - p0.x, b.z - p0.z);
+    const h0 = b.heading;
+    api.press('left', true); api.step(1.5); api.press('left', false);
+    const turned = Math.abs(b.heading - h0);
+    api.press('interact', true); api.step(1 / 30); api.press('interact', false); api.step(0.5);
+    return { riding, moved, turned, off: !g.boats.riding };
+  });
+  assert(r.riding, 'sube a la barca');
+  assert(r.moved > 8, `rema (${r.moved.toFixed(1)} m)`);
+  assert(r.turned > 0.4, `gira (${r.turned.toFixed(2)} rad)`);
+  assert(r.off, 'se baja');
+});
+
+await test('vecinos: no todos quietos con la misma postura', async () => {
+  const r = await ev(() => {
+    const api = __game, g = api.game;
+    api.setHour(11);
+    const ns = [...g.npcs.npcs.values()].filter((n) => n.c.alive && !n.c.downed);
+    const p0 = ns.map((n) => n.c.pos.clone());
+    api.step(40);
+    const moved = ns.filter((n, i) => n.c.pos.distanceTo(p0[i]) > 0.8).length;
+    const styles = new Set(ns.map((n) => n.c.model.idleStyle)).size;
+    return { moved, styles, total: ns.length };
+  });
+  assert(r.moved >= 3, `vecinos que se mueven en 40 s: ${r.moved}/${r.total}`);
+  assert(r.styles >= 3, `posturas distintas: ${r.styles}`);
+});
+
 await test('sin errores de ejecución', async () => {
   assert(errors.length === 0, errors.slice(0, 5).join('\n'));
 });

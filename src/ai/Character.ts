@@ -49,7 +49,7 @@ export class Character implements Actor {
   readonly village: string | null;
   readonly model: HumanoidModel;
   readonly pos = new THREE.Vector3();
-  private prevPos = new THREE.Vector3();
+  readonly prevPos = new THREE.Vector3();
   yaw = 0;
   private renderYaw = 0;
   alive = true;
@@ -96,6 +96,13 @@ export class Character implements Actor {
   /** Callbacks del gestor. */
   onStrike: ((c: Character) => void) | null = null;
   onDeath: ((c: Character, killer: string | null) => void) | null = null;
+  /** Herido de muerte: en el suelo, sin poder luchar ni huir, desangrándose. */
+  downed = false;
+  /** Pérdida de salud por segundo (sangrado). */
+  bleed = 0;
+  woundAnim: AnimState = 'downed';
+  /** Cuerpo escondido (en el agua, lejos de miradas): nadie lo encontrará. */
+  hiddenBody = false;
   onHurt: ((c: Character, attacker: string | null) => void) | null = null;
 
   constructor(o: CharacterOpts, mats: MaterialLibrary, private readonly models: ModelLibrary) {
@@ -374,9 +381,21 @@ export class Character implements Actor {
     this.onDeath?.(this, killer);
   }
 
+  /** Desangrado: devuelve true si está en el suelo (sin IA). */
+  updateWounds(dt: number): boolean {
+    if (!this.alive || !this.downed) return false;
+    this.stop();
+    this.phase = 'none';
+    this.blocking = false;
+    this.health -= this.bleed * dt;
+    if (this.health <= 0) this.die(this.lastAttacker);
+    return true;
+  }
+
   /** Elige animación según estado. */
   chooseAnim(speed: number, idleAnim: AnimState): void {
     if (!this.alive) { this.model.setState('dead'); return; }
+    if (this.downed) { this.model.speed = 0; this.model.setState(this.woundAnim); return; }
     let s: AnimState;
     if (this.phase === 'windup') s = 'windup';
     else if (this.phase === 'strike') s = 'strike';

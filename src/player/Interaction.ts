@@ -10,6 +10,8 @@ import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 import type { WorldItem } from '../items/WorldItems';
 import { itemDef } from '../data/items';
 import type { Interactable } from '../world/Interactables';
+import type { Character } from '../ai/Character';
+import { dragGround } from '../social/Bodies';
 
 export interface Carried {
   body: RAPIER.RigidBody;
@@ -32,6 +34,8 @@ export interface FocusTarget {
   body?: RAPIER.RigidBody;
   collider?: RAPIER.Collider;
   point?: THREE.Vector3;
+  /** Cuerpo (muerto o moribundo) que se puede arrastrar. */
+  corpse?: Character;
 }
 
 const REACH = 3.0;
@@ -41,6 +45,8 @@ const tmpE = new THREE.Vector3();
 export class Interaction {
   focus: FocusTarget = { kind: 'none', text: '' };
   carried: Carried | null = null;
+  /** Cuerpo que se va arrastrando. */
+  dragging: Character | null = null;
 
   constructor(private readonly g: Game) {}
 
@@ -52,6 +58,11 @@ export class Interaction {
     this.updateFocus(tmpE, tmpF);
 
     const inp = g.input;
+    if (this.dragging) {
+      this.updateDrag(dt);
+      if (inp.wasPressed('grab') || inp.wasPressed('interact')) this.releaseDrag();
+      return;
+    }
     if (this.carried) {
       this.updateCarry(dt, tmpE, tmpF);
       if (inp.wasPressed('grab')) this.drop(false);
@@ -121,6 +132,12 @@ export class Interaction {
         }
       }
     }
+    // Cuerpos en el suelo delante (muertos o desangrándose): arrastrar.
+    const corpse = this.corpseInFront(fwd);
+    if (corpse) {
+      this.focus = { kind: 'interactable', corpse, text: corpse.alive ? `${corpse.name} (se desangra)` : `Cuerpo de ${corpse.name}`, sub: '[R] Arrastrar' };
+      return;
+    }
     // Agua: mirando hacia abajo estando dentro o al borde.
     const lvl = g.hf.waterLevelAt(g.player.pos.x + fwd.x, g.player.pos.z + fwd.z);
     if (lvl !== null && fwd.y < -0.35) {
@@ -134,6 +151,9 @@ export class Interaction {
     if (id.includes('crate')) return 'Caja';
     if (id.includes('sack')) return 'Saco';
     if (id.includes('stool')) return 'Taburete';
+    if (id === 'severed_arm') return 'Brazo cortado';
+    if (id === 'severed_leg') return 'Pierna cortada';
+    if (id === 'severed_head') return 'Cabeza';
     return 'Objeto';
   }
 
@@ -181,9 +201,61 @@ export class Interaction {
     return true;
   }
 
+  private corpseInFront(fwd: THREE.Vector3): Character | null {
+    const g = this.g;
+    const p = g.player.pos;
+    const fl = Math.hypot(fwd.x, fwd.z) || 1;
+    let best: Character | null = null, bd = 2.4;
+    const cands: Character[] = [];
+    for (const n of g.npcs.npcs.values()) if ((!n.c.alive && !n.buried) || n.c.downed) cands.push(n.c);
+    for (const r of g.raids.raiders) if (!r.c.alive || r.c.downed) cands.push(r.c);
+    for (const c of cands) {
+      if (!c.model.root.visible || c.hiddenBody) continue;
+      // El cuerpo tendido ocupa de los pies a la cabeza: se toma el punto medio.
+      const cx = c.pos.x - Math.sin(c.yaw) * 0.8, cz = c.pos.z - Math.cos(c.yaw) * 0.8;
+      for (const [x, z] of [[c.pos.x, c.pos.z], [cx, cz]]) {
+        const dx = x - p.x, dz = z - p.z, d = Math.hypot(dx, dz);
+        if (d > bd || Math.abs(c.pos.y - p.y) > 1.5) continue;
+        if (d > 0.6 && (dx * fwd.x + dz * fwd.z) / (d * fl) < 0.55) continue;
+        best = c; bd = d;
+      }
+    }
+    return best;
+  }
+
+  private startDrag(c: Character): void {
+    this.dragging = c;
+    this.g.bus.emit('sfx', { id: 'grab_heavy' });
+    this.g.bus.emit('notify', { text: 'Arrastras el cuerpo. [R] para soltarlo. En agua honda se hunde.', kind: 'info' });
+  }
+
+  private updateDrag(dt: number): void {
+    const g = this.g;
+    const c = this.dragging!;
+    if (c.hiddenBody) { this.releaseDrag(); return; }
+    const p = g.player.pos;
+    // Se arrastra delante de ti, tirando de él por los hombros.
+    const fx = -Math.sin(g.player.yaw), fz = -Math.cos(g.player.yaw);
+    const tx = p.x + fx * 0.9, tz = p.z + fz * 0.9;
+    const y = dragGround(g, tx, tz, p.y);
+    c.pos.set(tx, y, tz);
+    c.prevPos.copy(c.pos);
+    c.yaw = g.player.yaw;
+    g.player.speedMul = Math.min(g.player.speedMul, 0.5);
+    g.vitals.drainStamina(3, dt);
+    g.bodies.checkWater(c);
+  }
+
+  releaseDrag(): void {
+    if (!this.dragging) return;
+    this.dragging = null;
+    this.g.bus.emit('sfx', { id: 'land', volume: 0.5 });
+  }
+
   private tryGrab(): void {
     const f = this.focus;
     const g = this.g;
+    if (f.corpse) { this.startDrag(f.corpse); return; }
     let body: RAPIER.RigidBody | undefined;
     let collider: RAPIER.Collider | undefined;
     let item: WorldItem | null = null;

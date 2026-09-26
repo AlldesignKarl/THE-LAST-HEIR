@@ -410,9 +410,13 @@ export class UIManager {
       const gb = h('button', 'btn inline', g.guide.enabled ? 'Activada (ocultar)' : 'Oculta (mostrar)');
       gb.onclick = () => { g.guide.enabled = !g.guide.enabled; this.openOptions(); };
       gd.append(gb);
+      const dr = h('div', '', `<h3>Resolución dinámica</h3><div class="muted">Baja la resolución si el juego va lento (ahora al ${Math.round(g.renderer.renderScale * 100)} %).</div>`);
+      const db = h('button', 'btn inline', g.dynamicRes ? 'Activada (desactivar)' : 'Desactivada (activar)');
+      db.onclick = () => { g.dynamicRes = !g.dynamicRes; if (!g.dynamicRes) { g.renderer.renderScale = 1; g.renderer.applyPixelRatio(); } this.openOptions(); };
+      dr.append(db);
       const back = h('button', 'btn', 'Volver');
       back.onclick = () => this.openPause();
-      p.append(q, s, a, gd, back);
+      p.append(q, s, a, gd, dr, back);
       el.append(p);
     });
   }
