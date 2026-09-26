@@ -293,6 +293,17 @@ export class HumanoidModel {
       m.rotation.set(0, Math.PI / 2, 0);
       m.position.set(-0.06, 0.1, 0);
       this.elL.add(m);
+    } else if (modelId === 'bucket' || modelId === 'sack' || modelId === 'fish_crate') {
+      // Colgando de la mano.
+      m.rotation.set(0, 0, 0);
+      m.position.set(0, modelId === 'bucket' ? -0.2 : -0.22, 0);
+      if (modelId === 'fish_crate' || modelId === 'sack') m.scale.setScalar(0.6);
+      this.handL.add(m);
+    } else if (modelId === 'firewood' || modelId === 'plank') {
+      // Bajo el brazo, en horizontal.
+      m.rotation.set(Math.PI / 2, 0, Math.PI / 2);
+      m.position.set(0.05, 0.02, 0.1);
+      this.handL.add(m);
     } else {
       m.rotation.set(Math.PI * 0.35, 0, 0);
       m.position.set(0, 0, 0.1);

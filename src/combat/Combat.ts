@@ -346,9 +346,17 @@ export class Combat {
       // testigos, el crimen se sabrá solo si encuentran el cuerpo.
       const c = a instanceof Character ? a : null;
       const incapacitated = !a.alive || !!c?.downed;
-      const witnessed = g.npcs ? g.npcs.witnessesCrime(g.player.pos, c) : true;
-      if (witnessed || !incapacitated) {
-        g.bus.emit('crime', { type: incapacitated ? 'murder' : 'assault', village: a.village, witnessed: true });
+      const type = incapacitated ? 'murder' : 'assault';
+      const witness = g.npcs?.findWitness(g.player.pos, c) ?? null;
+      const victimNpc = c ? g.npcs?.get(c.id) ?? null : null;
+      if (witness) {
+        // Un guardia lo ve: lo sabe ya. Un vecino: corre a contarlo.
+        if (witness.c.faction === 'guard') g.bus.emit('crime', { type, village: a.village, witnessed: true });
+        else g.npcs.startReport(witness, type, a.village, incapacitated ? c?.id ?? null : null);
+      } else if (!incapacitated && victimNpc) {
+        // La víctima sigue en pie: huye y lo cuenta ella.
+        if (victimNpc.c.faction === 'guard') g.bus.emit('crime', { type, village: a.village, witnessed: true });
+        else g.npcs.startReport(victimNpc, type, a.village);
       } else if (c) g.bodies.registerMurder(c, a.village);
     }
     if (a.faction === 'livestock' && a.village) g.bus.emit('crime', { type: 'livestock', village: a.village, witnessed: true });

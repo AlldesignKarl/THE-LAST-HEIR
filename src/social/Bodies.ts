@@ -28,6 +28,11 @@ export class Bodies {
     if (!this.pending.has(c.id)) this.pending.set(c.id, { c, village });
   }
 
+  /** El crimen ya se conoce por otra vía (un testigo lo contó). */
+  resolve(id: string): void {
+    this.pending.delete(id);
+  }
+
   isPending(id: string): boolean {
     return this.pending.has(id);
   }

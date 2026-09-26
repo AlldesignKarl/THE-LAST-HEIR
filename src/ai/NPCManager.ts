@@ -20,7 +20,12 @@ export class NPC {
   placeId = '';
   onTower = false;
   deadDay = -1;
-  state: 'routine' | 'flee' | 'shelter' | 'fight' | 'defend' | 'talk' = 'routine';
+  state: 'routine' | 'flee' | 'shelter' | 'fight' | 'defend' | 'talk' | 'report' = 'routine';
+  /** Testigo que corre a contar un crimen. */
+  report: { type: 'assault' | 'murder'; village: string; t: number; victim: string | null } | null = null;
+  /** Recado en curso (ir a por agua, leña, al campo…). */
+  errand: { place: string; back: string; phase: 'go' | 'do' | 'back'; t: number; anim: AnimState; prop: string | null } | null = null;
+  errandT = 30 + Math.random() * 60;
   thinkT = Math.random();
   barkT = 10 + Math.random() * 30;
   patrolIdx = 0;
@@ -41,6 +46,25 @@ export class NPC {
 }
 
 interface NpcSave { alive: boolean; health: number; deadDay: number; pos?: number[]; buried?: boolean; hidden?: boolean; severed?: string[] }
+
+type ErrandDef = { place: string; anim: AnimState; prop: string | null; t: [number, number] };
+const W = (place: string, anim: AnimState, prop: string | null, t: [number, number]): ErrandDef => ({ place, anim, prop, t });
+/** Recados diarios por oficio: van, hacen la tarea un rato y vuelven. */
+const ERRANDS: Record<string, ErrandDef[]> = {
+  farmer: [W('field_3', 'farm', null, [25, 45]), W('well', 'work', 'bucket', [6, 10]), W('market_stall', 'sell', 'sack', [8, 14])],
+  fisher: [W('beach_nets', 'work', null, [15, 30]), W('fish_rack_work', 'work', 'fish_crate', [10, 20]), W('pier_start', 'idle', null, [6, 12]), W('market_stall', 'sell', 'fish_crate', [8, 14])],
+  baker: [W('well', 'work', 'bucket', [6, 10]), W('woodpile_zone', 'work', 'firewood', [8, 14]), W('market_stall', 'sell', 'sack', [8, 14])],
+  innkeeper: [W('well', 'work', 'bucket', [6, 10]), W('market_stall', 'sell', 'sack', [8, 14]), W('woodpile_zone', 'work', 'firewood', [8, 12])],
+  cooper: [W('woodpile_zone', 'work', 'plank', [10, 18]), W('well', 'work', 'bucket', [6, 10]), W('harbor_lane', 'talk', null, [8, 14])],
+  widow: [W('well', 'work', 'bucket', [6, 12]), W('plaza_bench', 'talk', null, [15, 30]), W('market_stall', 'sell', 'sack', [8, 14])],
+  smith: [W('woodpile_zone', 'work', 'firewood', [8, 14]), W('well', 'work', 'bucket', [6, 10])],
+  carpenter: [W('woodpile_zone', 'work', 'plank', [15, 25]), W('forest_edge', 'work', null, [15, 30])],
+  boatwright: [W('woodpile_zone', 'work', 'plank', [10, 20]), W('pier_start', 'work', null, [10, 20])],
+  merchant: [W('well', 'work', 'bucket', [6, 10]), W('plaza', 'talk', null, [10, 20])],
+  hunter: [W('forest_edge', 'idle', null, [20, 40]), W('market_stall', 'sell', null, [8, 12])],
+  priest: [W('plaza', 'talk', null, [10, 20]), W('well', 'work', 'bucket', [6, 10])],
+  physician: [W('plaza', 'talk', null, [10, 20]), W('market_stall', 'sell', null, [8, 12])],
+};
 
 const PATROL = ['patrol_1', 'patrol_2', 'patrol_3', 'patrol_4'];
 
@@ -315,6 +339,7 @@ export class NPCManager {
     const c = n.c;
     n.thinkT -= dt;
     if (n.talking) { c.stop(); c.faceYaw = Math.atan2(g.player.pos.x - c.pos.x, g.player.pos.z - c.pos.z); return; }
+    if (n.state === 'report' && n.report) { this.updateReport(n, dt); return; }
     const isGuard = c.faction === 'guard';
     const fighter = isGuard || n.def.bravery >= 0.6;
     // Amenazas cercanas.
@@ -393,6 +418,7 @@ export class NPCManager {
     // Rutina.
     const e = scheduleAt(n.def.schedule, hour);
     if (e !== n.entry) {
+      if (n.errand) this.endErrand(n);
       n.entry = e;
       n.wander = 'none';
       const pid = this.resolvePlaceId(n, e);
@@ -401,8 +427,48 @@ export class NPCManager {
       this.goTo(n, pid, (e.activity === 'patrol' ? 1.25 : 1.4) * pace);
       n.idleAnim = 'idle';
     }
-    this.fidget(n, dt);
+    if (!this.errand(n, dt)) this.fidget(n, dt);
     void night;
+  }
+
+  /** Recados del oficio. Devuelve true si hay uno en curso. */
+  private errand(n: NPC, dt: number): boolean {
+    const c = n.c;
+    const hour = this.g.time.hourFloat;
+    const er = n.errand;
+    if (er) {
+      if (er.phase === 'go' && c.arrived) {
+        er.phase = 'do';
+        n.idleAnim = er.anim;
+        const p = this.place(er.place);
+        if (p) c.faceYaw = p.yaw;
+      } else if (er.phase === 'do') {
+        n.idleAnim = er.anim;
+        er.t -= dt;
+        if (er.t <= 0) { er.phase = 'back'; this.goTo(n, er.back, 1.25 + Math.random() * 0.2); n.errand = er; }
+      } else if (er.phase === 'back' && c.arrived) this.endErrand(n);
+      return true;
+    }
+    n.errandT -= dt;
+    if (n.errandT > 0) return false;
+    n.errandT = 50 + Math.random() * 70;
+    const act = n.entry?.activity;
+    if (n.state !== 'routine' || n.talking || !c.arrived || n.onTower || hour < 7 || hour > 19.5) return false;
+    if (!act || !['work', 'sell', 'farm', 'social', 'wander', 'eat'].includes(act)) return false;
+    const list = (ERRANDS[n.def.profession] ?? []).filter((x) => x.place !== n.placeId && this.place(x.place));
+    if (!list.length) return false;
+    const pick = list[Math.floor(Math.random() * list.length)];
+    const back = n.placeId;
+    this.goTo(n, pick.place, 1.3 + Math.random() * 0.2);
+    n.errand = { place: pick.place, back, phase: 'go', t: pick.t[0] + Math.random() * (pick.t[1] - pick.t[0]), anim: pick.anim, prop: pick.prop };
+    if (pick.prop) c.model.setOffhand(this.g.models, pick.prop);
+    return true;
+  }
+
+  private endErrand(n: NPC): void {
+    if (n.errand?.prop) n.c.model.setOffhand(this.g.models, n.c.hasTorch ? 'torch' : null);
+    n.errand = null;
+    n.settled = false;
   }
 
   /**
@@ -465,7 +531,7 @@ export class NPCManager {
 
   private onArrive(n: NPC): void {
     const c = n.c;
-    if (n.wander !== 'none') return; // de paseo cerca de su sitio
+    if (n.wander !== 'none' || (n.errand && n.errand.phase !== 'back')) return; // de paseo o de recado
     const p = this.place(n.placeId);
     if (!p || !n.entry) return;
     if (n.placeId === 'tower_top' && !n.onTower) { this.climbTower(n); return; }
@@ -534,6 +600,14 @@ export class NPCManager {
 
   private onDeath(n: NPC, killer: string | null): void {
     const g = this.g;
+    // Un testigo que muere antes de contarlo se lleva el secreto; el cuerpo
+    // de su víctima queda por descubrir.
+    if (n.report?.victim) {
+      const v = this.npcs.get(n.report.victim);
+      if (v) g.bodies.registerMurder(v.c, n.report.village);
+    }
+    n.report = null;
+    if (n.errand) this.endErrand(n);
     n.deadDay = g.time.day;
     n.state = 'routine';
     g.bus.emit('sfx', { id: 'death', x: n.c.pos.x, y: n.c.pos.y + 1, z: n.c.pos.z });
@@ -575,6 +649,81 @@ export class NPCManager {
   }
 
   /** ¿Alguien despierto ve al jugador cometer un delito? */
+  /** El primer vecino o guardia que ve lo que pasa en `pos` (o null). */
+  findWitness(pos: THREE.Vector3, victim: Character | null = null): NPC | null {
+    const g = this.g;
+    const range = sightRange(g, true) * 0.6;
+    for (const n of this.npcs.values()) {
+      const c = n.c;
+      if (!c.alive || c.indoors || c.downed || c === victim) continue;
+      const d = c.pos.distanceTo(pos);
+      if (d > Math.max(6, range)) continue;
+      const fx = Math.sin(c.yaw), fz = Math.cos(c.yaw);
+      const dot = ((pos.x - c.pos.x) * fx + (pos.z - c.pos.z) * fz) / (d || 1);
+      if (d > 3 && dot < -0.35) continue;
+      if (canSee(g, c.pos, pos, `${c.id}>witness`, this.now)) return n;
+    }
+    return null;
+  }
+
+  /**
+   * Un testigo sale corriendo a contarlo: a un guardia vivo o, si no hay, a
+   * la plaza. El pueblo solo se entera cuando llega (si muere antes, nada).
+   */
+  startReport(n: NPC, type: 'assault' | 'murder', village: string, victim: string | null = null): void {
+    const g = this.g;
+    if (n.report) { if (type === 'murder') n.report.type = 'murder'; n.report.victim = victim ?? n.report.victim; return; }
+    n.report = { type, village, t: 0, victim };
+    n.state = 'report';
+    n.errand = null;
+    n.talking = false;
+    if (n.c.faction !== 'guard') n.c.setWeapon(null);
+    g.bus.emit('sfx', { id: 'shout', x: n.c.pos.x, y: n.c.pos.y + 1.6, z: n.c.pos.z });
+    g.bus.emit('notify', { text: `¡${n.def.name} te ha visto y sale corriendo a avisar!`, kind: 'alert' });
+    this.runToReport(n);
+  }
+
+  private reportTarget(n: NPC): { x: number; z: number; guard: NPC | null } {
+    let best: NPC | null = null, bd = Infinity;
+    for (const o of this.npcs.values()) {
+      if (o === n || o.c.faction !== 'guard' || !o.c.alive || o.c.downed) continue;
+      const d = o.c.pos.distanceTo(n.c.pos);
+      if (d < bd) { bd = d; best = o; }
+    }
+    if (best) return { x: best.c.pos.x, z: best.c.pos.z, guard: best };
+    const p = this.place('plaza')!;
+    return { x: p.x, z: p.z, guard: null };
+  }
+
+  private runToReport(n: NPC): void {
+    const t = this.reportTarget(n);
+    const c = n.c;
+    c.setPath(this.nav.clear(c.pos.x, c.pos.z, t.x, t.z) ? [{ x: t.x, z: t.z }] : this.nav.findPath(c.pos.x, c.pos.z, t.x, t.z), 3.9);
+    c.indoors = false;
+  }
+
+  private updateReport(n: NPC, dt: number): void {
+    const g = this.g;
+    const r = n.report!;
+    r.t += dt;
+    const t = this.reportTarget(n);
+    const d = Math.hypot(t.x - n.c.pos.x, t.z - n.c.pos.z);
+    // Ha llegado: con un guardia al lado, o a la plaza con gente.
+    let others = 0;
+    if (!t.guard) for (const o of this.npcs.values()) if (o !== n && o.c.alive && !o.c.downed && !o.c.indoors && o.c.pos.distanceTo(n.c.pos) < 10) others++;
+    if ((t.guard && d < 3.5) || (!t.guard && d < 6 && others > 0) || r.t > 120) {
+      g.bus.emit('crime', { type: r.type, village: r.village, witnessed: true });
+      if (r.victim) g.bodies.resolve(r.victim); // ya se sabe: el cuerpo no vuelve a contar
+      g.bus.emit('notify', { text: t.guard ? `${n.def.name} le ha contado a ${t.guard.def.name} lo que hiciste.` : `${n.def.name} ha dado la voz de alarma en la plaza.`, kind: 'alert' });
+      g.bus.emit('sfx', { id: 'shout', x: n.c.pos.x, y: n.c.pos.y + 1.6, z: n.c.pos.z });
+      n.report = null;
+      n.state = 'flee';
+      this.goTo(n, `in:${n.def.home}`, 3.4);
+      return;
+    }
+    if (Math.floor(r.t / 2) !== Math.floor((r.t - dt) / 2)) this.runToReport(n); // el guardia se mueve
+  }
+
   witnessesCrime(pos: THREE.Vector3, victim: Character | null = null): boolean {
     const g = this.g;
     const range = sightRange(g, true) * 0.6;
