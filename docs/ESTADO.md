@@ -8,8 +8,8 @@ Resumen honesto de lo que funciona, cómo se ha verificado y qué falta.
 |---|---|---|
 | Tipos | `npm run typecheck` (TS estricto) | Sin errores |
 | Unitarias | `npm test` (Vitest): terreno, transformaciones, inventario, necesidades, misiones, reputación, guardado, navegación, trazado del pueblo y la costa, multijugador | 31/31 |
-| E2E | `npm run e2e`: el juego real en Chromium (WebGL por software) dirigido por `window.__game` | 25/25 |
-| E2E multijugador | `node e2e/mp.mjs <url>`: dos jugadores en dos pestañas | 25/25 |
+| E2E | `npm run e2e`: el juego real en Chromium (WebGL por software) dirigido por `window.__game` | 26/26 |
+| E2E multijugador | `node e2e/mp.mjs <url>`: dos jugadores en dos pestañas | 23/23 |
 | Build | `npm run build` | Correcto (JS ~3,7 MB, 1,3 MB gzip; incluye el WASM de Rapier) |
 
 Escenarios E2E (todos juegan sobre los sistemas reales, sin simulaciones):
