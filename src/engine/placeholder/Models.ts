@@ -374,20 +374,20 @@ const D: Record<string, ModelDef> = {
   } },
   // Muros de mampostería derrumbados: hiladas escalonadas y piedras caídas al pie.
   ruin_wall: { shape: { type: 'box', hx: 2.0, hy: 0.8, hz: 0.3 }, mass: 0, build: (b) => {
-    b.box(4.0, 1.0, 0.6, 'rock', 0, -0.3, 0);
-    b.box(2.6, 0.5, 0.56, 'rock', -0.7, 0.45, 0.01);
-    b.box(1.3, 0.35, 0.52, 'rock', -1.3, 0.85, 0);
-    b.box(0.6, 0.2, 0.5, 'rock', 0.8, 0.28, 0.02, 0, 0.1, 0.06);
-    for (const [x, z, s] of [[1.4, 0.55, 0.28], [0.6, -0.6, 0.22], [-1.9, 0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'rock', x, -0.68, z, 0.2, x, 0.1);
+    b.box(4.0, 1.0, 0.6, 'caveRock', 0, -0.3, 0);
+    b.box(2.6, 0.5, 0.56, 'caveRock', -0.7, 0.45, 0.01);
+    b.box(1.3, 0.35, 0.52, 'caveRock', -1.3, 0.85, 0);
+    b.box(0.6, 0.2, 0.5, 'caveRock', 0.8, 0.28, 0.02, 0, 0.1, 0.06);
+    for (const [x, z, s] of [[1.4, 0.55, 0.28], [0.6, -0.6, 0.22], [-1.9, 0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'caveRock', x, -0.68, z, 0.2, x, 0.1);
   } },
   ruin_wall_low: { shape: { type: 'box', hx: 1.5, hy: 0.4, hz: 0.3 }, mass: 0, build: (b) => {
-    b.box(3.0, 0.5, 0.6, 'rock', 0, -0.15, 0);
-    b.box(1.6, 0.3, 0.54, 'rock', 0.5, 0.25, 0.02);
-    for (const [x, z, s] of [[-1.2, 0.6, 0.25], [1.7, -0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'rock', x, -0.3, z, 0.3, x, 0.2);
+    b.box(3.0, 0.5, 0.6, 'caveRock', 0, -0.15, 0);
+    b.box(1.6, 0.3, 0.54, 'caveRock', 0.5, 0.25, 0.02);
+    for (const [x, z, s] of [[-1.2, 0.6, 0.25], [1.7, -0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'caveRock', x, -0.3, z, 0.3, x, 0.2);
   } },
   ruin_corner: { shape: { type: 'box', hx: 0.45, hy: 1.1, hz: 0.45 }, mass: 0, build: (b) => {
-    b.box(0.9, 1.6, 0.9, 'rock', 0, -0.3, 0);
-    b.box(0.8, 0.6, 0.8, 'rock', 0.03, 0.8, -0.02, 0, 0.2, 0.05);
+    b.box(0.9, 1.6, 0.9, 'caveRock', 0, -0.3, 0);
+    b.box(0.8, 0.6, 0.8, 'caveRock', 0.03, 0.8, -0.02, 0, 0.2, 0.05);
   } },
   /** Viga caída y ennegrecida. */
   fallen_beam: { shape: { type: 'box', hx: 1.8, hy: 0.12, hz: 0.12 }, mass: 0, build: (b) => {

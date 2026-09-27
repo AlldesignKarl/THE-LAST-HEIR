@@ -157,16 +157,16 @@ export class Viewmodel {
   constructor(private readonly g: Game) {
     this.camera = new THREE.PerspectiveCamera(62, 1, 0.01, 10);
     this.scene.add(this.camera, this.hemi, this.dir, this.dir.target, this.torchLight, ...this.fireLights);
-    const skin = new THREE.MeshStandardMaterial({ color: 0xc49474, roughness: 0.58 });
+    const skin = new THREE.MeshStandardMaterial({ color: 0xa87858, roughness: 0.6 });
     const sleeve = g.materials.tint('cloth', 0x5a4a38);
     const cuffMat = g.materials.get('leather');
     const fistGeo = mergeGeometries(fistGeometry())!;
     const mkArm = (grp: THREE.Group, hand: THREE.Group, fist: THREE.Mesh) => {
       // Manga de lana, puño de cuero y muñeca.
-      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.043, 0.056, 0.46, 12), sleeve);
+      const arm = new THREE.Mesh(new THREE.CylinderGeometry(0.034, 0.044, 0.46, 12), sleeve);
       arm.rotation.x = Math.PI / 2;
       arm.position.set(0, -0.015, 0.3);
-      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.046, 0.046, 0.05, 12), cuffMat);
+      const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.037, 0.037, 0.05, 12), cuffMat);
       cuff.rotation.x = Math.PI / 2;
       cuff.position.set(0, -0.015, 0.09);
       const wrist = new THREE.Mesh(new THREE.CylinderGeometry(0.026, 0.032, 0.07, 10), skin);

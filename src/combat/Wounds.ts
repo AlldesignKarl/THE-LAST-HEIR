@@ -23,8 +23,10 @@ interface Pool { mesh: THREE.Mesh; target: number; grow: number; owner: Characte
 interface Bleeder { c: Character; limb: Limb | null; emitter: string; neck?: boolean; t?: number; base?: number }
 
 const MAX_PIECES = 24;
+/** Salpicaduras: sangre oscura y húmeda (casi negra sobre la tierra). */
+const SPLAT = new THREE.MeshStandardMaterial({ color: 0x220202, roughness: 0.25, metalness: 0, envMapIntensity: 0.5, transparent: true, opacity: 0.85, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, depthWrite: false });
 const MAX_POOLS = 70;
-const BLOOD = new THREE.MeshStandardMaterial({ color: 0x3c0303, roughness: 0.4, metalness: 0, envMapIntensity: 0.25, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, depthWrite: false, side: THREE.DoubleSide });
+const BLOOD = new THREE.MeshStandardMaterial({ color: 0x2c0202, roughness: 0.4, metalness: 0, envMapIntensity: 0.25, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, depthWrite: false, side: THREE.DoubleSide });
 
 let seq = 0;
 
@@ -231,8 +233,8 @@ export class Wounds {
       const t = g.hf.heightAt(x, z);
       const floor = g.worldItems.groundAt?.(x, from.y, z) ?? t;
       const y = (Math.abs(floor - t) < 0.05 ? Math.max(t, g.hf.heightAt(x + 0.1, z), g.hf.heightAt(x, z + 0.1)) : floor) + 0.015;
-      const mesh = new THREE.Mesh(this.splatGeometry(), BLOOD);
-      const r = 0.05 + Math.random() * 0.14;
+      const mesh = new THREE.Mesh(this.splatGeometry(), SPLAT);
+      const r = 0.02 + Math.random() * 0.07;
       mesh.position.set(x, y, z);
       mesh.rotation.y = Math.random() * 6;
       mesh.scale.set(r * (1 + Math.random() * 0.8), 1, r);
