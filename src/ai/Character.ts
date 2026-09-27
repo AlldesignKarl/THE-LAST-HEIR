@@ -383,8 +383,18 @@ export class Character implements Actor {
     this.onDeath?.(this, killer);
   }
 
+  /** Sujeto por el jugador en un remate: sin IA ni movimiento propio. */
+  seized: AnimState | null = null;
+
   /** Desangrado: devuelve true si está en el suelo (sin IA). */
   updateWounds(dt: number): boolean {
+    if (this.alive && this.seized) {
+      this.path = [];
+      this.arrived = true;
+      this.phase = 'none';
+      this.blocking = false;
+      return true;
+    }
     if (!this.alive || !this.downed) return false;
     this.stop();
     this.phase = 'none';
@@ -397,6 +407,7 @@ export class Character implements Actor {
   /** Elige animación según estado. */
   chooseAnim(speed: number, idleAnim: AnimState): void {
     if (!this.alive) { this.model.setState('dead'); return; }
+    if (this.seized) { this.model.speed = 0; this.model.setState(this.seized); return; }
     if (this.downed) { this.model.speed = 0; this.model.setState(this.woundAnim); return; }
     let s: AnimState;
     if (this.phase === 'windup') s = 'windup';

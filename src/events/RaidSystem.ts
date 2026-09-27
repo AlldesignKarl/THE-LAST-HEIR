@@ -210,7 +210,7 @@ export class RaidSystem {
     const lod = d < 60 ? 0 : d < 160 ? 1 : 2;
     c.lod = lod;
     c.setShadow(d < 35);
-    c.ensureCollider(g.physics, lod === 0 && c.alive && !c.downed);
+    c.ensureCollider(g.physics, lod === 0 && c.alive && !c.downed && !c.seized);
     if (!c.alive) {
       c.updateModel(dt, false);
       c.hitboxesValid = false;

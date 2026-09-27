@@ -19,7 +19,7 @@ import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 
 interface Piece { body: RAPIER.RigidBody; mesh: THREE.Object3D; t: number; emitter: string }
 interface Pool { mesh: THREE.Mesh; target: number; grow: number; owner: Character | null }
-interface Bleeder { c: Character; limb: Limb | null; emitter: string }
+interface Bleeder { c: Character; limb: Limb | null; emitter: string; neck?: boolean }
 
 const MAX_PIECES = 24;
 const MAX_POOLS = 30;
@@ -111,6 +111,21 @@ export class Wounds {
     const emitter = `bleed_${c.id}_${seq++}`;
     g.particles.addEmitter({ id: emitter, kind: 'blood', pos: c.pos.clone(), rate: 16, spread: 0.08, vel: new THREE.Vector3(0, -0.4, 0), sizeMul: 0.6, enabled: true });
     this.bleeders.push({ c, limb, emitter });
+  }
+
+  /**
+   * Degüello (remate por la espalda): chorro arterial hacia delante, la
+   * herida del cuello mana mientras cae y queda un charco grande.
+   */
+  throatCut(c: Character, dir: { x: number; y: number; z: number }): void {
+    const g = this.g;
+    const n = c.model.neckWorld(new THREE.Vector3());
+    g.particles.burst('blood', n.x, n.y, n.z, 55, 3.2, dir, 1.1);
+    g.particles.burst('blood', n.x, n.y, n.z, 25, 1.4, { x: dir.x * 0.4, y: -0.6, z: dir.z * 0.4 }, 0.8);
+    const emitter = `throat_${c.id}_${seq++}`;
+    g.particles.addEmitter({ id: emitter, kind: 'blood', pos: n.clone(), rate: 45, spread: 0.05, vel: new THREE.Vector3(dir.x * 1.2, -0.3, dir.z * 1.2), sizeMul: 0.75, enabled: true });
+    this.bleeders.push({ c, limb: null, emitter, neck: true });
+    this.pool(c, 1.1);
   }
 
   /** Cercena un miembro: muñón en el cuerpo y el miembro como objeto físico. */
@@ -263,6 +278,7 @@ export class Wounds {
       if (!em) { this.bleeders.splice(i, 1); continue; }
       const stump = b.limb ? b.c.model.stumps.get(b.limb) : null;
       if (stump) stump.getWorldPosition(em.pos);
+      else if (b.neck) b.c.model.neckWorld(em.pos);
       else em.pos.set(b.c.pos.x, b.c.pos.y + 0.35, b.c.pos.z);
       // Muerto: deja de manar poco a poco.
       if (!b.c.alive) { em.rate *= Math.pow(0.5, dt); if (em.rate < 1) { g.particles.removeEmitter(b.emitter); this.bleeders.splice(i, 1); } }

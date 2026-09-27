@@ -209,6 +209,8 @@ export class AudioEngine {
       case 'clash': this.metal(dest, t, 1150 * r(), [1, 1.47, 2.09, 2.76, 3.41, 4.6], 0.9, 0.22); this.noiseBurst(dest, t, 0.05, 'highpass', 3000, 0.5, 0.5); break;
       case 'block_wood': this.tone(dest, t, 0.1, 180 * r(), 'triangle', 0.5); this.noiseBurst(dest, t, 0.06, 'bandpass', 900, 1.5, 0.35); break;
       case 'chop': this.tone(dest, t, 0.09, 190 * r(), 'triangle', 0.55, 120); this.noiseBurst(dest, t, 0.08, 'bandpass', 1100 * r(), 1.2, 0.45); break;
+      // Crujido seco de vértebras: dos chasquidos agudos y un golpe sordo.
+      case 'neck_snap': this.noiseBurst(dest, t, 0.03, 'highpass', 2500, 1, 0.7); this.noiseBurst(dest, t + 0.035, 0.025, 'bandpass', 1800, 2, 0.5); this.tone(dest, t, 0.08, 140, 'triangle', 0.35, 70); break;
       case 'kick': this.tone(dest, t, 0.1, 90, 'sine', 0.5); this.noiseBurst(dest, t, 0.08, 'lowpass', 800, 1, 0.3); break;
       case 'bow_draw': this.noiseBurst(dest, t, 0.7, 'bandpass', 300, 6, 0.08, 500); break;
       case 'bow_release': this.tone(dest, t, 0.25, 140, 'triangle', 0.35, 90); this.noiseBurst(dest, t, 0.12, 'bandpass', 1500, 1, 0.2); break;

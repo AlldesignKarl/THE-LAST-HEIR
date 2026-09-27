@@ -6,7 +6,7 @@
 export type Action =
   | 'forward' | 'back' | 'left' | 'right'
   | 'sprint' | 'crouch' | 'jump'
-  | 'interact' | 'grab' | 'attack' | 'block' | 'dodge' | 'kick' | 'torch'
+  | 'interact' | 'grab' | 'attack' | 'block' | 'dodge' | 'kick' | 'torch' | 'takedown'
   | 'slot1' | 'slot2' | 'slot3' | 'slot4'
   | 'inventory' | 'journal' | 'map' | 'pause' | 'perf';
 
@@ -16,7 +16,7 @@ const DEFAULT_BINDINGS: Record<string, Action> = {
   ShiftLeft: 'sprint', ShiftRight: 'sprint',
   ControlLeft: 'crouch', ControlRight: 'crouch',
   Space: 'jump',
-  KeyE: 'interact', KeyR: 'grab', KeyC: 'dodge', KeyF: 'kick', KeyT: 'torch',
+  KeyE: 'interact', KeyR: 'grab', KeyC: 'dodge', KeyF: 'kick', KeyT: 'torch', KeyG: 'takedown',
   Digit1: 'slot1', Digit2: 'slot2', Digit3: 'slot3', Digit4: 'slot4',
   Tab: 'inventory', KeyI: 'inventory', KeyJ: 'journal', KeyM: 'map',
   Escape: 'pause', F3: 'perf',

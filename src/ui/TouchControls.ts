@@ -25,6 +25,7 @@ const BUTTONS: ButtonDef[] = [
   { a: 'jump', label: 'Saltar', cls: 'b-jump' },
   { a: 'dodge', label: 'Esquivar', cls: 'b-dodge' },
   { a: 'kick', label: 'Patada', cls: 'b-kick' },
+  { a: 'takedown', label: 'Remate', cls: 'b-takedown' },
   { a: 'grab', label: 'Agarrar', cls: 'b-grab' },
   { a: 'torch', label: 'Antorcha', cls: 'b-torch' },
   { a: 'weapon', label: 'Arma', cls: 'b-weapon' },
@@ -248,6 +249,10 @@ export class TouchControls {
     const focus = g.interaction.focus.kind !== 'none';
     this.buttons.get('interact')!.classList.toggle('hot', focus);
     this.buttons.get('grab')!.classList.toggle('hot', !!g.interaction.carried);
+    // El botón de remate solo aparece cuando hay alguien de espaldas al alcance.
+    const td = this.buttons.get('takedown')!;
+    td.style.display = g.takedown.candidate ? 'flex' : 'none';
+    td.classList.toggle('hot', !!g.takedown.candidate);
     this.buttons.get('torch')!.classList.toggle('latched', g.equipment.slots.off === 'torch');
     this.orient.style.display = window.innerHeight > window.innerWidth ? 'block' : 'none';
   }

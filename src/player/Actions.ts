@@ -198,6 +198,7 @@ export class Actions {
       }
       g.bus.emit('item:removed', { itemId: id, count: 1, reason: 'consume' });
       g.bus.emit('sfx', { id: d.category === 'drink' ? 'drink' : 'eat' });
+      g.viewmodel?.play(d.category === 'drink' ? 'drink' : 'eat', id);
       g.equipment.validate();
       return;
     }

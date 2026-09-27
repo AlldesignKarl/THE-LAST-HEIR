@@ -60,6 +60,7 @@ import { Guide } from '../ui/Guide';
 import { Boats } from '../world/Boats';
 import { Fishing } from '../player/Fishing';
 import { Wounds } from '../combat/Wounds';
+import { Takedown } from '../combat/Takedown';
 import { Seasons } from '../env/Seasons';
 import { Bodies } from '../social/Bodies';
 import { SaveSystem } from '../save/SaveSystem';
@@ -125,6 +126,9 @@ export class Game {
   readonly boats: Boats;
   readonly fishing: Fishing;
   readonly wounds: Wounds;
+  readonly takedown: Takedown;
+  /** Acciones diferidas (segundos de juego). */
+  private timers: { t: number; fn: () => void }[] = [];
   readonly seasons: Seasons;
   readonly bodies: Bodies;
   /** Id del jugador local (en multijugador, el del usuario). */
@@ -195,6 +199,7 @@ export class Game {
     this.boats = new Boats(this);
     this.fishing = new Fishing(this);
     this.wounds = new Wounds(this);
+    this.takedown = new Takedown(this);
     this.seasons = new Seasons(this);
     this.bodies = new Bodies(this);
     this.grass = new Grass(this.hf, scene, (x, z) => {
@@ -438,12 +443,24 @@ export class Game {
     if (this.vitals.health < 25) this.player.speedMul *= 0.85;
     this.player.frozen = this.vitals.dead;
     this.fishing.update(dt);
+    // Temporizadores de juego.
+    for (let i = this.timers.length - 1; i >= 0; i--) {
+      const tm = this.timers[i];
+      tm.t -= dt;
+      if (tm.t <= 0) { this.timers.splice(i, 1); tm.fn(); }
+    }
     // En modo construcción el clic coloca y E desmonta; en la barca E baja;
     // con la caña, el clic lanza: en esos casos no hay combate ni uso normal.
     if (!this.boats.riding) {
       this.autoOpenDoors();
-      this.interaction.update(dt);
-      if (!this.fishing.holding && !this.interaction.dragging) this.combat.update(dt);
+      // Remate por la espalda: mientras dura, el jugador no se mueve ni hace otra cosa.
+      if (this.takedown.update(dt)) {
+        this.player.frozen = true;
+        this.interaction.focus = { kind: 'none', text: '' };
+      } else {
+        this.interaction.update(dt);
+        if (!this.fishing.holding && !this.interaction.dragging) this.combat.update(dt);
+      }
     }
     // Antes de mover: dentro de la cueva el jugador está legítimamente bajo el terreno.
     const pp = this.player.pos;
@@ -464,6 +481,11 @@ export class Game {
     this.physics.step(dt);
     this.worldItems.update(dt);
     this.input.endTick();
+  }
+
+  /** Ejecuta `fn` dentro de `sec` segundos de juego. */
+  later(sec: number, fn: () => void): void {
+    this.timers.push({ t: sec, fn });
   }
 
   private doorT = 0;
@@ -602,6 +624,9 @@ export class Game {
     if (this.combat.hitStop > 0) {
       this.combat.hitStop -= frameDt;
       this.loop.timeScale = 0.08;
+    } else if (this.combat.slowmo > 0) {
+      this.combat.slowmo -= frameDt;
+      this.loop.timeScale = 0.35;
     } else this.loop.timeScale = 1;
     const { dx, dy } = this.input.takeMouseDelta();
     if (!this.paused) this.player.look(dx, dy, this.input.sensitivity);

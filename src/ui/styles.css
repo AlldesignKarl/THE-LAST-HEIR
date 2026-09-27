@@ -118,6 +118,7 @@ canvas.map { display: block; border: 1px solid var(--panel-edge); }
 .b-jump { right: 186px; bottom: 16px; width: 52px; height: 52px; }
 .b-dodge { right: 108px; bottom: 88px; width: 52px; height: 52px; }
 .b-kick { right: 104px; bottom: 150px; width: 48px; height: 48px; }
+.b-takedown { right: 30px; bottom: 262px; width: 64px; height: 64px; font-size: 13px; border-color: #c04a3a; }
 .b-grab { right: 36px; bottom: 200px; width: 50px; height: 50px; }
 .b-weapon { right: 164px; bottom: 124px; width: 50px; height: 50px; }
 .b-torch { right: 168px; bottom: 186px; width: 48px; height: 48px; }

@@ -346,7 +346,7 @@ export class UIManager {
         <div><b>WASD</b> Moverse · <b>Shift</b> Correr · <b>Ctrl</b> Agacharse · <b>Espacio</b> Saltar</div>
         <div><b>E</b> Usar / coger · <b>R</b> Agarrar, transportar y soltar objetos</div>
         <div><b>Clic izq.</b> Ataque ligero · <b>Mantener</b> ataque fuerte / tensar arco</div>
-        <div><b>Clic der.</b> Bloquear · <b>C</b> Esquivar · <b>F</b> Patada</div>
+        <div><b>Clic der.</b> Bloquear · <b>C</b> Esquivar · <b>F</b> Patada · <b>G</b> Remate por la espalda</div>
         <div><b>T</b> Antorcha en la mano izquierda · <b>1–4</b> Armas rápidas</div>
         <div><b>Tab / I</b> Inventario · <b>J</b> Diario · <b>M</b> Mapa · <b>Esc</b> Pausa · <b>F3</b> Rendimiento</div>
         <h3>Pantalla táctil</h3>

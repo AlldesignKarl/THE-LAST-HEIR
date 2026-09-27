@@ -42,6 +42,8 @@ export class Combat {
   private activeT = 0;
   hitStop = 0;
   shake = 0;
+  /** Cámara lenta tras un golpe mortal (segundos reales). */
+  slowmo = 0;
   private arrows: Arrow[] = [];
   private actorsTmp: Actor[] = [];
 
@@ -270,13 +272,17 @@ export class Combat {
     if (tag?.kind === 'tree') {
       const mul = w.chop * g.skills.mul('survival');
       g.bus.emit('sfx', { id: 'chop', x: hit.point.x, y: hit.point.y, z: hit.point.z });
-      g.particles.burst('dust', hit.point.x, hit.point.y, hit.point.z, 5, 1.5, undefined, 0.5);
+      // Astillas que saltan hacia ti y serrín.
+      g.particles.burst('chip', hit.point.x, hit.point.y, hit.point.z, 10 + (this.heavy ? 8 : 0), 3.2, { x: -dir.x, y: 0.6, z: -dir.z });
+      g.particles.burst('dust', hit.point.x, hit.point.y, hit.point.z, 4, 1.2, undefined, 0.4);
+      this.shake = Math.max(this.shake, this.heavy ? 0.22 : 0.12);
       if (mul > 0.05) {
         g.treeFelling.damage(tag.id, dmg * mul * (this.heavy ? 1.2 : 0.8), g.player.pos);
         g.skills.add('survival', 0.5);
       }
       this.swingBlocked = w.chop < 0.5;
-      this.hitStop = 0.05;
+      // El filo se clava un instante en la madera.
+      this.hitStop = w.chop >= 0.5 ? (this.heavy ? 0.12 : 0.08) : 0.05;
       return;
     }
     if (tag?.kind === 'rock') {
@@ -333,6 +339,9 @@ export class Combat {
       this.shake = Math.max(this.shake, this.heavy ? 0.35 : 0.2);
     }
     this.hitStop = res.blocked ? 0.07 : this.heavy ? 0.11 : 0.07;
+    // Golpe mortal (o que deja a alguien desangrándose): un instante a cámara lenta.
+    const c = a instanceof Character ? a : null;
+    if (wasAlive && (!a.alive || c?.downed)) { this.slowmo = 0.45; this.shake = Math.max(this.shake, 0.4); }
     g.bus.emit('actor:damaged', { targetId: a.id, attackerId: 'player', amount: res.applied, part: zone, blocked: res.blocked });
     this.onPlayerAggression(a);
   }

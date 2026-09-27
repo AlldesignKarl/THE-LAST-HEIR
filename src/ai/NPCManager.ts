@@ -238,7 +238,7 @@ export class NPCManager {
       const every = lod === 0 ? 1 : lod === 1 ? 6 : 30;
       const step = (this.tick + n.def.id.length) % every === 0;
       const prevHandle = c.collider?.handle;
-      c.ensureCollider(g.physics, lod === 0 && (!c.indoors || c.homeShown) && c.alive && !c.downed);
+      c.ensureCollider(g.physics, lod === 0 && (!c.indoors || c.homeShown) && c.alive && !c.downed && !c.seized);
       // Los handles de Rapier se reutilizan: desregistrar al destruir el collider.
       if (prevHandle !== undefined && c.collider?.handle !== prevHandle) g.interactables.unregisterCollider(prevHandle);
       if (c.collider && !g.interactables.forCollider(c.collider.handle)) this.registerTalk(n);

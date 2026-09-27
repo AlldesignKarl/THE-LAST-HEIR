@@ -5,7 +5,7 @@
  */
 import * as THREE from 'three';
 
-export type ParticleKind = 'fire' | 'ember' | 'smoke' | 'dust' | 'blood' | 'spark' | 'steam' | 'rain_splash';
+export type ParticleKind = 'fire' | 'ember' | 'smoke' | 'dust' | 'blood' | 'spark' | 'steam' | 'rain_splash' | 'chip';
 
 interface KindSpec {
   additive: boolean;
@@ -27,6 +27,7 @@ const SPECS: Record<ParticleKind, KindSpec> = {
   steam: { additive: false, life: [1, 2], size: [0.3, 0.5], grow: 1, color: [0.75, 0.75, 0.78], color2: [0.85, 0.85, 0.88], gravity: -0.8, drag: 1, alpha: 0.25 },
   dust: { additive: false, life: [0.6, 1.4], size: [0.2, 0.4], grow: 1.2, color: [0.45, 0.38, 0.28], color2: [0.5, 0.45, 0.36], gravity: -0.2, drag: 2, alpha: 0.35 },
   blood: { additive: false, life: [0.3, 0.7], size: [0.04, 0.09], grow: 0.1, color: [0.35, 0.02, 0.02], color2: [0.2, 0.01, 0.01], gravity: 9, drag: 0.3, alpha: 0.9 },
+  chip: { additive: false, life: [0.6, 1.3], size: [0.035, 0.07], grow: 0, color: [0.78, 0.62, 0.4], color2: [0.6, 0.45, 0.28], gravity: 9.5, drag: 0.8, alpha: 1 },
   rain_splash: { additive: false, life: [0.15, 0.25], size: [0.05, 0.1], grow: 2, color: [0.6, 0.65, 0.7], color2: [0.6, 0.65, 0.7], gravity: 3, drag: 0, alpha: 0.4 },
 };
 

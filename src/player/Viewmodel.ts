@@ -60,6 +60,66 @@ const POSES = {
   bowDrawn: P(0.06, -0.08, -0.18, 0.1, 0, 0),
 };
 
+/**
+ * Animaciones de acción en primera persona: fotogramas clave para cada mano
+ * (posición y giro respecto a la cámara), interpolados con suavizado. La
+ * pose inicial es la que tenga la mano al empezar. `item`: objeto que se
+ * muestra en la mano derecha durante la animación (comida, bebida…).
+ */
+interface ClipKey { t: number; R?: Pose; L?: Pose }
+interface Clip { dur: number; keys: ClipKey[]; hideWeapon?: boolean }
+const FIST_IDLE = POSES.idleFists;
+const L_IDLE = P(-0.22, -0.32, -0.42, 0.1, -0.1, 0.1);
+const CLIPS: Record<string, Clip> = {
+  // Agacharse a coger algo y guardarlo en el zurrón.
+  pickup: { dur: 0.62, hideWeapon: false, keys: [
+    { t: 0.16, R: P(0.1, -0.46, -0.72, -0.75, 0.1, 0) },
+    { t: 0.27, R: P(0.1, -0.48, -0.68, -0.55, 0.15, 0.25) },
+    { t: 0.48, R: P(0.34, -0.64, -0.24, 0.45, 0.35, 0.35) },
+    { t: 0.62, R: POSES.idle },
+  ] },
+  // Meter algo en el zurrón o en un arcón.
+  store: { dur: 0.45, keys: [
+    { t: 0.12, R: P(0.18, -0.36, -0.5, -0.2, 0.2, 0.1) },
+    { t: 0.3, R: P(0.34, -0.66, -0.22, 0.5, 0.4, 0.3) },
+    { t: 0.45, R: POSES.idle },
+  ] },
+  // Llevarse la comida a la boca y dar bocados.
+  eat: { dur: 1.35, hideWeapon: true, keys: [
+    { t: 0.28, R: P(0.07, -0.17, -0.25, 0.85, 0.15, -0.25), L: P(-0.24, -0.4, -0.42, 0.1, -0.1, 0.1) },
+    { t: 0.42, R: P(0.05, -0.12, -0.2, 1.0, 0.15, -0.25) },
+    { t: 0.56, R: P(0.07, -0.18, -0.26, 0.85, 0.15, -0.25) },
+    { t: 0.72, R: P(0.05, -0.12, -0.2, 1.0, 0.15, -0.25) },
+    { t: 0.86, R: P(0.07, -0.18, -0.26, 0.85, 0.15, -0.25) },
+    { t: 1.0, R: P(0.05, -0.13, -0.21, 1.0, 0.15, -0.25) },
+    { t: 1.35, R: FIST_IDLE, L: L_IDLE },
+  ] },
+  // Beber a morro del odre o la jarra.
+  drink: { dur: 1.4, hideWeapon: true, keys: [
+    { t: 0.3, R: P(0.05, -0.1, -0.26, 1.35, 0.1, -0.35) },
+    { t: 0.5, R: P(0.04, -0.05, -0.24, 1.75, 0.1, -0.35) },
+    { t: 1.05, R: P(0.04, -0.04, -0.24, 1.8, 0.1, -0.35) },
+    { t: 1.4, R: FIST_IDLE },
+  ] },
+  // Degollar por la espalda: la izquierda sujeta la frente, la derecha pasa la hoja.
+  throat: { dur: 1.7, keys: [
+    { t: 0.22, L: P(-0.06, -0.05, -0.5, 0.25, 0.1, -0.35), R: P(0.42, -0.13, -0.42, 0.1, -0.9, -1.5) },
+    { t: 0.5, L: P(-0.05, -0.02, -0.46, 0.3, 0.1, -0.35), R: P(0.44, -0.12, -0.42, 0.1, -0.95, -1.5) },
+    { t: 0.66, R: P(-0.26, -0.15, -0.46, 0.1, 0.55, -1.5) },
+    { t: 1.0, L: P(-0.08, -0.25, -0.52, 0.3, 0.1, -0.3), R: P(-0.2, -0.3, -0.5, 0.2, 0.4, -1.2) },
+    { t: 1.35, L: P(-0.12, -0.5, -0.5, 0.2, 0, -0.1), R: P(0.1, -0.45, -0.5, 0.3, 0.2, -0.3) },
+    { t: 1.7, L: L_IDLE, R: POSES.idle },
+  ] },
+  // Romper el cuello: una mano en la barbilla, otra en la nuca, giro seco.
+  necksnap: { dur: 1.35, keys: [
+    { t: 0.24, L: P(-0.1, -0.08, -0.46, 0.2, 0, -0.45), R: P(0.1, -0.02, -0.44, 0.35, 0, 0.35) },
+    { t: 0.6, L: P(-0.1, -0.07, -0.44, 0.2, 0, -0.45), R: P(0.1, -0.01, -0.43, 0.35, 0, 0.35) },
+    { t: 0.68, L: P(0.0, -0.18, -0.44, 0.2, 0, 0.55), R: P(0.0, -0.13, -0.44, 0.35, 0, 1.25) },
+    { t: 1.0, L: P(-0.05, -0.42, -0.48, 0.2, 0, 0.3), R: P(0.08, -0.4, -0.48, 0.35, 0, 0.6) },
+    { t: 1.35, L: L_IDLE, R: FIST_IDLE },
+  ] },
+};
+
 export class Viewmodel {
   readonly scene = new THREE.Scene();
   readonly camera: THREE.PerspectiveCamera;
@@ -75,7 +135,6 @@ export class Viewmodel {
   private dir = new THREE.DirectionalLight(0xffffff, 1);
   private torchLight = new THREE.PointLight(0xff9040, 0, 6, 2);
   private fireLights = [new THREE.PointLight(0xff8040, 0, 12, 2), new THREE.PointLight(0xff8040, 0, 12, 2)];
-  private reachT = 0;
   private swayX = 0;
   private swayY = 0;
   private lastYaw = 0;
@@ -151,7 +210,53 @@ export class Viewmodel {
 
   /** Animación de "alcanzar" al recoger un objeto. */
   reach(): void {
-    this.reachT = 0.35;
+    this.play('pickup');
+  }
+
+  private clip: { c: Clip; t: number; R0: Pose; L0: Pose; item: THREE.Object3D | null } | null = null;
+
+  /** ¿Hay una animación de acción en curso? */
+  get busy(): boolean { return !!this.clip; }
+
+  /** Reproduce una animación de acción (ver CLIPS). `item`: modelo a mostrar en la mano. */
+  play(name: keyof typeof CLIPS, item?: string): void {
+    const c = CLIPS[name];
+    if (!c) return;
+    if (this.clip?.item) this.clip.item.parent?.remove(this.clip.item);
+    let obj: THREE.Object3D | null = null;
+    if (item) {
+      obj = this.g.models.create(itemDef(item).model).object;
+      obj.scale.setScalar(0.7);
+      obj.position.set(0.0, 0.05, -0.04);
+      obj.rotation.set(0.4, 0, 0.2);
+      obj.traverse((o) => { (o as THREE.Mesh).castShadow = false; });
+      this.rightHand.add(obj);
+    }
+    const pose = (g: THREE.Group): Pose => P(g.position.x, g.position.y, g.position.z, g.rotation.x, g.rotation.y, g.rotation.z);
+    this.clip = { c, t: 0, R0: pose(this.right), L0: pose(this.left), item: obj };
+  }
+
+  /** Pose de una mano en el instante t de la animación (con suavizado entre claves). */
+  private sample(side: 'R' | 'L', t: number, out: { p: THREE.Vector3; r: THREE.Vector3 }): boolean {
+    const cl = this.clip!;
+    let prevT = 0, prev: Pose = side === 'R' ? cl.R0 : cl.L0;
+    let any = false;
+    for (const k of cl.c.keys) {
+      const pose = k[side];
+      if (!pose) continue;
+      any = true;
+      if (t <= k.t) {
+        const u = Math.max(0, Math.min(1, (t - prevT) / Math.max(1e-3, k.t - prevT)));
+        const e = u * u * (3 - 2 * u);
+        out.p.lerpVectors(prev.p, pose.p, e);
+        out.r.set(prev.r.x + (pose.r.x - prev.r.x) * e, prev.r.y + (pose.r.y - prev.r.y) * e, prev.r.z + (pose.r.z - prev.r.z) * e);
+        return true;
+      }
+      prevT = k.t; prev = pose;
+    }
+    if (!any) return false;
+    out.p.copy(prev.p); out.r.set(prev.r.x, prev.r.y, prev.r.z);
+    return true;
   }
 
   private rebuild(): void {
@@ -229,7 +334,6 @@ export class Viewmodel {
       default: break;
     }
     if (g.interaction.carried) { target = POSES.lowered; speed = 8; }
-    if (this.reachT > 0) { this.reachT -= dt; target = POSES.reach; speed = 18; }
     void k;
     // Balanceo al andar y retardo al girar (inercia).
     const bob = pl.bobAmount;
@@ -281,6 +385,28 @@ export class Viewmodel {
     this.left.position.copy(this.curL.p);
     this.left.rotation.set(this.curL.r.x, this.curL.r.y, this.curL.r.z);
     this.left.visible = isBow || !!off || c.state === 'block' || !main;
+
+    // Animación de acción: manda sobre las poses normales.
+    if (this.clip) {
+      const cl = this.clip;
+      cl.t += dt;
+      if (this.sample('R', cl.t, this.cur)) {
+        this.right.position.copy(this.cur.p);
+        this.right.rotation.set(this.cur.r.x, this.cur.r.y, this.cur.r.z);
+        this.right.visible = true;
+      }
+      if (this.sample('L', cl.t, this.curL)) {
+        this.left.position.copy(this.curL.p);
+        this.left.rotation.set(this.curL.r.x, this.curL.r.y, this.curL.r.z);
+        this.left.visible = true;
+      }
+      if (this.weaponObj) this.weaponObj.visible = !cl.c.hideWeapon;
+      if (cl.t >= cl.c.dur) {
+        if (cl.item) cl.item.parent?.remove(cl.item);
+        if (this.weaponObj) this.weaponObj.visible = true;
+        this.clip = null;
+      }
+    }
 
     // Punta de la antorcha en coordenadas de mundo (para fuego y luz).
     this.camera.updateMatrixWorld(true);

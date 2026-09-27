@@ -32,7 +32,11 @@ export type AnimState =
   /** Cargado al hombro: doblado por la cintura, brazos y piernas colgando. */
   | 'carried'
   /** Durmiendo tendido boca arriba (en una cama). */
-  | 'sleep';
+  | 'sleep'
+  /** Sujeto por la espalda (remate): rígido, manos al brazo que le sujeta. */
+  | 'seized'
+  /** Degollado: manos al cuello, se le doblan las rodillas. */
+  | 'throat';
 
 /** Miembros que se pueden cercenar. */
 export type Limb = 'head' | 'armL' | 'armR' | 'legL' | 'legR';
@@ -347,14 +351,34 @@ export class HumanoidModel {
       this.prop.position.set(0, -0.03, 0.05);
       this.handR.add(this.prop);
     }
+    const prev = this.state;
     this.state = s;
     this.stateT = 0;
-    if (s === 'dead') this.deadT = 0;
+    if (s === 'dead') {
+      this.deadT = 0;
+      // Cada muerte cae a su manera: de espaldas, o se le doblan las rodillas y cae de bruces.
+      this.fallDir = this.neckBroken || prev === 'throat' || Math.random() < 0.6 ? -1 : 1;
+    }
     if (s === 'hit') this.hitT = 0.3;
+  }
+
+  /** Depuración: sustituye ángulos de la pose actual. */
+  poseOverride: Partial<Record<'shLx' | 'shRx' | 'shLz' | 'shRz' | 'elL' | 'elR' | 'headX' | 'spineX', number>> | null = null;
+
+  /** Dirección de la caída al morir (-1 de espaldas, 1 de bruces). */
+  private fallDir = -1;
+
+  /** Cuello roto: la cabeza queda girada en cualquier pose. */
+  neckBroken = false;
+
+  /** Posición mundial del cuello (base de la cabeza). */
+  neckWorld(out: THREE.Vector3): THREE.Vector3 {
+    return this.neck.getWorldPosition(out).add(new THREE.Vector3(0, 0.08, 0));
   }
 
   /** Deja el cuerpo ya tendido (sin volver a animar la caída). */
   snapDead(): void {
+    this.fallDir = -1;
     this.state = 'dead';
     this.deadT = 1;
     this.cur.rootX = -1.5;
@@ -481,12 +505,38 @@ export class HumanoidModel {
       spineX = 1.25; headX = 0.45;
       shLx = shRx = -1.35 + sw2; shLz = 0.15; shRz = -0.15; elL = elR = -0.25;
       hipLx = hipRx = -1.25 - sw2; knL = knR = 0.35;
+    } else if (s === 'seized') {
+      // Sujeto por detrás: la cabeza hacia atrás, las manos al brazo del agresor, pataleo.
+      const tr = Math.sin(this.stateT * 14) * 0.05;
+      headX = -0.55; spineX = -0.22 + tr * 0.5;
+      shLx = shRx = -1.0 + tr; shLz = 0.75; shRz = -0.75; elL = elR = -1.25;
+      knL = 0.25 + Math.max(0, tr) * 3; knR = 0.2; hipLx = -0.1 - Math.max(0, tr) * 2; hipsY = -0.04;
+    } else if (s === 'throat') {
+      // Degollado: se lleva las manos al cuello y se desploma de rodillas.
+      const k = Math.min(1, this.stateT / 0.7);
+      const tr = Math.sin(this.stateT * 18) * 0.04 * (1 - k * 0.5);
+      headX = 0.35 + tr; spineX = 0.2 + k * 0.35;
+      shLx = shRx = -0.85 + tr; shLz = 0.7; shRz = -0.7; elL = elR = -1.4;
+      hipsY = -0.47 * k; hipLx = hipRx = 0.05 * k; knL = knR = 1.55 * k;
     } else if (s === 'dead') {
       this.deadT += dt;
-      const k = Math.min(1, this.deadT / 0.7);
-      rootX = -k * k * 1.5;
-      hipsY = -k * 0.75;
-      shLx = shRx = -0.4 * k; elL = elR = -0.2; knL = knR = 0.3 * k; hipsYaw = 0.2 * k;
+      if (this.fallDir < 0) {
+        // De espaldas (o desde las rodillas, tras degollarlo).
+        const k = Math.min(1, this.deadT / 0.7);
+        rootX = -k * k * 1.5;
+        hipsY = -k * 0.75;
+        shLx = shRx = -0.4 * k; elL = elR = -0.2; knL = knR = 0.3 * k; hipsYaw = 0.2 * k;
+      } else {
+        // Se le doblan las rodillas y cae de bruces, con los brazos por delante.
+        const k1 = Math.min(1, this.deadT / 0.3);
+        const k2 = Math.max(0, Math.min(1, (this.deadT - 0.25) / 0.55));
+        hipsY = -0.45 * k1 - 0.3 * k2;
+        knL = knR = 1.4 * k1 * (1 - k2) + 0.25 * k2;
+        hipLx = hipRx = -0.3 * k1 * (1 - k2);
+        rootX = k2 * k2 * 1.45;
+        spineX = 0.3 * k1 * (1 - k2);
+        shLx = -1.2 * k2; shRx = -0.6 * k2; shLz = 0.3; shRz = -0.5; elL = elR = -0.4; headY = 0.9 * k2; hipsYaw = -0.2 * k2;
+      }
     }
     if (this.hitT > 0 && s !== 'dead') { spineX -= this.hitT * 1.2; headX -= this.hitT; }
     const sp = s === 'dead' ? 20 : s === 'strike' ? 30 : 14;
@@ -496,8 +546,15 @@ export class HumanoidModel {
     this.hips.rotation.y = this.target('hipsYaw', hipsYaw, dt);
     this.spine.rotation.x = this.target('spineX', spineX, dt, sp);
     this.spine.rotation.y = this.target('spineY', spineY, dt, sp);
-    this.head.rotation.x = this.target('headX', headX, dt, 4);
-    this.head.rotation.y = this.target('headY', headY, dt, 3);
+    if (this.poseOverride) {
+      // Ajuste manual de articulaciones (herramienta de depuración de poses).
+      const o = this.poseOverride;
+      shLx = o.shLx ?? shLx; shRx = o.shRx ?? shRx; shLz = o.shLz ?? shLz; shRz = o.shRz ?? shRz;
+      elL = o.elL ?? elL; elR = o.elR ?? elR; headX = o.headX ?? headX; spineX = o.spineX ?? spineX;
+    }
+    if (this.neckBroken) { headY = 1.35; headX = 0.35; }
+    this.head.rotation.x = this.target('headX', headX, dt, this.neckBroken ? 40 : s === 'seized' ? 10 : 4);
+    this.head.rotation.y = this.target('headY', headY, dt, this.neckBroken ? 40 : 3);
     this.shL.rotation.x = this.target('shLx', shLx, dt, sp);
     this.shR.rotation.x = this.target('shRx', shRx, dt, sp);
     this.shL.rotation.z = this.target('shLz', shLz, dt, sp);

@@ -26,7 +26,7 @@ export interface Carried {
 }
 
 export interface FocusTarget {
-  kind: 'item' | 'prop' | 'interactable' | 'water' | 'none';
+  kind: 'item' | 'prop' | 'interactable' | 'water' | 'takedown' | 'none';
   text: string;
   sub?: string;
   item?: WorldItem;
@@ -87,6 +87,13 @@ export class Interaction {
     const g = this.g;
     const hit = g.physics.raycast(eye.x, eye.y, eye.z, fwd.x, fwd.y, fwd.z, 4, ALL & ~GROUP.PLAYER, g.player.collider);
     this.focus = { kind: 'none', text: '' };
+    // Remate por la espalda: tiene prioridad sobre lo demás.
+    const td = g.takedown?.candidate;
+    if (td) {
+      const touch = g.input.touchMode;
+      this.focus = { kind: 'takedown', text: `${td.c.name} (de espaldas)`, sub: `${touch ? 'Remate' : '[G]'} ${td.kind === 'throat' ? 'Degollar' : 'Romper el cuello'}` };
+      return;
+    }
     if (hit) {
       const wi = g.worldItems.forCollider(hit.collider.handle);
       if (wi && hit.toi <= REACH) {
