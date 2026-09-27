@@ -353,6 +353,14 @@ export class HumanoidModel {
     if (s === 'hit') this.hitT = 0.3;
   }
 
+  /** Deja el cuerpo ya tendido (sin volver a animar la caída). */
+  snapDead(): void {
+    this.state = 'dead';
+    this.deadT = 1;
+    this.cur.rootX = -1.5;
+    this.cur.hipsY = -0.75;
+  }
+
   /** Posición mundial del punto de antorcha (mano izquierda). */
   torchWorld(out: THREE.Vector3): THREE.Vector3 {
     return this.handL.getWorldPosition(out).add(new THREE.Vector3(0, 0.35, 0));

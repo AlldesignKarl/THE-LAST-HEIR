@@ -58,18 +58,36 @@ export class Bodies {
     }
   }
 
-  /** ¿Algún vecino o guardia vivo lo ve ahora? */
+  /** Edificio en cuyo interior está el cuerpo (o null si está fuera). */
+  buildingOf(c: Character): string | null {
+    for (const b of this.g.settlement.buildings.values()) {
+      if (b.contains(c.pos.x, c.pos.z, 0.05) && Math.abs(c.pos.y - b.floorY) < 1.6) return b.def.id;
+    }
+    return null;
+  }
+
+  /**
+   * ¿Algún vecino o guardia vivo lo ve ahora? Los que están dentro de una
+   * casa solo ven lo que hay en esa misma casa; los de fuera, lo que tienen
+   * a la vista (las paredes tapan; una puerta abierta, no).
+   */
   private finder(c: Character): Character | null {
     const g = this.g;
     const night = g.time.nightFactor;
     const range = (18 - night * 11) * g.weather.visibility;
+    const inB = this.buildingOf(c);
     for (const n of g.npcs.npcs.values()) {
       const o = n.c;
-      if (o === c || !o.alive || o.downed || o.indoors) continue;
+      if (o === c || !o.alive || o.downed) continue;
+      if (o.indoors) {
+        // Dentro: lo encuentra quien entra en esa misma casa.
+        if (inB && n.placeId === `in:${inB}` && o.pos.distanceTo(c.pos) < 12) return o;
+        continue;
+      }
       const torch = o.hasTorch ? 5 : 0;
       const d = o.pos.distanceTo(c.pos);
       if (d > range + torch) continue;
-      if (canSee(g, o.pos, c.pos.clone().setY(c.pos.y - 0.9), `${o.id}>body>${c.id}`, this.now)) return o;
+      if (canSee(g, o.pos, c.pos.clone().setY(c.pos.y - 0.95), `${o.id}>body>${c.id}`, this.now)) return o;
     }
     return null;
   }
@@ -126,16 +144,34 @@ export class Bodies {
     for (const [id, p] of this.pending) {
       const c = p.c;
       if (c.hiddenBody) continue;
-      let near = false;
-      for (const pl of g.settlement.places.values()) {
-        if (Math.hypot(pl.x - c.pos.x, pl.z - c.pos.z) < 30) { near = true; break; }
+      let found: boolean;
+      const bid = this.buildingOf(c);
+      if (bid) {
+        // Dentro de un edificio: solo lo encuentra quien vive o trabaja ahí.
+        // En tu choza, o en una casa cuyo dueño ha muerto, nadie entra.
+        found = bid !== 'player_hut' && this.occupied(bid);
+      } else {
+        found = false;
+        for (const pl of g.settlement.places.values()) {
+          if (Math.hypot(pl.x - c.pos.x, pl.z - c.pos.z) < 30) { found = true; break; }
+        }
       }
-      if (near) {
+      if (found) {
         this.pending.delete(id);
         g.bus.emit('crime', { type: 'murder', village: p.village, witnessed: true });
         g.bus.emit('notify', { text: `Mientras dormías han encontrado el cuerpo de ${c.name}.`, kind: 'alert' });
       }
     }
+  }
+
+  /** ¿Alguien vivo usa ese edificio (vive, trabaja o come en él)? */
+  private occupied(bid: string): boolean {
+    for (const n of this.g.npcs.npcs.values()) {
+      if (!n.c.alive) continue;
+      if (n.def.home === bid) return true;
+      if (n.def.schedule.some((e) => e.place === `in:${bid}` || this.g.settlement.places.get(e.place)?.building === bid)) return true;
+    }
+    return false;
   }
 
   serialize(): object {

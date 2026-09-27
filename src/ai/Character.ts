@@ -51,7 +51,7 @@ export class Character implements Actor {
   readonly pos = new THREE.Vector3();
   readonly prevPos = new THREE.Vector3();
   yaw = 0;
-  private renderYaw = 0;
+  renderYaw = 0;
   alive = true;
   health: number;
   maxHealth: number;

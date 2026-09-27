@@ -49,6 +49,8 @@ export class Interaction {
   dragging: Character | null = null;
   private carryT = 0;
   private pickFrom = new THREE.Vector3();
+  /** Dejando el cuerpo en el suelo (animación de bajarlo del hombro). */
+  private lowering: { c: Character; t: number; fromPos: THREE.Vector3; fromQ: THREE.Quaternion; toPos: THREE.Vector3; toQ: THREE.Quaternion; yaw: number } | null = null;
 
   constructor(private readonly g: Game) {}
 
@@ -60,6 +62,7 @@ export class Interaction {
     this.updateFocus(tmpE, tmpF);
 
     const inp = g.input;
+    if (this.lowering) { this.updateLowering(dt); return; }
     if (this.dragging) {
       this.updateCarryBody(dt);
       if (this.carryT > 0.8 && (inp.wasPressed('grab') || inp.wasPressed('interact'))) this.releaseDrag();
@@ -278,18 +281,75 @@ export class Interaction {
     if (!c) return;
     const g = this.g;
     this.dragging = null;
+    const spot = this.findBodySpot();
+    const fromPos = c.carryPose ? c.carryPose.pos.clone() : c.model.root.position.clone();
+    const fromQ = c.carryPose ? c.carryPose.q.clone() : c.model.root.quaternion.clone();
+    // Tendido boca arriba (como la pose de muerto) o de lado si aún vive.
+    const toQ = new THREE.Quaternion().setFromEuler(new THREE.Euler(c.alive ? 0 : -1.5, spot.yaw, 0, 'XYZ'));
+    this.lowering = { c, t: 0, fromPos, fromQ, toPos: new THREE.Vector3(spot.x, spot.y, spot.z), toQ, yaw: spot.yaw };
+    c.model.setState(c.alive ? c.woundAnim : 'dead');
+    g.player.forceCrouch = true;
+    g.bus.emit('sfx', { id: 'grab_heavy', volume: 0.5 });
+  }
+
+  /** Bajar el cuerpo del hombro al suelo (0,6 s) y dejarlo quieto. */
+  private updateLowering(dt: number): void {
+    const L = this.lowering!;
+    const g = this.g;
+    L.t += dt / 0.6;
+    const k = Math.min(1, L.t);
+    const e = k * k * (3 - 2 * k);
+    const pos = L.fromPos.clone().lerp(L.toPos, e);
+    pos.y += Math.sin(e * Math.PI) * 0.08;
+    L.c.carryPose = { pos, q: L.fromQ.clone().slerp(L.toQ, e) };
+    if (k < 1) return;
+    const c = L.c;
+    this.lowering = null;
     g.player.forceCrouch = false;
     c.carryPose = null;
-    // Se deja en el suelo delante.
-    const fx = -Math.sin(g.player.yaw), fz = -Math.cos(g.player.yaw);
-    const tx = g.player.pos.x + fx * 0.9, tz = g.player.pos.z + fz * 0.9;
-    c.pos.set(tx, dragGround(g, tx, tz, g.player.pos.y), tz);
+    c.pos.copy(L.toPos);
     c.prevPos.copy(c.pos);
-    c.yaw = g.player.yaw + Math.PI / 2;
-    c.model.root.rotation.set(0, c.yaw, 0);
-    c.model.setState(c.alive ? c.woundAnim : 'dead');
+    c.yaw = c.renderYaw = L.yaw;
+    c.model.root.rotation.set(c.alive ? 0 : -1.5, c.yaw, 0);
+    if (!c.alive) c.model.snapDead();
     g.bus.emit('sfx', { id: 'land', volume: 0.6 });
     g.bodies.checkWater(c);
+  }
+
+  /**
+   * Busca dónde cabe el cuerpo tendido delante del jugador sin atravesar
+   * paredes, muebles ni el suelo: prueba distancias y orientaciones y
+   * comprueba con rayos que haya hueco para la cabeza y los pies.
+   */
+  private findBodySpot(): { x: number; y: number; z: number; yaw: number } {
+    const g = this.g;
+    const p = g.player.pos;
+    const yaw = g.player.yaw;
+    const fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    const mask = GROUP.STATIC | GROUP.PROP | GROUP.TERRAIN;
+    const floorAt = (x: number, z: number) => g.worldItems.groundAt?.(x, p.y + 0.4, z) ?? dragGround(g, x, z, p.y);
+    const clearRay = (ox: number, oy: number, oz: number, dx: number, dz: number, len: number) => {
+      const l = Math.hypot(dx, dz) || 1;
+      return !g.physics.raycast(ox, oy, oz, dx / l, 0, dz / l, len, mask, g.player.collider);
+    };
+    for (const dist of [0.95, 0.75, 0.55, 0.35]) {
+      const x = p.x + fx * dist, z = p.z + fz * dist;
+      // Que no haya pared entre el jugador y el sitio.
+      if (!clearRay(p.x, p.y + 0.5, p.z, fx, fz, dist + 0.25)) continue;
+      const y = floorAt(x, z);
+      if (Math.abs(y - p.y) > 0.6) continue;
+      for (const off of [Math.PI / 2, -Math.PI / 2, 0, Math.PI, Math.PI / 4, -Math.PI / 4]) {
+        const by = yaw + off;
+        // La pose de muerto se extiende ~1,1 m hacia atrás (cabeza) y ~0,8 m hacia delante (pies).
+        const ax = Math.sin(by), az = Math.cos(by);
+        if (!clearRay(x, y + 0.25, z, -ax, -az, 1.2)) continue;
+        if (!clearRay(x, y + 0.25, z, ax, az, 0.9)) continue;
+        if (!clearRay(x, y + 0.25, z, az, -ax, 0.3) || !clearRay(x, y + 0.25, z, -az, ax, 0.3)) continue;
+        return { x, y, z, yaw: by };
+      }
+    }
+    // Sin hueco delante: a los pies del jugador, en la dirección de la mirada.
+    return { x: p.x, y: floorAt(p.x, p.z), z: p.z, yaw: yaw + Math.PI };
   }
 
   private tryGrab(): void {
