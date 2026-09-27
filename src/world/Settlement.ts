@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { BuildingInstance, type Door } from './Buildings';
 import {
-  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PASTURE, PEDDLER_CART, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
+  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, LANDMARKS, MARKET_STALLS, PALISADE, PASTURE, PEDDLER_CART, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
 } from './WorldLayout';
 import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
@@ -525,6 +525,7 @@ export class Settlement {
       this.placeStatic('peddler_cart', c.x, this.ground(c.x, c.z) + 0.95, c.z, c.rot, 'stall');
     }
     this.buildPasture();
+    this.buildLandmarks();
     // Puestos de mercado con mercancía (de Lucía).
     MARKET_STALLS.forEach((s, i) => {
       const y = this.ground(s.x, s.z);
@@ -1233,6 +1234,62 @@ export class Settlement {
       const torch = loc(1.4, -1.8);
       g.fires.add({ id: 'penon_candle', kind: 'candle', pos: new THREE.Vector3(torch.x, base + 0.9, torch.z), policy: 'night', canCook: false, heat: 0 });
       this.places.set('penon_cave', { id: 'penon_cave', x: cpos.x, y: base, z: cpos.z, yaw: 0 });
+    }
+  }
+
+  /**
+   * Rincones del campo: carbonera humeante con la tienda del carbonero,
+   * refugio de cazador con su lumbre, casa en ruinas con un arcón olvidado,
+   * cruceros en los caminos, espantapájaros en los campos y colmenas.
+   */
+  private buildLandmarks(): void {
+    const g = this.g;
+    const L = LANDMARKS;
+    const at = (model: string, x: number, z: number, hy: number, rot = 0, tag = 'static') => this.placeStatic(model, x, this.ground(x, z) + hy, z, rot, tag);
+    for (const c of L.crosses) at('wayside_cross', c.x, c.z, 1.4, c.rot);
+    for (const s of L.scarecrows) at('scarecrow', s.x, s.z, 1.0, s.x * 0.1);
+    at('beehives', L.beehives.x, L.beehives.z, 0.55, L.beehives.rot);
+    // Carbonera: humo lento y continuo, leña apilada y la tienda del carbonero.
+    {
+      const c = L.charcoal;
+      at('charcoal_kiln', c.x, c.z, 0.8);
+      const top = new THREE.Vector3(c.x, this.ground(c.x, c.z) + 1.7, c.z);
+      g.particles.addEmitter({ id: 'charcoal_smoke', kind: 'smoke', pos: top, rate: 2.5, spread: 0.4, vel: new THREE.Vector3(0.1, 0.7, 0), sizeMul: 0.9, enabled: true });
+      at('woodpile', c.x + 4.2, c.z - 1.5, 0.45, 1.2);
+      at('woodpile', c.x + 4.4, c.z + 0.6, 0.45, 1.5);
+      at('tent', c.x - 4.5, c.z + 3.5, 0.9, -0.6);
+      g.worldItems.spawn('firewood', c.x + 3.2, this.ground(c.x + 3.2, c.z + 2.4) + 0.2, c.z + 2.4, { uid: 'charcoal_wood', authored: true });
+    }
+    // Refugio del cazador: lumbre apagada, pieles y flechas.
+    {
+      const r = L.leanTo;
+      at('lean_to', r.x, r.z, 0.8, 0.5);
+      const fx = r.x + Math.sin(0.5) * 2.4, fz = r.z + Math.cos(0.5) * 2.4;
+      this.placeStatic('firering', fx, this.ground(fx, fz) + 0.1, fz, 0, 'static');
+      g.fires.add({ id: 'leanto_fire', kind: 'campfire', pos: new THREE.Vector3(fx, this.ground(fx, fz) + 0.2, fz), policy: 'manual', canCook: true, heat: 18, lit: false, fuel: 0 });
+      g.worldItems.spawn('hide', r.x - 0.4, this.ground(r.x, r.z) + 0.25, r.z - 0.2, { uid: 'leanto_hide', authored: true, rotY: 0.5 });
+      g.worldItems.spawn('arrow', r.x + 0.6, this.ground(r.x, r.z) + 0.2, r.z, { uid: 'leanto_arrows', authored: true, rotY: 1.2, count: 8 });
+    }
+    // Casa en ruinas: muros derrumbados, una viga quemada, huesos y un arcón.
+    {
+      const r = L.ruin;
+      const rot = 0.35;
+      const W = (lx: number, lz: number) => { const w = toWorldXZ(lx, lz, rot); return { x: r.x + w.x, z: r.z + w.z }; };
+      const put = (m: string, lx: number, lz: number, hy: number, ry = 0) => { const p = W(lx, lz); return at(m, p.x, p.z, hy, rot + ry, 'ruin'); };
+      put('ruin_wall', -1.2, -3, 0.8);
+      put('ruin_wall_low', 1.9, 3, 0.4);
+      put('ruin_wall_low', -3.6, 0.4, 0.4, Math.PI / 2);
+      put('ruin_wall', 3.6, -0.6, 0.8, Math.PI / 2);
+      for (const [lx, lz] of [[-3.6, -3], [3.6, -3], [3.6, 3]]) put('ruin_corner', lx, lz, 1.1);
+      put('fallen_beam', 0.3, 0.2, 0.4, 0.5);
+      const sk = W(-1.8, 1.4);
+      this.placeStatic('skeleton', sk.x, this.ground(sk.x, sk.z) + 0.1, sk.z, 1.1, 'ruin');
+      const cp = W(1.8, -2.1);
+      const chest = this.placeStatic('chest', cp.x, this.ground(cp.x, cp.z) + 0.3, cp.z, rot, 'ruin');
+      g.containers.create('ruin_chest', 'Arcón chamuscado', null, [
+        { id: 'silver_coin', count: 2 }, { id: 'knife', count: 1 }, { id: 'herbs', count: 2 }, { id: 'torch', count: 1 },
+      ], 38);
+      g.interactables.register(chest.handle, { id: 'ruin_chest', kind: 'container', pos: new THREE.Vector3(cp.x, this.ground(cp.x, cp.z) + 0.5, cp.z), label: () => 'Abrir el arcón chamuscado', interact: (game) => game.ui.openContainer('ruin_chest') });
     }
   }
 

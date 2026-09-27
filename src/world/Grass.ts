@@ -25,12 +25,12 @@ function grassAtlas(): THREE.Texture {
   let seed = 1;
   const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const tuft = (ox: number, oy: number, kind: number) => {
-    const blades = 70;
+    const blades = 115;
     for (let i = 0; i < blades; i++) {
       const x = ox + 10 + rnd() * (S - 20);
       const h = S * (0.35 + rnd() * 0.6) * (kind === 2 ? 0.8 : 1);
       const lean = (rnd() - 0.5) * 60;
-      const w = 1.5 + rnd() * 2.2;
+      const w = 1.1 + rnd() * 1.8;
       const tone = 0.65 + rnd() * 0.55;
       const grd = g.createLinearGradient(0, oy + S, 0, oy + S - h);
       if (kind === 2) {
@@ -123,11 +123,24 @@ export class Grass {
       shader.uniforms.uTime = GlobalUniforms.uTime;
       shader.uniforms.uWind = GlobalUniforms.uWind;
       shader.uniforms.uGrassTint = SeasonUniforms.uGrassTint;
+      shader.uniforms.uSunDir = GlobalUniforms.uSunDir;
+      shader.uniforms.uSunColor = GlobalUniforms.uSunColor;
       shader.fragmentShader = shader.fragmentShader
-        .replace('#include <common>', '#include <common>\nuniform vec3 uGrassTint;')
-        .replace('#include <map_fragment>', '#include <map_fragment>\ndiffuseColor.rgb *= uGrassTint;');
+        .replace('#include <common>', '#include <common>\nuniform vec3 uGrassTint; uniform vec3 uSunDir; uniform vec3 uSunColor; varying vec3 vGWPos; varying float vGH;')
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          diffuseColor.rgb *= uGrassTint;
+          // Oclusión en la base de la mata (más oscura abajo).
+          diffuseColor.rgb *= mix(0.55, 1.0, smoothstep(0.0, 0.7, vGH));`)
+        .replace('#include <opaque_fragment>', `
+          // Translucidez: a contraluz la hierba deja pasar el sol (brilla la punta).
+          {
+            vec3 Vd = normalize(vGWPos - cameraPosition);
+            float back = pow(max(0.0, dot(Vd, uSunDir)), 4.0);
+            outgoingLight += diffuseColor.rgb * uSunColor * back * 0.35 * smoothstep(0.2, 1.0, vGH);
+          }
+          #include <opaque_fragment>`);
       shader.vertexShader = shader.vertexShader
-        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;\nattribute float aVariant;')
+        .replace('#include <common>', '#include <common>\nuniform float uTime;\nuniform float uWind;\nattribute float aVariant;\nvarying vec3 vGWPos; varying float vGH;')
         .replace('#include <uv_vertex>', `#include <uv_vertex>
           // Celda del atlas (fila 0 del lienzo = mitad superior en UV).
           vMapUv = vMapUv * 0.5 + vec2(mod(aVariant, 2.0), 1.0 - floor(aVariant / 2.0)) * 0.5;`)
@@ -136,11 +149,16 @@ export class Grass {
             vec4 wp = instanceMatrix * vec4(transformed, 1.0);
             float k = clamp(transformed.y / 0.55, 0.0, 1.0);
             float s = sin(uTime * 2.1 + wp.x * 0.35 + wp.z * 0.27) * 0.6 + sin(uTime * 3.7 + wp.x) * 0.25;
+            // Rachas: ondas lentas que recorren el prado.
+            float gust = pow(max(0.0, sin(uTime * 0.7 - wp.x * 0.06 - wp.z * 0.035)), 3.0);
+            s += gust * 1.4;
             transformed.x += s * uWind * 0.18 * k * k;
             transformed.z += s * uWind * 0.1 * k * k;
+            vGWPos = wp.xyz;
+            vGH = k;
           }`);
     };
-    mat.customProgramCacheKey = () => 'grass';
+    mat.customProgramCacheKey = () => 'grass-v2';
     this.mesh = new THREE.InstancedMesh(geo, mat, MAX);
     this.mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(MAX * 3), 3);
     this.variant = new THREE.InstancedBufferAttribute(new Float32Array(MAX), 1);
@@ -205,8 +223,13 @@ export class Grass {
           if (n >= MAX) break;
           this.mesh.setMatrixAt(n, m);
           this.variant.setX(n, v);
-          const t = 0.8 + hash2(n, cx, cz) * 0.35;
-          this.tmpC.setRGB(t, t * (0.95 + hash2(cz, n, 2) * 0.1), t * 0.85);
+          // Manchas: zonas más verdes, más secas o más oscuras (no un tono uniforme).
+          const e = m.elements;
+          const px = e[12], pz = e[14];
+          const patch = Math.sin(px * 0.045 + Math.sin(pz * 0.03) * 2) * 0.5 + Math.sin(pz * 0.06 - px * 0.02) * 0.5;
+          const t = (0.8 + hash2(n, cx, cz) * 0.3) * (0.92 + patch * 0.1);
+          const dry = Math.max(0, patch) * 0.12;
+          this.tmpC.setRGB(t * (1 + dry), t * (0.97 + hash2(cz, n, 2) * 0.08), t * (0.85 - dry));
           this.mesh.setColorAt(n, this.tmpC);
           n++;
         }

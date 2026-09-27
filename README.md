@@ -20,9 +20,11 @@ Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game`
 
 ## Qué hay en el vertical slice
 
-- **Robledo** (parte del pueblo principal): iglesia con campanario, taberna, herrería, carpintería, establo, granero, casas, mercado, pozo, empalizada con portón y una brecha, torre de vigilancia con escalera. Interiores en la choza del jugador, taberna e iglesia.
-- **10 habitantes** con nombre, oficio, casa, agenda propia, diálogos (algunos mienten), comercio y reacciones. Los guardias patrullan, el vigía sube a la torre de noche.
-- **Bosque, arroyo con puente, prado de ciervos, guarida de lobos, Cueva del Cuervo** (oscura: necesitas antorcha) y el **campamento de Los Cuervos**.
+- **Robledo** (parte del pueblo principal): iglesia con campanario, taberna, herrería, carpintería, establo, granero, casas, mercado, pozo, empalizada con portón y una brecha, torre de vigilancia con escalera. Todas las casas se pueden visitar y están amuebladas.
+- **29 habitantes** con nombre, oficio, casa, agenda propia y recados por el pueblo, diálogos (algunos mienten), comercio y reacciones. Los guardias patrullan, el vigía sube a la torre de noche. Los testigos de un crimen corren a contarlo.
+- **Remates y cuerpos**: por la espalda, G degüella (arma blanca) o rompe el cuello (manos). Heridas por zonas (decapitación, amputaciones, desangrado). Los cuerpos se cargan al hombro y se esconden (en casa, en el bosque, en el agua); solo hay castigo si alguien los encuentra.
+- **Bosque, arroyo con puente, prado de ciervos, guarida de lobos, Cueva del Cuervo** (oscura: necesitas antorcha) y el **campamento de Los Cuervos**. Prado con ovejas, carbonera, refugio de cazador, casa en ruinas, cruceros, colmenas y espantapájaros.
+- **Estaciones** (primavera, verano, otoño, invierno con nieve) y **tiempo de cada día** sorteado (despejado, lluvia, niebla, tormenta). Un día dura 30 minutos reales.
 - **Día/noche** real: sol, luna, estrellas, antorchas que el pueblo enciende al anochecer, ventanas iluminadas según quién está en casa, hogueras. **Clima**: despejado, nublado, niebla, lluvia y tormenta, con efecto en visibilidad, frío y sonido.
 - **Supervivencia moderada**: salud, stamina, hambre, sed, calor corporal. Comer, beber (pozo, arroyo, odre), cocinar, dormir, encender fuego.
 - **Interacción física**: todo objeto del mundo es un cuerpo rígido. Se coge (con animación de mano), se agarra y transporta, se suelta, se lanza y se empuja. Robar a la vista tiene consecuencias.
@@ -32,18 +34,18 @@ Parámetros de URL: `?quality=low|medium|high`, `?debug` (expone `window.__game`
 - **Ataques de bandidos**: salen de su campamento, se reúnen, se acercan, entran por la brecha o fuerzan el portón, incendian y saquean, y huyen si caen su cabecilla o la mitad. Campana de alarma, guardias a sus puestos, vecinos a casa. Consecuencias persistentes (casas dañadas, vecinos muertos, comerciante ausente, reputación, recompensas, reparaciones al alba).
 - **Reputación, economía** (maravedíes, precios según confianza, stock limitado que se repone), **habilidades por uso**.
 - **Costa**: playa, embarcadero, barrio de pescadores y mar con oleaje, profundidad y espuma; se nada (con cansancio y riesgo de ahogarse). **Barcas de remos** (se alquilan a Mateo) para llegar a tres **islas** con contenido: ermita en ruinas, coca naufragada y el refugio del Peñón. **Pesca con caña** desde la orilla, el muelle o la barca.
-- **Tu parcela**: tala árboles, parte los troncos en tablones, pica piedra en la cantera y **construye tu casa por piezas** (cimientos, suelos, paredes con puerta o ventana, hastiales, tejados, valla, escalera, cama, arcón y hoguera) con colisión real, puertas que se abren y medio material de vuelta al desmontar.
+- **Recursos**: tala árboles, parte los troncos en tablones y pica piedra en la cantera (se venden o se usan en las misiones).
 - **Guía de objetivos**: flecha con distancia, marcador en el mundo y en el mapa para la tarea que sigues.
-- **Multijugador cooperativo** (hasta 5 a la vez por servidor) en la versión publicada en claude.ai: crea un servidor, comparte el enlace de invitación y jugad juntos. Construcciones, árboles talados, piedra, barcas, hora y tiempo son comunes; inventario e historia, de cada uno. Chat con Enter.
+- **Multijugador cooperativo** (hasta 5 a la vez por servidor) en la versión publicada en claude.ai: crea un servidor, comparte el enlace de invitación y jugad juntos. Árboles talados, piedra, barcas, estación, hora y tiempo son comunes; inventario e historia, de cada uno. Chat con Enter.
 - **Guardado automático** (cada 45 s, al dormir, al cumplir tareas, al salir o cambiar de app) + 3 ranuras manuales en partida individual. En multijugador, el mundo se guarda en la base de datos de la página y la partida de cada jugador en su espacio privado.
 
 ## Controles
 
 **Móvil/tableta**: joystick con el pulgar izquierdo, arrastrar a la derecha para mirar y botones en pantalla (se activan solos en pantallas táctiles).
 
-**Construir**: B modo construcción · X/Z o rueda cambiar pieza · Q girar · clic colocar · E desmontar. **Barca**: E subir/bajar, W/S remar, A/D girar. **Multijugador**: Enter chat · Esc → invitar.
+**Barca**: E subir/bajar, W/S remar, A/D girar. **Multijugador**: Enter chat · Esc → invitar.
 
-**Teclado y ratón**: WASD mover · Shift correr · Ctrl agacharse · Espacio saltar · E usar/coger · R agarrar/soltar · Clic ataque (mantener: fuerte / tensar arco) · Clic der. bloquear · C esquivar · F patada · T antorcha · 1–4 armas · Tab inventario · J diario · M mapa · Esc pausa · F3 rendimiento.
+**Teclado y ratón**: WASD mover · Shift correr · Ctrl agacharse · Espacio saltar · E usar/coger · R agarrar/soltar · Clic ataque (mantener: fuerte / tensar arco) · Clic der. bloquear · C esquivar · F patada · G remate por la espalda · T antorcha · 1–4 armas · Tab inventario · J diario · M mapa · Esc pausa · F3 rendimiento.
 
 ## Documentación
 

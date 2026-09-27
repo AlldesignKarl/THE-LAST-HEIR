@@ -6,7 +6,7 @@
 import { Simplex2 } from '../core/noise';
 import { clamp, lerp, pointSegmentDist, smoothstep, toLocalXZ } from '../core/math';
 import {
-  BANDIT_CAMP, BUILDINGS, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PASTURE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
+  BANDIT_CAMP, BUILDINGS, CAVE, CAVE_HILL, CLEARINGS, DEER_MEADOW, FIELDS, GROVE_NE, PASTURE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
   WORLD_HALF, WORLD_SEED, WOLF_DEN, type P2,
 } from './WorldLayout';
 
@@ -284,6 +284,7 @@ export class Heightfield {
     if (Math.hypot(x - BANDIT_CAMP.x, z - BANDIT_CAMP.z) < BANDIT_CAMP.radius + 4) return 0;
     if (Math.hypot(x - DEER_MEADOW.x, z - DEER_MEADOW.z) < DEER_MEADOW.radius) return 0;
     if (Math.abs(x - PASTURE.x) < PASTURE.w / 2 + 6 && Math.abs(z - PASTURE.z) < PASTURE.d / 2 + 6) return 0;
+    for (const c of CLEARINGS) if (Math.hypot(x - c.x, z - c.z) < c.r) return 0;
     if (Math.hypot(x - WOLF_DEN.x, z - WOLF_DEN.z) < 8) return 0;
     const hill = Math.hypot(x - CAVE_HILL.x, z - CAVE_HILL.z);
     if (hill < CAVE_HILL.radius + 3 && hill > CAVE_HILL.radius - CAVE_HILL.cliff - 4) return 0; // acantilado

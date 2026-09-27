@@ -117,6 +117,21 @@ export const BUILDINGS: BuildingDef[] = [
 /** Pozo de la plaza. */
 export const WELL = { x: 4, z: 3 };
 /** Puestos del mercado. */
+/**
+ * Rincones del campo: carbonera del bosque, refugio del cazador, casa en
+ * ruinas, cruceros en los caminos, espantapájaros y colmenas. Los claros
+ * quedan sin árboles.
+ */
+export const LANDMARKS = {
+  charcoal: { x: -142, z: 42, r: 10 },
+  leanTo: { x: -186, z: 2, r: 7 },
+  ruin: { x: -128, z: 112, r: 11 },
+  crosses: [{ x: 6, z: -70, rot: 0.2 }, { x: -83, z: 23, rot: 1.3 }, { x: 6, z: 70, rot: -0.1 }],
+  scarecrows: [{ x: 48, z: 96 }, { x: 70, z: 110 }],
+  beehives: { x: 22, z: 118, rot: 0.6 },
+};
+export const CLEARINGS = [LANDMARKS.charcoal, LANDMARKS.leanTo, LANDMARKS.ruin];
+
 /** Carro del buhonero en la plaza. */
 export const PEDDLER_CART = { x: 12, z: -5, rot: 1.35 };
 

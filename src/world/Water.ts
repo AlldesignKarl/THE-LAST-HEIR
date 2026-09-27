@@ -128,7 +128,7 @@ export class Water {
         }`)
         .replace('#include <opaque_fragment>', `
           // Alfa premultiplicado: cuerpo del agua × cobertura + reflejo encima.
-          gl_FragColor = vec4((totalDiffuse * diffuseColor.a + min(totalSpecular * 0.5, vec3(0.9)) * (1.0 - foam * 0.5)) * wEdge, diffuseColor.a * wEdge);
+          gl_FragColor = vec4((totalDiffuse * diffuseColor.a + min(totalSpecular * 0.34, vec3(0.6)) * (1.0 - foam * 0.5)) * wEdge, diffuseColor.a * wEdge);
         `)
         .replace('#include <fog_fragment>', `
           #ifdef USE_FOG

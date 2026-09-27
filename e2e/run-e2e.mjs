@@ -685,7 +685,7 @@ await test('heridas: hachazo a un vecino sin testigos, se desangra, cargarlo al 
     for (let xx = 60; xx < 300; xx += 2) if (g.hf.isSeaWater(xx, 10) && g.hf.waterLevelAt(xx, 10) - g.hf.heightAt(xx, 10) > 2.5) { sx = xx; break; }
     api.teleport(sx - 1.2, 10, -Math.PI / 2); api.step(1.2);
     // Llevarlo al agua honda y soltarlo: flota unos segundos y se hunde.
-    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.3);
+    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(0.8);
     const floatY = n.c.pos.y - g.hf.waterLevelAt(n.c.pos.x, n.c.pos.z);
     api.step(16);
     const hidden = n.c.hiddenBody;
@@ -728,6 +728,49 @@ await test('heridas: brazo, pierna y cabeza cortados; el cuerpo encontrado sí c
   assert(r.res[1].sev.includes('legL') && r.res[1].anim === 'downed', `pierna: ${JSON.stringify(r.res[1])}`);
   assert(r.res[2].sev.includes('head') && !r.res[2].alive, `cabeza: ${JSON.stringify(r.res[2])}`);
   assert(r.rep1 < r.rep0, `al encontrar el cuerpo baja la reputación (${r.rep0} → ${r.rep1})`);
+});
+
+await test('remate por la espalda: degollar y romper el cuello; cuerpo guardado en casa', async () => {
+  const r = await ev(() => {
+    const api = __game, g = api.game;
+    api.setHour(10);
+    const vict = [...g.npcs.npcs.values()].filter((x) => x.c.alive && !x.c.downed && x.c.faction === 'villager').slice(0, 2);
+    const out = [];
+    vict.forEach((n, i) => {
+      if (i === 0) { api.give('knife'); g.equipment.equip('knife'); } else g.equipment.slots.main = null;
+      const x = -150 + i * 40, z = 20;
+      n.entry = n.def.schedule.filter((s) => s.from <= 10).pop() ?? n.def.schedule[0];
+      n.placeId = 'forest_edge'; n.settled = true;
+      n.c.place(x, g.hf.heightAt(x, z), z, 0); n.c.stop(); n.c.indoors = false; n.c.faceYaw = 0; n.c.yaw = 0;
+      api.step(0.1);
+      // Detrás de él (mira hacia +z).
+      api.teleport(x, z - 1.1, 0); api.lookAt(x, n.c.pos.y + 1.3, z); api.step(0.1);
+      const prompt = g.interaction.focus.sub;
+      api.press('takedown', true); api.step(1 / 30); api.press('takedown', false);
+      api.step(2.5);
+      out.push({ prompt, dead: !n.c.alive, pending: g.bodies.isPending(n.def.id), neck: n.c.model.neckBroken });
+    });
+    // El segundo cuerpo, a la choza: dentro nadie lo ve y al dormir no se encuentra.
+    const c = vict[1].c;
+    const hut = g.settlement.buildings.get('player_hut');
+    const inside = hut.localToWorld(0.3, 0, 0.5);
+    c.pos.set(inside.x, hut.floorY, inside.z); c.prevPos.copy(c.pos);
+    const pp = hut.localToWorld(0.9, 0, 1.2);
+    api.teleport(pp.x, pp.z, 0, hut.floorY + 0.05); api.lookAt(c.pos.x, c.pos.y, c.pos.z); api.step(0.1);
+    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(1.2);
+    const carried = !!g.interaction.dragging;
+    g.player.yaw = hut.rotY; api.step(0.1);
+    api.press('grab', true); api.step(1 / 30); api.press('grab', false); api.step(1.0);
+    const inHut = hut.contains(c.pos.x, c.pos.z, 0.1) && Math.abs(c.pos.y - hut.floorY) < 0.3;
+    g.bodies.onTimeSkip();
+    return { out, carried, inHut, stillPending: g.bodies.isPending(vict[1].def.id) };
+  });
+  assert(r.out[0].prompt.includes('Degollar'), `aviso con cuchillo: ${r.out[0].prompt}`);
+  assert(r.out[0].dead && r.out[0].pending, `degollado sin testigos: ${JSON.stringify(r.out[0])}`);
+  assert(r.out[1].prompt.includes('cuello'), `aviso a mano: ${r.out[1].prompt}`);
+  assert(r.out[1].dead && r.out[1].neck, `cuello roto: ${JSON.stringify(r.out[1])}`);
+  assert(r.carried && r.inHut, `cuerpo dejado dentro de la choza (${r.carried}, ${r.inHut})`);
+  assert(r.stillPending, 'en la choza no lo encuentra nadie al dormir');
 });
 
 await test('barca: subir, remar, girar y bajarse', async () => {

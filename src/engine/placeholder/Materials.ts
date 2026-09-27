@@ -10,6 +10,9 @@ export const GlobalUniforms = {
   uTime: { value: 0 },
   uWind: { value: 0.3 },
   uWetness: { value: 0 },
+  /** Dirección hacia el sol (mundo) y su color×intensidad (para la translucidez de hojas y hierba). */
+  uSunDir: { value: new THREE.Vector3(0, 1, 0) },
+  uSunColor: { value: new THREE.Color(0, 0, 0) },
 };
 
 export type MatId =

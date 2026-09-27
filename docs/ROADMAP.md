@@ -36,6 +36,13 @@ Una zona completamente jugable alrededor de Robledo:
 - Multijugador cooperativo de hasta 5 por servidor con enlace de invitación y guardado automático en la nube (ver `ESTADO.md`).
 - Pendiente para una fase posterior: sincronizar vecinos, animales, asaltos, objetos sueltos y arcones; una parcela por jugador; colisión y combate entre jugadores.
 
+## Fase 1.7 · Mundo vivo, sigilo y realismo ✅
+- Construcción por piezas retirada (a petición); la parcela queda como claro.
+- 29 vecinos con recados diarios por el pueblo; testigos que corren a avisar; interiores amueblados en todas las casas.
+- Heridas por zonas con amputación, decapitación y desangrado; cuerpos que se cargan al hombro, se esconden en casa, en el bosque o en el agua (flotan y se hunden); remate por la espalda (degüello o cuello roto).
+- Estaciones con nieve en invierno y tiempo sorteado cada día; arroyo con orillas naturales y agua con reflejo y absorción; senderos; prado con ovejas y nuevos rincones (carbonera, refugio, ruina, cruceros, colmenas, espantapájaros).
+- Animaciones de acción en primera persona (comer, beber, recoger, remates) y armas con modelos más fieles.
+
 ## Fase 2 · Profundidad de sistemas
 - Cocina completa, fogatas colocables, odres, temperatura por ropa.
 - Armaduras y escudos con durabilidad; lanza, maza, daga.

@@ -148,6 +148,8 @@ export class EnvironmentLighting {
       : night * 0.28 * (1 - overcast * 0.7);
     this.sun.color.copy(dayAmt > 0.02 ? sunColor : moonColor);
     this.sun.intensity = directIntensity * (1 - this.interior);
+    GlobalUniforms.uSunDir.value.copy(lightDir);
+    GlobalUniforms.uSunColor.value.copy(this.sun.color).multiplyScalar(this.sun.intensity);
     // Sombra que sigue a la cámara, en pasos para evitar parpadeo.
     const s = this.shadowFollowStep;
     const tx = Math.round(camPos.x / s) * s, tz = Math.round(camPos.z / s) * s;

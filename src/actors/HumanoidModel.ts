@@ -9,6 +9,7 @@ import type { MaterialLibrary } from '../engine/placeholder/Materials';
 import type { ModelLibrary } from '../engine/placeholder/Models';
 import { damp } from '../core/math';
 import { RigidSkin, characterMaterial, SURF } from '../engine/RigidSkin';
+import { woundCap } from './WoundMesh';
 
 export interface Appearance {
   skin: number;
@@ -42,8 +43,6 @@ export type AnimState =
 export type Limb = 'head' | 'armL' | 'armR' | 'legL' | 'legR';
 export interface Hitbox { zone: 'head' | 'torso' | 'arm' | 'leg'; pos: THREE.Vector3; r: number; limb?: Limb }
 
-const FLESH = new THREE.MeshStandardMaterial({ color: 0x6e0c0c, roughness: 0.35, metalness: 0 });
-const BONE = new THREE.MeshStandardMaterial({ color: 0xd9cdb4, roughness: 0.6 });
 
 /** Torso (torno): de la cintura (y=0) a los hombros (y≈0.6), radio unitario aprox. */
 function torsoGeometry(): THREE.BufferGeometry {
@@ -583,11 +582,8 @@ export class HumanoidModel {
     const b = this.app.build;
     const bone = { head: this.head, armL: this.shL, armR: this.shR, legL: this.hipL, legR: this.hipR }[limb];
     bone.scale.setScalar(1e-4);
-    const stump = new THREE.Group();
     const r = limb === 'head' ? 0.055 : limb.startsWith('arm') ? 0.05 : 0.075;
-    const flesh = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 1.05, 0.03, 12), FLESH);
-    const bn = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.28, r * 0.28, 0.036, 8), BONE);
-    stump.add(flesh, bn);
+    const stump = woundCap(r, limb === 'head');
     if (limb === 'head') {
       stump.position.set(0, 0.1, 0);
       this.neck.add(stump);

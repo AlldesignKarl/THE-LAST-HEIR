@@ -35,17 +35,18 @@ src/
     Buildings.ts          Constructor procedural de edificios + colliders
     Settlement.ts         Construye un pueblo desde datos
     Cave.ts               Cueva (malla cerrada + collider trimesh)
-    Water.ts              Río y agua bebible
+    Water.ts              Arroyo: cinta con la profundidad real por vértice, reflejo Fresnel y absorción
+    GroundScatter.ts      Detalle de suelo instanciado (rocas, arbustos, helechos, ramas, juncos, tocones, setas)
     NavGraph.ts           Grafo de navegación + A*
-  env/                    TimeOfDay, Sky, Weather, EnvironmentLighting
-  player/                 Player, PlayerController, CameraRig, Viewmodel, Interaction, Carry
+  env/                    TimeOfDay, Sky, Weather, EnvironmentLighting, Seasons (estación y tiempo del día)
+  player/                 Player, PlayerController, Viewmodel (poses + animaciones por fotogramas clave), Interaction (cargar cuerpos)
   items/                  ItemDefs (datos), Inventory, Equipment, WorldItems, Containers
   survival/               Needs
-  combat/                 WeaponDefs, Damage, MeleeSystem, Projectiles, Hitboxes
-  actors/                 Actor (salud/facción/hitboxes), HumanoidModel, AnimalModel
+  combat/                 WeaponDefs, Combat (cuerpo a cuerpo, proyectiles), Wounds (amputación, degüello, sangre), Takedown (remate por la espalda)
+  actors/                 Actor (salud/facción/hitboxes), HumanoidModel, AnimalModel (ciervo, lobo, oveja), WoundMesh
   ai/                     NPCManager, NPC, Schedule, Perception, Steering, CombatBrain
   animals/                AnimalManager, Animal
-  social/                 Reputation, Crime, Dialogue
+  social/                 Reputation, Dialogue, Bodies (crímenes pendientes, cuerpos hallados o hundidos)
   quests/                 QuestSystem, Flags
   economy/                Economy, Trader
   events/                 EventDirector, RaidSystem

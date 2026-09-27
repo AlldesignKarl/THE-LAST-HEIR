@@ -322,6 +322,77 @@ const D: Record<string, ModelDef> = {
     b.add(new THREE.CylinderGeometry(0.2, 0.18, 0.4, 10), 'planks', 0.35, 0.0, -0.5);
     b.box(0.6, 0.12, 0.35, 'clothRed', -0.2, 0.0, 0.5);
   } },
+  /** Espantapájaros: cruz de palos, saco relleno de paja y sombrero viejo. */
+  scarecrow: { shape: { type: 'box', hx: 0.15, hy: 1.0, hz: 0.15 }, mass: 0, build: (b) => {
+    b.cyl(0.04, 0.05, 2.2, 'roughWood', 0, 0.1, 0, 0, 0, 0, 6);
+    b.cyl(0.03, 0.03, 1.5, 'roughWood', 0, 0.65, 0, 0, 0, Math.PI / 2, 6);
+    b.add(new THREE.CylinderGeometry(0.2, 0.26, 0.7, 8), 'cloth', 0, 0.45, 0);
+    b.add(new THREE.CylinderGeometry(0.07, 0.11, 0.6, 6), 'cloth', -0.45, 0.62, 0, 0, 0, Math.PI / 2 - 0.15);
+    b.add(new THREE.CylinderGeometry(0.07, 0.11, 0.6, 6), 'cloth', 0.45, 0.62, 0, 0, 0, -Math.PI / 2 + 0.15);
+    for (const sx of [-1, 1]) b.add(new THREE.ConeGeometry(0.07, 0.2, 5), 'straw', sx * 0.8, 0.58, 0, 0, 0, sx * Math.PI / 2);
+    b.add(new THREE.SphereGeometry(0.15, 8, 6), 'straw', 0, 1.02, 0);
+    b.add(new THREE.CylinderGeometry(0.24, 0.24, 0.02, 10), 'leather', 0, 1.13, 0, 0.12);
+    b.add(new THREE.CylinderGeometry(0.11, 0.13, 0.14, 8), 'leather', 0, 1.2, 0, 0.12);
+    b.add(new THREE.ConeGeometry(0.2, 0.3, 6), 'straw', 0, 0.02, 0, Math.PI);
+  } },
+  /** Tres colmenas de paja (hornos de mimbre) sobre un banco de tablas. */
+  beehives: { shape: { type: 'box', hx: 1.2, hy: 0.55, hz: 0.35 }, mass: 0, build: (b) => {
+    b.box(2.4, 0.08, 0.6, 'planks', 0, -0.2, 0);
+    for (const sx of [-1, 1]) b.box(0.08, 0.36, 0.5, 'roughWood', sx * 1.05, -0.4, 0);
+    for (const x of [-0.75, 0, 0.75]) {
+      const skep = new THREE.SphereGeometry(0.34, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
+      skep.scale(1, 1.25, 1);
+      b.add(skep, 'straw', x, -0.16, 0);
+      for (let k = 0; k < 4; k++) b.add(new THREE.TorusGeometry(0.33 - k * 0.055, 0.012, 4, 14), 'rope', x, -0.1 + k * 0.1, 0, Math.PI / 2);
+      b.box(0.08, 0.05, 0.02, 'dirt', x, -0.13, 0.33);
+    }
+  } },
+  /** Crucero de piedra en el camino, sobre gradas. */
+  wayside_cross: { shape: { type: 'box', hx: 0.7, hy: 1.4, hz: 0.7 }, mass: 0, build: (b) => {
+    b.box(1.4, 0.25, 1.4, 'stoneWall', 0, -1.27, 0).box(1.0, 0.25, 1.0, 'stoneWall', 0, -1.02, 0);
+    b.box(0.22, 1.9, 0.22, 'stoneWall', 0, 0.02, 0);
+    b.box(0.9, 0.2, 0.2, 'stoneWall', 0, 0.62, 0).box(0.2, 0.2, 0.2, 'stoneWall', 0, 1.02, 0);
+  } },
+  /** Carbonera: montón de leña cubierto de tierra que arde despacio. */
+  charcoal_kiln: { shape: { type: 'cyl', hh: 0.8, r: 2.4 }, mass: 0, build: (b) => {
+    const dome = new THREE.SphereGeometry(2.5, 16, 8, 0, Math.PI * 2, 0, Math.PI / 2);
+    dome.scale(1, 0.66, 1);
+    b.add(dome, 'dirt', 0, -0.8, 0);
+    b.add(new THREE.CylinderGeometry(0.25, 0.3, 0.2, 8), 'charred', 0, 0.84, 0);
+    for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; b.box(0.12, 0.1, 0.12, 'charred', Math.cos(a) * 2.1, -0.55, Math.sin(a) * 2.1); }
+  } },
+  /** Refugio de cazador: techo inclinado de ramas sobre dos horcas y lecho de helechos. */
+  lean_to: { shape: { type: 'box', hx: 1.4, hy: 0.8, hz: 1.0 }, mass: 0, build: (b) => {
+    for (const sx of [-1, 1]) {
+      b.cyl(0.05, 0.06, 1.8, 'roughWood', sx * 1.3, 0.1, 0.9, 0, 0, 0, 6);
+      b.cyl(0.03, 0.03, 0.4, 'roughWood', sx * 1.3 + 0.1, 0.95, 0.9, 0, 0, -0.6, 5);
+    }
+    b.cyl(0.05, 0.05, 2.8, 'roughWood', 0, 0.98, 0.9, 0, 0, Math.PI / 2, 6);
+    for (let i = 0; i < 11; i++) b.cyl(0.035, 0.045, 2.2, 'roughWood', -1.25 + i * 0.25, 0.1, -0.05, 1.05, 0, 0, 5);
+    b.box(2.7, 0.06, 2.0, 'leaves', 0, 0.2, -0.1, 1.05 - Math.PI / 2, 0, 0);
+    b.box(2.4, 0.12, 1.3, 'straw', 0, -0.74, -0.1);
+  } },
+  // Muros de mampostería derrumbados: hiladas escalonadas y piedras caídas al pie.
+  ruin_wall: { shape: { type: 'box', hx: 2.0, hy: 0.8, hz: 0.3 }, mass: 0, build: (b) => {
+    b.box(4.0, 1.0, 0.6, 'rock', 0, -0.3, 0);
+    b.box(2.6, 0.5, 0.56, 'rock', -0.7, 0.45, 0.01);
+    b.box(1.3, 0.35, 0.52, 'rock', -1.3, 0.85, 0);
+    b.box(0.6, 0.2, 0.5, 'rock', 0.8, 0.28, 0.02, 0, 0.1, 0.06);
+    for (const [x, z, s] of [[1.4, 0.55, 0.28], [0.6, -0.6, 0.22], [-1.9, 0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'rock', x, -0.68, z, 0.2, x, 0.1);
+  } },
+  ruin_wall_low: { shape: { type: 'box', hx: 1.5, hy: 0.4, hz: 0.3 }, mass: 0, build: (b) => {
+    b.box(3.0, 0.5, 0.6, 'rock', 0, -0.15, 0);
+    b.box(1.6, 0.3, 0.54, 'rock', 0.5, 0.25, 0.02);
+    for (const [x, z, s] of [[-1.2, 0.6, 0.25], [1.7, -0.5, 0.3]] as const) b.box(s, s * 0.7, s, 'rock', x, -0.3, z, 0.3, x, 0.2);
+  } },
+  ruin_corner: { shape: { type: 'box', hx: 0.45, hy: 1.1, hz: 0.45 }, mass: 0, build: (b) => {
+    b.box(0.9, 1.6, 0.9, 'rock', 0, -0.3, 0);
+    b.box(0.8, 0.6, 0.8, 'rock', 0.03, 0.8, -0.02, 0, 0.2, 0.05);
+  } },
+  /** Viga caída y ennegrecida. */
+  fallen_beam: { shape: { type: 'box', hx: 1.8, hy: 0.12, hz: 0.12 }, mass: 0, build: (b) => {
+    b.box(3.6, 0.22, 0.22, 'charred', 0, 0, 0);
+  } },
   stall: { shape: { type: 'box', hx: 1.2, hy: 0.45, hz: 0.6 }, mass: 0, build: (b) => { b.box(2.4, 0.08, 1.2, 'planks', 0, 0.45, 0); b.box(2.4, 0.9, 0.06, 'planks', 0, 0, 0.55); for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.1, 2.4, 0.1, 'darkWood', sx * 1.15, 0.75, sz * 0.55); b.box(2.8, 0.04, 1.6, 'clothRed', 0, 1.95, 0, 0.15); } },
   well: { shape: { type: 'cyl', hh: 0.5, r: 1.0 }, mass: 0, build: (b) => {
     // Brocal con grosor: pared exterior, pared interior que baja 3 m (caras

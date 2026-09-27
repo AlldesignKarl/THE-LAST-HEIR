@@ -16,15 +16,15 @@ import type { Character } from '../ai/Character';
 import type { Limb } from '../actors/HumanoidModel';
 import type { WeaponDef } from './WeaponDefs';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
+import { woundCap } from '../actors/WoundMesh';
 
 interface Piece { body: RAPIER.RigidBody; mesh: THREE.Object3D; t: number; emitter: string }
 interface Pool { mesh: THREE.Mesh; target: number; grow: number; owner: Character | null }
-interface Bleeder { c: Character; limb: Limb | null; emitter: string; neck?: boolean }
+interface Bleeder { c: Character; limb: Limb | null; emitter: string; neck?: boolean; t?: number; base?: number }
 
 const MAX_PIECES = 24;
-const MAX_POOLS = 30;
+const MAX_POOLS = 70;
 const BLOOD = new THREE.MeshStandardMaterial({ color: 0x3c0303, roughness: 0.4, metalness: 0, envMapIntensity: 0.25, transparent: true, opacity: 0.9, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4, depthWrite: false, side: THREE.DoubleSide });
-const FLESH = new THREE.MeshStandardMaterial({ color: 0x6e0c0c, roughness: 0.35 });
 
 let seq = 0;
 
@@ -124,7 +124,8 @@ export class Wounds {
     g.particles.burst('blood', n.x, n.y, n.z, 25, 1.4, { x: dir.x * 0.4, y: -0.6, z: dir.z * 0.4 }, 0.8);
     const emitter = `throat_${c.id}_${seq++}`;
     g.particles.addEmitter({ id: emitter, kind: 'blood', pos: n.clone(), rate: 45, spread: 0.05, vel: new THREE.Vector3(dir.x * 1.2, -0.3, dir.z * 1.2), sizeMul: 0.75, enabled: true });
-    this.bleeders.push({ c, limb: null, emitter, neck: true });
+    this.bleeders.push({ c, limb: null, emitter, neck: true, t: 0, base: 45 });
+    this.splatter(n, new THREE.Vector3(dir.x, 0, dir.z).normalize(), 7);
     this.pool(c, 1.1);
   }
 
@@ -163,14 +164,15 @@ export class Wounds {
     g.particles.addEmitter({ id: emitter, kind: 'blood', pos: center.clone(), rate: 22, spread: 0.05, vel: new THREE.Vector3(0, -0.3, 0), sizeMul: 0.55, enabled: true });
     this.pieces.push({ body, mesh: piece, t: 0, emitter });
     while (this.pieces.length > MAX_PIECES) this.removePiece(this.pieces[0]);
-    // Chorro de sangre en el corte.
+    // Chorro de sangre en el corte y salpicaduras en el suelo.
     g.particles.burst('blood', start.x, start.y, start.z, 40, 3.5, { x: away.x, y: 0.6, z: away.z }, 1.2);
+    this.splatter(start, away, limb === 'head' ? 9 : 6);
     g.bus.emit('sfx', { id: 'hit_flesh', x: start.x, y: start.y, z: start.z, volume: 1 });
     // Goteo del muñón mientras siga con vida.
     if (c.alive) {
       const e2 = `stump_${c.id}_${limb}_${seq++}`;
       g.particles.addEmitter({ id: e2, kind: 'blood', pos: start.clone(), rate: 30, spread: 0.04, vel: new THREE.Vector3(away.x * 0.6, -0.2, away.z * 0.6), sizeMul: 0.7, enabled: true });
-      this.bleeders.push({ c, limb, emitter: e2 });
+      this.bleeders.push({ c, limb, emitter: e2, t: 0, base: 30 });
     }
     this.pool(c, 0.8);
   }
@@ -186,9 +188,19 @@ export class Wounds {
       add(new THREE.SphereGeometry(0.11, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.55), mat(app.hair, 0.9), 0.045).scale.set(0.95, 1.02, 1.02);
       if (app.beard) add(new THREE.SphereGeometry(0.07, 10, 6), mat(app.hair, 0.95), -0.05).scale.set(1.1, 0.8, 0.8);
       for (const sx of [-1, 1]) { const e = add(new THREE.SphereGeometry(0.012, 6, 4), mat(0x1a1410, 0.4), 0.035); e.position.set(sx * 0.035, 0.035, 0.092); }
-      const neck = add(new THREE.CylinderGeometry(0.05, 0.052, 0.07, 10), mat(app.skin, 0.6), -0.1);
-      void neck;
-      add(new THREE.CylinderGeometry(0.052, 0.052, 0.01, 10), FLESH, -0.136);
+      add(new THREE.CylinderGeometry(0.05, 0.052, 0.07, 10), mat(app.skin, 0.6), -0.1);
+      // Cara: nariz, orejas, párpados caídos y boca entreabierta.
+      add(new THREE.BoxGeometry(0.02, 0.045, 0.03), mat(app.skin, 0.6), 0.01).position.set(0, 0.01, 0.105);
+      for (const sx of [-1, 1]) {
+        add(new THREE.SphereGeometry(0.02, 6, 4), mat(app.skin, 0.6), 0.02).position.set(sx * 0.095, 0.02, 0);
+        add(new THREE.BoxGeometry(0.03, 0.008, 0.01), mat(new THREE.Color(app.skin).multiplyScalar(0.8).getHex(), 0.6), 0.03).position.set(sx * 0.035, 0.032, 0.096);
+      }
+      add(new THREE.BoxGeometry(0.035, 0.012, 0.01), mat(0x2a0a08, 0.5), -0.03).position.set(0, -0.035, 0.094);
+      // Corte del cuello (hacia abajo).
+      const cap = woundCap(0.052, true);
+      cap.rotation.x = Math.PI;
+      cap.position.y = -0.136;
+      g.add(cap);
       return g;
     }
     const arm = limb.startsWith('arm');
@@ -200,9 +212,54 @@ export class Wounds {
     add(new THREE.CylinderGeometry(r * 0.95, r * 0.8, len * 0.48, 10), mat(arm ? app.skin : cloth, arm ? 0.6 : 0.85), -len * 0.25);
     if (arm) add(new THREE.SphereGeometry(r * 0.95, 8, 6), mat(app.skin, 0.6), -len * 0.5).scale.set(0.9, 1.2, 0.6);
     else add(new THREE.BoxGeometry(0.1, 0.07, 0.24), mat(0x2a1c12, 0.7), -len * 0.5).position.z = 0.05;
-    add(new THREE.CylinderGeometry(r * 1.1, r * 1.1, 0.012, 10), FLESH, len * 0.5);
-    add(new THREE.CylinderGeometry(r * 0.3, r * 0.3, 0.02, 6), new THREE.MeshStandardMaterial({ color: 0xd9cdb4, roughness: 0.6 }), len * 0.505);
+    const cap = woundCap(r * 1.08);
+    cap.position.y = len * 0.5;
+    g.add(cap);
     return g;
+  }
+
+  /**
+   * Salpicaduras: manchas pequeñas e irregulares en el suelo, en la
+   * dirección del chorro, a distancias distintas.
+   */
+  splatter(from: THREE.Vector3, dir: THREE.Vector3, n: number): void {
+    const g = this.g;
+    for (let i = 0; i < n; i++) {
+      const d = 0.3 + Math.random() * 1.9;
+      const side = (Math.random() - 0.5) * 0.9;
+      const x = from.x + dir.x * d - dir.z * side, z = from.z + dir.z * d + dir.x * side;
+      const t = g.hf.heightAt(x, z);
+      const floor = g.worldItems.groundAt?.(x, from.y, z) ?? t;
+      const y = (Math.abs(floor - t) < 0.05 ? Math.max(t, g.hf.heightAt(x + 0.1, z), g.hf.heightAt(x, z + 0.1)) : floor) + 0.015;
+      const mesh = new THREE.Mesh(this.splatGeometry(), BLOOD);
+      const r = 0.05 + Math.random() * 0.14;
+      mesh.position.set(x, y, z);
+      mesh.rotation.y = Math.random() * 6;
+      mesh.scale.set(r * (1 + Math.random() * 0.8), 1, r);
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
+      (mesh.geometry as unknown as { userData: { y: number } }).userData = { y };
+      this.pools.push({ mesh, target: 0, grow: 0, owner: null });
+    }
+    while (this.pools.length > MAX_POOLS) { const old = this.pools.shift()!; this.group.remove(old.mesh); old.mesh.geometry.dispose(); }
+  }
+
+  private splatGeometry(): THREE.BufferGeometry {
+    const seg = 10;
+    const pos: number[] = [0, 0, 0];
+    const idx: number[] = [];
+    const ph = Math.random() * 6;
+    for (let i = 0; i < seg; i++) {
+      const a = (i / seg) * Math.PI * 2;
+      const r = 1 + 0.35 * Math.sin(a * 3 + ph) + 0.2 * Math.sin(a * 7 + ph * 2);
+      pos.push(Math.cos(a) * r, 0, Math.sin(a) * r);
+      idx.push(0, 1 + ((i + 1) % seg), 1 + i);
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(new Array(pos.length / 3).fill(0).flatMap(() => [0, 1, 0]), 3));
+    geo.setIndex(idx);
+    return geo;
   }
 
   /** Charco de sangre bajo alguien (crece despacio). */
@@ -282,7 +339,21 @@ export class Wounds {
       else em.pos.set(b.c.pos.x, b.c.pos.y + 0.35, b.c.pos.z);
       // Muerto: deja de manar poco a poco.
       if (!b.c.alive) { em.rate *= Math.pow(0.5, dt); if (em.rate < 1) { g.particles.removeEmitter(b.emitter); this.bleeders.splice(i, 1); } }
-      else em.enabled = b.c.visible && !b.c.indoors;
+      else {
+        em.enabled = b.c.visible && !b.c.indoors;
+        // Mana a borbotones, al ritmo del corazón (cada vez más débil).
+        if (b.base !== undefined) {
+          b.t = (b.t ?? 0) + dt;
+          const beat = Math.pow(Math.max(0, Math.sin(b.t * 7.2)), 6);
+          const weak = Math.max(0.3, 1 - b.t / 40);
+          em.rate = b.base * weak * (0.25 + 1.8 * beat);
+          if (stump) {
+            const up = new THREE.Vector3(0, 1, 0).applyQuaternion(stump.getWorldQuaternion(new THREE.Quaternion()));
+            em.vel.copy(up).multiplyScalar(0.3 + beat * 1.6 * weak);
+            em.vel.y -= 0.2;
+          }
+        }
+      }
     }
     for (const p of this.pools) {
       const s = p.mesh.scale.x;
