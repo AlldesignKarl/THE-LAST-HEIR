@@ -73,6 +73,7 @@ async function test(name, fn) {
 
 const browser = await launch();
 page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+page.setDefaultTimeout(120000); // el renderizado por software puede tardar en dar un fotograma
 page.on('pageerror', (e) => errors.push(`[pageerror] ${e.message}`));
 page.on('console', (m) => { if (m.type() === 'error') errors.push(`[console] ${m.text()}`); });
 await openGame();
