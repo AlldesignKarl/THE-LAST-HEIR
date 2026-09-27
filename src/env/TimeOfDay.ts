@@ -10,7 +10,7 @@ export const SUNSET = 20.5;
 export class TimeOfDay {
   /** Minutos de juego desde el día 1, 00:00. */
   totalMinutes: number;
-  dayLengthSeconds = 2400;
+  dayLengthSeconds = 1800;
   private lastHour = -1;
 
   constructor(private readonly bus: EventBus | null, startDay = 1, startHour = 7) {

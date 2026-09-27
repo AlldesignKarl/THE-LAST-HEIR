@@ -15,7 +15,8 @@ export const GlobalUniforms = {
 export type MatId =
   | 'stoneWall' | 'plaster' | 'wattle' | 'planks' | 'darkWood' | 'beam' | 'thatch' | 'tiles'
   | 'rock' | 'caveRock' | 'bark' | 'pineBark' | 'roughWood' | 'cobble' | 'rope' | 'sand' | 'wellWater' | 'leaves' | 'pine' | 'cloth' | 'clothRed' | 'metal' | 'iron' | 'gold'
-  | 'straw' | 'dirt' | 'bread' | 'meat' | 'meatCooked' | 'apple' | 'leather' | 'paper' | 'ash' | 'charred';
+  | 'straw' | 'dirt' | 'bread' | 'meat' | 'meatCooked' | 'apple' | 'leather' | 'paper' | 'ash' | 'charred'
+  | 'hickory' | 'oilcloth' | 'forged' | 'edge';
 
 interface MatSpec {
   tex?: TexId;
@@ -50,6 +51,14 @@ const SPECS: Record<MatId, MatSpec> = {
   clothRed: { tex: 'cloth', color: 0x8a3a2a, roughness: 0.95 },
   metal: { tex: 'metal', roughness: 0.35, metalness: 0.85 },
   iron: { tex: 'metal', color: 0x777777, roughness: 0.55, metalness: 0.8 },
+  /** Mango de nogal americano/fresno pulido por el uso. */
+  hickory: { tex: 'roughWood', color: 0xf0c080, roughness: 0.5 },
+  /** Estopa y trapo empapados en sebo (cabeza de la antorcha). */
+  oilcloth: { tex: 'cloth', color: 0x5a4630, roughness: 0.92 },
+  /** Hierro forjado ennegrecido (cabeza del hacha, hoja del cuchillo). */
+  forged: { tex: 'metal', color: 0x5c5a58, roughness: 0.62, metalness: 0.85 },
+  /** Filo afilado, brillante. */
+  edge: { tex: 'metal', color: 0xd8d8d4, roughness: 0.22, metalness: 0.95 },
   gold: { color: 0xc9a241, roughness: 0.3, metalness: 1 },
   straw: { tex: 'thatch', color: 0xd8c38a, roughness: 1 },
   dirt: { tex: 'dirt', roughness: 1 },

@@ -182,6 +182,7 @@ export class Terrain {
         // Suelo de bosque (hojarasca bajo los árboles) y tinte macro.
         splat2[idx * 4] = hf.forestDensity(x, z);
         splat2[idx * 4 + 2] = hf.beachWeight(x, z, h);
+        splat2[idx * 4 + 3] = hf.riverbedWeight(x, z);
         splat2[idx * 4 + 1] = 0.9 + 0.2 * (Math.sin(x * 0.013 + z * 0.021) * 0.5 + 0.5) * (Math.cos(z * 0.017 - x * 0.009) * 0.5 + 0.5);
       }
     }
@@ -378,6 +379,18 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
           float k = hblend(wsa, hh, cB.a);
           terr = mix(terr, cB.rgb, k); tn = mix(tn, nB, k); hh = mix(hh, cB.a, k);
         }
+        // Lecho del arroyo: grava y cantos rodados, oscurecidos y verdosos bajo el agua.
+        float wbed = smoothstep(0.1, 0.7, vSplat2.w + nmod * 0.3);
+        if (wbed > 0.001) {
+          vec2 gu = wp * 0.9;
+          vec4 g1 = texture2D(tRock, gu);
+          vec4 g2 = texture2D(tSand, wp * 0.35);
+          float pebble = smoothstep(0.45, 0.7, texture2D(tRock, wp * 2.3 + 0.17).a);
+          vec3 bed = mix(g2.rgb * vec3(0.8, 0.78, 0.7), g1.rgb * vec3(0.95, 0.9, 0.82), pebble);
+          bed *= mix(0.55, 0.75, g1.a) * vec3(0.8, 0.95, 0.85);
+          float k = hblend(wbed, hh, max(g1.a, pebble));
+          terr = mix(terr, bed, k); tn = mix(tn, texture2D(tRockN, gu).xy * 2.0 - 1.0, k * 0.8); hh = mix(hh, pebble, k);
+        }
         float shoreWet = 1.0 - smoothstep(uSea + 0.1, uSea + 0.9, vWPos.y);
         float underwater = 1.0 - smoothstep(uSea - 0.4, uSea + 0.05, vWPos.y);
         // Roca en pendientes (triplanar).
@@ -414,7 +427,7 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
         terr = mix(terr, terr * vec3(1.08, 1.02, 0.86), smoothstep(0.55, 0.8, macro) * (1.0 - wr) * 0.6);
         terr *= vSplat2.y;
         // Humedad: oscurece y abrillanta; charcos en las zonas bajas del barro.
-        float wet = clamp(uWetness * (1.0 - wr * 0.6) + wm * 0.45 + shoreWet * 0.8, 0.0, 1.0);
+        float wet = clamp(uWetness * (1.0 - wr * 0.6) + wm * 0.45 + shoreWet * 0.8 + wbed * 0.9, 0.0, 1.0);
         terr = mix(terr, terr * vec3(0.55, 0.7, 0.68), underwater * 0.8);
         float puddle = smoothstep(0.35, 0.15, hh) * clamp(uWetness * 1.4 + wm * 0.3, 0.0, 1.0);
         terr *= mix(1.0, 0.6, wet);
@@ -434,6 +447,6 @@ function createTerrainMaterial(textures: TextureLibrary, lowQuality: boolean): T
           normal = normalize((viewMatrix * vec4(wN, 0.0)).xyz);
         }`);
   };
-  mat.customProgramCacheKey = () => (lowQuality ? 'terrain-v2-lq' : 'terrain-v2');
+  mat.customProgramCacheKey = () => (lowQuality ? 'terrain-v3-lq' : 'terrain-v3');
   return mat;
 }

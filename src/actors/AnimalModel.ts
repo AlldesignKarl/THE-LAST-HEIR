@@ -15,6 +15,8 @@ export interface AnimalLook {
   neckLen: number;
   antlers?: boolean;
   wolf?: boolean;
+  /** Oveja: vellón lanudo y cara oscura. */
+  sheep?: boolean;
 }
 
 const G = { sphere: new THREE.SphereGeometry(1, 12, 8), cyl: new THREE.CylinderGeometry(1, 1, 1, 7), cone: new THREE.ConeGeometry(1, 1, 6) };
@@ -46,14 +48,22 @@ export class AnimalModel {
     this.head.rotation.x = look.wolf ? 0.9 : 0.6;
     this.tail = sk.bone(this.body, 0, 0.1, -0.6);
     this.tail.rotation.x = look.wolf ? 2.3 : -0.4;
-    sk.part(this.body, G.sphere, b, 0.28, 0.27, 0.62);
+    if (look.sheep) {
+      // Vellón: varias masas de lana superpuestas (bultos irregulares).
+      sk.part(this.body, G.sphere, b, 0.34, 0.32, 0.56);
+      for (const [x, y, z, r] of [[0.14, 0.12, 0.25, 0.2], [-0.15, 0.1, 0.2, 0.2], [0.12, 0.14, -0.22, 0.21], [-0.13, 0.12, -0.25, 0.2], [0, 0.2, 0, 0.22], [0, 0.05, 0.42, 0.18], [0, 0.08, -0.45, 0.17]] as const) sk.part(this.body, G.sphere, b, r, r * 0.85, r, x, y, z);
+    } else {
+      sk.part(this.body, G.sphere, b, 0.28, 0.27, 0.62);
+    }
     sk.part(this.body, G.sphere, belly, 0.22, 0.18, 0.5, 0, -0.1, 0);
     sk.part(this.neck, G.cyl, b, 0.1, look.neckLen, 0.12, 0, look.neckLen / 2, 0);
-    sk.part(this.head, G.sphere, b, 0.12, 0.12, 0.16, 0, 0, 0.03);
-    sk.part(this.head, G.cone, b, 0.08, 0.26, 0.08, 0, -0.02, 0.2, Math.PI / 2);
+    const face = look.sheep ? 0x2e2824 : b;
+    sk.part(this.head, G.sphere, face, 0.1, 0.11, 0.15, 0, 0, 0.03);
+    sk.part(this.head, G.cone, face, 0.075, look.sheep ? 0.2 : 0.26, 0.075, 0, -0.02, 0.18, Math.PI / 2);
     sk.part(this.head, G.sphere, dark, 0.025, 0.025, 0.025, 0, 0, 0.33);
     for (const sx of [-1, 1]) {
-      sk.part(this.head, G.cone, b, 0.04, 0.12, 0.02, sx * 0.07, 0.13, -0.02);
+      if (look.sheep) sk.part(this.head, G.sphere, face, 0.07, 0.025, 0.035, sx * 0.1, 0.05, -0.02, 0, 0, sx * 0.3); // orejas caídas
+      else sk.part(this.head, G.cone, b, 0.04, 0.12, 0.02, sx * 0.07, 0.13, -0.02);
       sk.part(this.head, G.sphere, dark, 0.018, 0.018, 0.018, sx * 0.065, 0.04, 0.12);
       if (look.antlers) {
         sk.part(this.head, G.cyl, antler, 0.015, 0.35, 0.015, sx * 0.08, 0.28, -0.04, 0, 0, -sx * 0.4);
@@ -65,10 +75,11 @@ export class AnimalModel {
       const hip = sk.bone(this.body, side * 0.14, -0.05, front ? 0.38 : -0.4);
       const knee = sk.bone(hip, 0, -up, 0);
       sk.part(hip, G.cyl, b, 0.06, up, 0.07, 0, -up / 2, 0);
-      sk.part(knee, G.cyl, look.wolf ? b : belly, 0.035, lo, 0.035, 0, -lo / 2, 0);
+      sk.part(knee, G.cyl, look.wolf ? b : look.sheep ? 0x2e2824 : belly, 0.035, lo, 0.035, 0, -lo / 2, 0);
       sk.part(knee, G.sphere, dark, 0.04, 0.03, 0.05, 0, -lo, 0.02);
       this.legs.push({ hip, knee, front, side });
     }
+    if (look.sheep) sk.part(this.head, G.sphere, 0xe8e0d0, 0.1, 0.07, 0.09, 0, 0.1, -0.02); // copete de lana
     if (look.wolf) sk.part(this.tail, G.cone, b, 0.07, 0.4, 0.07, 0, -0.18, 0);
     else sk.part(this.tail, G.sphere, 0xe8e0d0, 0.06, 0.08, 0.05);
     this.mesh = sk.build(this.body, characterMaterial());

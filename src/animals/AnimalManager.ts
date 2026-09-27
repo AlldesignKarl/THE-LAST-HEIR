@@ -10,11 +10,12 @@ import { AnimalModel } from '../actors/AnimalModel';
 import type { Actor, Faction, HitInfo, HitResult } from '../actors/Actor';
 import type { Hitbox } from '../actors/HumanoidModel';
 import { HIT_ZONES } from '../combat/WeaponDefs';
-import { DEER_MEADOW, WOLF_DEN } from '../world/WorldLayout';
+import { DEER_MEADOW, PASTURE, WOLF_DEN } from '../world/WorldLayout';
+import { toLocalXZ, toWorldXZ } from '../core/math';
 import { wrapAngle } from '../core/math';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
 
-type Species = 'deer' | 'wolf';
+type Species = 'deer' | 'wolf' | 'sheep';
 
 class Animal implements Actor {
   readonly kind = 'animal';
@@ -49,16 +50,19 @@ class Animal implements Actor {
   get hitboxes(): Hitbox[] { return this.model.hitboxes; }
 
   constructor(readonly id: string, readonly species: Species, readonly victimKind: string) {
-    const wolf = species === 'wolf';
+    const wolf = species === 'wolf', sheep = species === 'sheep';
     this.faction = wolf ? 'predator' : 'prey';
-    this.name = wolf ? 'Lobo' : 'Ciervo';
-    this.health = this.maxHealth = wolf ? 55 : 45;
-    this.radius = wolf ? 0.4 : 0.5;
-    this.height = wolf ? 0.9 : 1.5;
-    const stag = !wolf && Math.random() < 0.4;
+    this.name = wolf ? 'Lobo' : sheep ? 'Oveja' : 'Ciervo';
+    this.health = this.maxHealth = wolf ? 55 : sheep ? 30 : 45;
+    this.radius = wolf ? 0.4 : sheep ? 0.45 : 0.5;
+    this.height = wolf ? 0.9 : sheep ? 1.0 : 1.5;
+    const stag = !wolf && !sheep && Math.random() < 0.4;
+    const wool = [0xd8d0bc, 0xcfc6b0, 0xe0d8c8, 0x5a4a3a][Math.floor(Math.random() * 4)];
     this.model = new AnimalModel(wolf
       ? { body: 0x6a6660, belly: 0x9a948a, size: 0.95 + Math.random() * 0.15, legLen: 0.45, neckLen: 0.22, wolf: true }
-      : { body: 0x7a5a3c, belly: 0xb8a080, size: stag ? 1.1 : 0.95, legLen: 0.7, neckLen: 0.42, antlers: stag });
+      : sheep
+        ? { body: wool, belly: wool, size: 0.78 + Math.random() * 0.1, legLen: 0.42, neckLen: 0.2, sheep: true }
+        : { body: 0x7a5a3c, belly: 0xb8a080, size: stag ? 1.1 : 0.95, legLen: 0.7, neckLen: 0.42, antlers: stag });
   }
 
   takeHit(h: HitInfo): HitResult {
@@ -73,12 +77,15 @@ class Animal implements Actor {
       this.onDeath?.(this, h.attackerId);
       return { applied: amount, blocked: false, killed: true };
     }
-    if (this.species === 'deer') { this.state = 'flee'; this.stateT = 0; }
+    if (this.species !== 'wolf') { this.state = 'flee'; this.stateT = 0; }
     else if (this.health < this.maxHealth * 0.3) { this.state = 'leave'; this.stateT = 0; }
     else { this.state = 'attack'; this.attackT = 0.2; }
     return { applied: amount, blocked: false, killed: false };
   }
 }
+
+const SHEEP = 7;
+const ANIMAL_THE: Record<Species, string> = { deer: 'el ciervo', wolf: 'el lobo', sheep: 'la oveja' };
 
 export class AnimalManager {
   readonly animals = new Map<string, Animal>();
@@ -87,6 +94,9 @@ export class AnimalManager {
   private spawnT = 0;
   /** Días hasta que se reponen los ciervos cazados. */
   deerDeficit = 0;
+  /** Ovejas del rebaño muertas (se reponen poco a poco: Lope compra corderos). */
+  sheepLost = 0;
+  private herdInit = false;
   private tracks: THREE.InstancedMesh;
   private trackIdx = 0;
   private trackMat = new THREE.Matrix4();
@@ -101,7 +111,11 @@ export class AnimalManager {
     this.tracks.frustumCulled = false;
     this.tracks.renderOrder = 1;
     g.renderer.scene.add(this.tracks);
-    g.bus.on('time:hour', (e) => { if (e.hour === 6 && this.deerDeficit > 0) this.deerDeficit = Math.max(0, this.deerDeficit - 1); });
+    g.bus.on('time:hour', (e) => {
+      if (e.hour !== 6) return;
+      if (this.deerDeficit > 0) this.deerDeficit = Math.max(0, this.deerDeficit - 1);
+      if (this.sheepLost > 0 && g.time.day % 3 === 0) this.sheepLost--;
+    });
   }
 
   private spawn(species: Species, x: number, z: number): Animal {
@@ -116,11 +130,61 @@ export class AnimalManager {
       an.deathDay = this.g.time.day;
       an.killedByPlayer = killer === 'player';
       if (an.species === 'deer') this.deerDeficit++;
+      if (an.species === 'sheep') {
+        this.sheepLost++;
+        // Las ovejas son de Lope: matarlas a la vista de alguien es un delito.
+        if (killer === 'player' && this.g.npcs?.witnessesCrime(an.pos)) this.g.bus.emit('crime', { type: 'livestock', village: 'robledo', witnessed: true });
+      }
       if (killer === 'player') this.g.skills.add('hunting', 2);
       this.g.bus.emit('sfx', { id: an.species === 'wolf' ? 'wolf_growl' : 'deer_alarm', x: an.pos.x, y: an.pos.y + 0.5, z: an.pos.z, volume: 0.6 });
       this.g.bus.emit('actor:killed', { victimId: an.id, victimKind: an.victimKind, victimFaction: an.faction, killerId: killer });
     };
     return a;
+  }
+
+  private spawnSheep(): void {
+    const l = { x: (Math.random() - 0.5) * (PASTURE.w - 4), z: (Math.random() - 0.5) * (PASTURE.d - 4) };
+    const w = toWorldXZ(l.x, l.z, PASTURE.rot);
+    const a = this.spawn('sheep', PASTURE.x + w.x, PASTURE.z + w.z);
+    a.state = 'graze';
+  }
+
+  /** Punto al azar dentro del prado (o el más cercano dentro si se sale). */
+  private inPasture(x: number, z: number, out: THREE.Vector3): THREE.Vector3 {
+    const l = toLocalXZ(x - PASTURE.x, z - PASTURE.z, PASTURE.rot);
+    const lx = Math.max(-PASTURE.w / 2 + 1.5, Math.min(PASTURE.w / 2 - 1.5, l.x));
+    const lz = Math.max(-PASTURE.d / 2 + 1.5, Math.min(PASTURE.d / 2 - 1.5, l.z));
+    const w = toWorldXZ(lx, lz, PASTURE.rot);
+    return out.set(PASTURE.x + w.x, 0, PASTURE.z + w.z);
+  }
+
+  private sheepAI(a: Animal, dt: number, d: number): void {
+    a.stateT += dt;
+    const pp = this.g.player.pos;
+    const scared = (a.lastAttacker !== null && a.stateT < 20) || this.nearPredator(a, 20) || (this.g.player.sprinting && d < 6);
+    switch (a.state) {
+      case 'graze': case 'wander':
+        a.speed = a.state === 'wander' ? 0.7 : 0;
+        a.model.setState(a.state === 'graze' ? 'graze' : 'walk');
+        if (scared) { a.state = 'flee'; a.stateT = 0; this.g.bus.emit('sfx', { id: 'deer_alarm', x: a.pos.x, y: a.pos.y + 0.8, z: a.pos.z, volume: 0.35 }); break; }
+        if (a.stateT > 5 + Math.random() * 9) {
+          a.stateT = 0;
+          if (a.state === 'graze') {
+            a.state = 'wander';
+            // Van en rebaño: hacia otra oveja o a un punto cercano.
+            this.inPasture(a.pos.x + (Math.random() - 0.5) * 10, a.pos.z + (Math.random() - 0.5) * 10, a.target);
+          } else a.state = 'graze';
+        }
+        break;
+      case 'flee': {
+        a.model.setState('run');
+        a.speed = 3.6;
+        this.inPasture(a.pos.x + (a.pos.x - pp.x) * 2, a.pos.z + (a.pos.z - pp.z) * 2, a.target);
+        if (a.stateT > 6 && !scared) { a.state = 'graze'; a.stateT = 0; }
+        break;
+      }
+      default: a.state = 'graze'; break;
+    }
   }
 
   private despawn(a: Animal): void {
@@ -155,6 +219,14 @@ export class AnimalManager {
     if (wolfTime && this.count('wolf') < 3 && denD < 330 && denD > 60) {
       for (let i = this.count('wolf'); i < 3; i++) this.spawn('wolf', WOLF_DEN.x + (Math.random() - 0.5) * 8, WOLF_DEN.z + (Math.random() - 0.5) * 8);
     }
+    // Rebaño de ovejas en el prado cercado (aparecen sin que se vea).
+    const pastD = Math.hypot(pp.x - PASTURE.x, pp.z - PASTURE.z);
+    if (!this.herdInit && pastD < 300) {
+      // Al empezar, el rebaño ya está en el prado.
+      this.herdInit = true;
+      for (let i = this.count('sheep'); i < SHEEP - this.sheepLost; i++) this.spawnSheep();
+    }
+    if (this.count('sheep') < SHEEP - this.sheepLost && pastD < 300 && pastD > 45) this.spawnSheep();
     // Retirada: de día los lobos se van; de noche los ciervos.
     for (const a of this.animals.values()) {
       if (!a.alive) continue;
@@ -163,7 +235,7 @@ export class AnimalManager {
         if (a.state !== 'leave') { a.state = 'leave'; a.stateT = 0; }
       }
       if (a.state === 'leave' && d > 90) this.despawn(a);
-      if (d > 450) this.despawn(a);
+      if (d > 450) { if (a.species === 'sheep') this.herdInit = false; this.despawn(a); }
     }
     // Cadáveres viejos desaparecen.
     for (const a of this.animals.values()) {
@@ -176,7 +248,7 @@ export class AnimalManager {
   }
 
   onTimeSkip(): void {
-    for (const a of [...this.animals.values()]) if (a.alive) this.despawn(a);
+    for (const a of [...this.animals.values()]) if (a.alive && a.species !== 'sheep') this.despawn(a);
   }
 
   update(dt: number): void {
@@ -190,6 +262,7 @@ export class AnimalManager {
       const near = d < 70;
       if (a.alive) {
         if (a.species === 'deer') this.deerAI(a, dt, d);
+        else if (a.species === 'sheep') this.sheepAI(a, dt, d);
         else this.wolfAI(a, dt, d);
         this.moveTowards(a, dt);
       }
@@ -216,7 +289,7 @@ export class AnimalManager {
       g.physics.tag(a.collider, { kind: 'actor', id: a.id });
       g.interactables.register(a.collider.handle, {
         id: `animal:${a.id}`, kind: 'animal', pos: a.pos,
-        label: (game) => (a.alive || a.butchered ? null : game.inventory.has('knife') ? `Despiezar ${a.species === 'deer' ? 'el ciervo' : 'el lobo'}` : `${a.name} muerto · necesitas un cuchillo`),
+        label: (game) => (a.alive || a.butchered ? null : game.inventory.has('knife') ? `Despiezar ${ANIMAL_THE[a.species]}` : `${a.name} muerto · necesitas un cuchillo`),
         interact: (game) => this.butcher(a, game),
       });
     } else if (!on && a.body) {
@@ -234,17 +307,17 @@ export class AnimalManager {
   private butcher(a: Animal, g: Game): void {
     if (a.alive || a.butchered || !g.inventory.has('knife')) return;
     a.butchered = true;
-    const meat = a.species === 'deer' ? 3 : 1;
+    const meat = a.species === 'deer' ? 3 : a.species === 'sheep' ? 2 : 1;
     g.inventory.add('meat_raw', meat);
     g.bus.emit('item:acquired', { itemId: 'meat_raw', count: meat, source: 'loot' });
-    const hide = a.species === 'deer' ? 'hide' : 'pelt_wolf';
+    const hide = a.species === 'wolf' ? 'pelt_wolf' : 'hide';
     g.inventory.add(hide, 1);
     g.bus.emit('item:acquired', { itemId: hide, count: 1, source: 'loot' });
     g.skills.add('hunting', 3);
     g.time.advanceHours(0.25);
     g.particles.burst('blood', a.pos.x, a.pos.y + 0.4, a.pos.z, 20, 1.5);
     g.bus.emit('sfx', { id: 'hit_flesh', x: a.pos.x, y: a.pos.y, z: a.pos.z });
-    g.bus.emit('notify', { text: `Despiezas ${a.species === 'deer' ? 'el ciervo' : 'el lobo'}: ${meat} carne, 1 piel.`, kind: 'item' });
+    g.bus.emit('notify', { text: `Despiezas ${ANIMAL_THE[a.species]}: ${meat} carne, 1 piel.`, kind: 'item' });
     a.model.root.scale.multiplyScalar(0.7);
   }
 

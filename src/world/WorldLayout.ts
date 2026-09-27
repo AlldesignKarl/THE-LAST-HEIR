@@ -117,6 +117,12 @@ export const BUILDINGS: BuildingDef[] = [
 /** Pozo de la plaza. */
 export const WELL = { x: 4, z: 3 };
 /** Puestos del mercado. */
+/** Carro del buhonero en la plaza. */
+export const PEDDLER_CART = { x: 12, z: -5, rot: 1.35 };
+
+/** Prado cercado del pastor, al sur del pueblo. */
+export const PASTURE = { x: -2, z: 108, w: 26, d: 18, rot: 0.1 };
+
 export const MARKET_STALLS: { x: number; z: number; rot: number }[] = [
   { x: -8, z: 10, rot: 0.3 },
   { x: 2, z: 13, rot: -0.1 },

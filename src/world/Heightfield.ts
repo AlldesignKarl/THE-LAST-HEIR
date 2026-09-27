@@ -6,7 +6,7 @@
 import { Simplex2 } from '../core/noise';
 import { clamp, lerp, pointSegmentDist, smoothstep, toLocalXZ } from '../core/math';
 import {
-  BANDIT_CAMP, BUILDINGS, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
+  BANDIT_CAMP, BUILDINGS, CAVE, CAVE_HILL, DEER_MEADOW, FIELDS, GROVE_NE, PASTURE, PLAYER_PLOT, ROADS, SEA, STREAM, VILLAGES,
   WORLD_HALF, WORLD_SEED, WOLF_DEN, type P2,
 } from './WorldLayout';
 
@@ -109,12 +109,16 @@ export class Heightfield {
 
     // Arroyo: cauce excavado.
     const st = this.streamInfo(x, z);
-    if (st && st.dist < st.halfW + 5) {
-      const target = st.dist < st.halfW
-        ? st.level - STREAM.depth * (1 - (st.dist / st.halfW) ** 2) - 0.05
-        : st.level + 0.2;
-      const w = 1 - smoothstep(st.halfW + 1, st.halfW + 5, st.dist);
-      h = Math.min(h, lerp(h, target, w));
+    if (st && st.dist < st.halfW + 7) {
+      // Orilla irregular (la anchura varía con ruido) y talud suave, sin escalón.
+      // Donde el terreno natural queda por debajo del agua se levanta un
+      // ribazo, para que el agua nunca "flote" sobre el llano.
+      const hw = st.halfW + this.nd.noise(x / 7, z / 7) * 0.5;
+      const target = st.dist < hw
+        ? st.level - STREAM.depth * (1 - (st.dist / hw) ** 2) - 0.05 + this.nd.noise(x * 0.9, z * 0.9) * 0.06
+        : st.level - 0.05 + Math.min(0.5, (st.dist - hw) * 0.24);
+      const w = 1 - smoothstep(st.halfW + 1.5, st.halfW + 7, st.dist);
+      h = st.dist < hw ? Math.min(h, target) : lerp(h, target, w);
     }
 
     // Parcela del jugador: explanada suave.
@@ -186,6 +190,13 @@ export class Heightfield {
       if (!best || d < best.dist) best = { dist: d, level: lerp(s.la, s.lb, t), halfW: s.halfW };
     }
     return best;
+  }
+
+  /** Peso del lecho del arroyo (grava y cantos bajo el agua) en [0,1]. */
+  riverbedWeight(x: number, z: number): number {
+    const st = this.streamInfo(x, z);
+    if (!st) return 0;
+    return 1 - smoothstep(st.halfW - 0.6, st.halfW + 0.7, st.dist);
   }
 
   /** Nivel del agua en (x,z) si hay agua ahí. */
@@ -272,6 +283,7 @@ export class Heightfield {
     for (const b of BUILDINGS) if (Math.abs(x - b.x) < 14 && Math.abs(z - b.z) < 14) return 0;
     if (Math.hypot(x - BANDIT_CAMP.x, z - BANDIT_CAMP.z) < BANDIT_CAMP.radius + 4) return 0;
     if (Math.hypot(x - DEER_MEADOW.x, z - DEER_MEADOW.z) < DEER_MEADOW.radius) return 0;
+    if (Math.abs(x - PASTURE.x) < PASTURE.w / 2 + 6 && Math.abs(z - PASTURE.z) < PASTURE.d / 2 + 6) return 0;
     if (Math.hypot(x - WOLF_DEN.x, z - WOLF_DEN.z) < 8) return 0;
     const hill = Math.hypot(x - CAVE_HILL.x, z - CAVE_HILL.z);
     if (hill < CAVE_HILL.radius + 3 && hill > CAVE_HILL.radius - CAVE_HILL.cliff - 4) return 0; // acantilado

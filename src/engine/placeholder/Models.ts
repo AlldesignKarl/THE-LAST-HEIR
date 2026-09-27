@@ -114,13 +114,33 @@ const D: Record<string, ModelDef> = {
   axe: {
     shape: { type: 'box', hx: 0.12, hy: 0.4, hz: 0.04 }, mass: 1.6,
     build: (b) => {
-      // Mango de fresno ligeramente curvo y cabeza barbuda con ojo.
-      b.cyl(0.02, 0.023, 0.42, 'roughWood', 0, 0.16, 0, 0, 0, 0.03, 8);
-      b.cyl(0.023, 0.026, 0.42, 'roughWood', 0.006, -0.23, 0, 0, 0, -0.04, 8);
-      b.add(blade([[0.02, 0.36], [0.07, 0.35], [0.2, 0.42], [0.22, 0.3], [0.19, 0.2], [0.14, 0.23], [0.07, 0.27], [0.02, 0.27]], 0.018, 0.006), 'iron');
-      b.box(0.06, 0.1, 0.045, 'iron', 0.0, 0.315, 0);
-      b.add(blade([[0.2, 0.42], [0.225, 0.3], [0.19, 0.2], [0.205, 0.2], [0.24, 0.3], [0.215, 0.43]], 0.006, 0.002), 'metal'); // filo afilado
-      b.cyl(0.024, 0.024, 0.03, 'leather', 0, -0.36, 0, 0, 0, 0, 8);
+      // Mango de nogal con curva en S (más grueso abajo, con talón) y cabeza
+      // forjada de hacha de mano: ojo, peto (cara trasera) y filo pulido.
+      const pts: THREE.Vector3[] = [];
+      for (let i = 0; i <= 14; i++) {
+        const t = i / 14; // 0 abajo, 1 arriba
+        const y = -0.42 + t * 0.8;
+        const x = 0.018 * Math.sin(t * Math.PI * 1.6 + 0.4) - 0.01 * t;
+        pts.push(new THREE.Vector3(x, y, 0));
+      }
+      const handle = new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 28, 0.019, 9, false);
+      // Engrosar hacia el talón.
+      const hp = handle.attributes.position as THREE.BufferAttribute;
+      for (let i = 0; i < hp.count; i++) {
+        const y = hp.getY(i);
+        const k = 1 + Math.max(0, (-0.25 - y)) * 1.6;
+        const c = pts[Math.min(14, Math.max(0, Math.round(((y + 0.42) / 0.8) * 14)))];
+        hp.setX(i, c.x + (hp.getX(i) - c.x) * k);
+        hp.setZ(i, hp.getZ(i) * k * 0.85);
+      }
+      handle.computeVertexNormals();
+      b.add(handle, 'hickory');
+      b.add(new THREE.SphereGeometry(0.026, 9, 6), 'hickory', 0.012, -0.425, 0).parts.get('hickory')!.at(-1)!.scale(1.1, 0.8, 0.85);
+      // Cabeza: cuerpo con ojo, mejilla que se abre hacia el filo curvo.
+      b.add(blade([[-0.035, 0.37], [0.03, 0.375], [0.1, 0.39], [0.165, 0.425], [0.19, 0.35], [0.192, 0.27], [0.17, 0.215], [0.1, 0.26], [0.03, 0.29], [-0.035, 0.295]], 0.03, 0.006), 'forged');
+      b.box(0.045, 0.085, 0.036, 'forged', -0.045, 0.332, 0); // peto
+      b.add(blade([[0.165, 0.425], [0.19, 0.35], [0.192, 0.27], [0.17, 0.215], [0.182, 0.215], [0.206, 0.27], [0.205, 0.35], [0.178, 0.43]], 0.012, 0.002), 'edge'); // filo
+      b.box(0.012, 0.012, 0.034, 'hickory', 0, 0.38, 0); // cuña del mango
     },
   },
   club: {
@@ -168,20 +188,37 @@ const D: Record<string, ModelDef> = {
   knife: {
     shape: { type: 'box', hx: 0.03, hy: 0.15, hz: 0.02 }, mass: 0.3,
     build: (b) => {
-      b.add(blade([[-0.012, 0.03], [0.014, 0.03], [0.014, 0.15], [0.004, 0.2], [-0.012, 0.16]], 0.003, 0.002), 'metal');
-      b.cyl(0.016, 0.016, 0.012, 'iron', 0, 0.025, 0, 0, 0, 0, 8);
-      b.cyl(0.013, 0.016, 0.1, 'darkWood', 0, -0.035, 0, 0, 0, 0, 8);
-      b.add(new THREE.SphereGeometry(0.016, 8, 6), 'iron', 0, -0.088, 0);
+      // Hoja de punta recortada con dientes en el lomo, guarda de hierro y
+      // empuñadura envuelta en cordel de cáñamo con lazada.
+      const edge: [number, number][] = [[0.015, 0.024], [0.016, 0.12], [0.012, 0.165], [0.004, 0.2], [-0.002, 0.212]];
+      const spine: [number, number][] = [[-0.008, 0.185], [-0.012, 0.16]];
+      for (let i = 0; i <= 8; i++) { const y = 0.15 - i * 0.009; spine.push([i % 2 ? -0.015 : -0.0115, y]); }
+      spine.push([-0.014, 0.024]);
+      b.add(blade([...edge, ...spine], 0.004, 0.0018), 'forged');
+      b.add(blade([[0.011, 0.03], [0.016, 0.03], [0.016, 0.12], [0.012, 0.165], [0.004, 0.2], [0.0, 0.2], [0.008, 0.162], [0.011, 0.12]], 0.0045, 0.001), 'edge');
+      b.box(0.0025, 0.1, 0.0052, 'iron', -0.004, 0.09, 0); // vaceo
+      b.box(0.074, 0.011, 0.022, 'iron', 0, 0.019, 0); // guarda
+      for (const sx of [-1, 1]) b.add(new THREE.SphereGeometry(0.007, 6, 4), 'iron', sx * 0.037, 0.019, 0);
+      b.cyl(0.0125, 0.0135, 0.11, 'darkWood', 0, -0.043, 0, 0, 0, 0, 8);
+      for (let i = 0; i < 13; i++) b.add(new THREE.TorusGeometry(0.0145, 0.0042, 4, 10), 'rope', 0, 0.006 - i * 0.0082, 0, Math.PI / 2 + (i % 2 ? 0.08 : -0.08));
+      b.cyl(0.015, 0.012, 0.014, 'iron', 0, -0.104, 0, 0, 0, 0, 10); // pomo
+      b.add(new THREE.TorusGeometry(0.012, 0.0028, 4, 10), 'rope', 0.004, -0.121, 0, 0, 0.6); // lazada
     },
   },
   torch: {
     shape: { type: 'cyl', hh: 0.3, r: 0.04 }, mass: 0.5,
     build: (b) => {
-      // Palo de pino y cabeza de estopa empapada en sebo, atada con cordel.
-      b.cyl(0.017, 0.025, 0.6, 'roughWood', 0, 0, 0, 0, 0, 0, 7);
-      b.cyl(0.036, 0.03, 0.14, 'charred', 0, 0.29, 0, 0, 0, 0, 9);
-      b.cyl(0.03, 0.036, 0.03, 'charred', 0, 0.375, 0, 0, 0, 0, 9);
-      for (const y of [0.24, 0.3, 0.35]) b.add(new THREE.TorusGeometry(0.036, 0.005, 4, 12), 'rope', 0, y, 0, Math.PI / 2);
+      // Palo de pino descortezado; cabeza de trapos y estopa enrollados en
+      // capas (más gruesa en el centro), empapados en sebo y requemados arriba.
+      b.cyl(0.018, 0.024, 0.6, 'roughWood', 0, -0.02, 0, 0, 0, 0, 8);
+      for (let i = 0; i < 7; i++) {
+        const y = 0.2 + i * 0.024;
+        const r = 0.03 + Math.sin((i / 6) * Math.PI) * 0.013;
+        b.add(new THREE.TorusGeometry(r, 0.014, 6, 14), i > 4 ? 'charred' : 'oilcloth', 0, y, 0, Math.PI / 2 + (i % 2 ? 0.12 : -0.1), i * 0.7);
+      }
+      b.cyl(0.036, 0.042, 0.16, 'oilcloth', 0, 0.27, 0, 0, 0, 0, 12);
+      b.cyl(0.03, 0.036, 0.03, 'charred', 0, 0.36, 0, 0, 0, 0, 12);
+      for (const y of [0.19, 0.265]) b.add(new THREE.TorusGeometry(0.041, 0.0045, 4, 14), 'rope', 0, y, 0, Math.PI / 2);
     },
   },
   bucket: {
@@ -252,6 +289,39 @@ const D: Record<string, ModelDef> = {
   pew: { shape: { type: 'box', hx: 1.2, hy: 0.45, hz: 0.25 }, mass: 0, build: (b) => { b.box(2.4, 0.06, 0.4, 'darkWood', 0, 0, 0); b.box(2.4, 0.6, 0.05, 'darkWood', 0, 0.3, -0.2); for (const sx of [-1, 1]) b.box(0.06, 0.9, 0.45, 'darkWood', sx * 1.15, 0.0, -0.02); } },
   altar: { shape: { type: 'box', hx: 0.9, hy: 0.5, hz: 0.45 }, mass: 0, build: (b) => b.box(1.8, 1.0, 0.9, 'stoneWall', 0, 0, 0).box(1.9, 0.02, 1.0, 'cloth', 0, 0.51, 0).box(0.06, 0.6, 0.06, 'gold', 0, 0.8, -0.2).box(0.35, 0.06, 0.06, 'gold', 0, 0.95, -0.2) },
   counter: { shape: { type: 'box', hx: 1.5, hy: 0.55, hz: 0.35 }, mass: 0, build: (b) => b.box(3.0, 1.1, 0.7, 'planks', 0, 0, 0).box(3.1, 0.06, 0.8, 'darkWood', 0, 0.57, 0) },
+  /** Tramo de cerca de palos (2.5 m): dos postes y dos travesaños sin desbastar. */
+  fence: { shape: { type: 'box', hx: 1.25, hy: 0.55, hz: 0.06 }, mass: 0, build: (b) => {
+    for (const sx of [-1, 1]) b.cyl(0.055, 0.065, 1.25, 'roughWood', sx * 1.2, 0.07, 0, 0.03 * sx, 0, 0.02, 7);
+    b.cyl(0.04, 0.045, 2.55, 'roughWood', 0, 0.35, 0.02, 0, 0, Math.PI / 2 + 0.02, 6);
+    b.cyl(0.04, 0.04, 2.55, 'roughWood', 0, -0.05, 0.02, 0, 0, Math.PI / 2 - 0.015, 6);
+  } },
+  /** Abrevadero de tronco vaciado. */
+  trough: { shape: { type: 'box', hx: 0.9, hy: 0.22, hz: 0.3 }, mass: 0, build: (b) => {
+    b.box(1.8, 0.06, 0.6, 'roughWood', 0, -0.19, 0).box(1.8, 0.4, 0.07, 'roughWood', 0, 0, 0.27).box(1.8, 0.4, 0.07, 'roughWood', 0, 0, -0.27);
+    b.box(0.07, 0.4, 0.6, 'roughWood', 0.87, 0, 0).box(0.07, 0.4, 0.6, 'roughWood', -0.87, 0, 0);
+    b.box(1.7, 0.02, 0.48, 'wellWater', 0, 0.1, 0);
+  } },
+  /** Almiar de heno con su palo central. */
+  haystack: { shape: { type: 'cyl', hh: 0.9, r: 1.1 }, mass: 0, build: (b) => {
+    b.add(new THREE.SphereGeometry(1.15, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62), 'straw', 0, -0.55, 0, 0, 0, 0, 1);
+    b.add(new THREE.CylinderGeometry(1.12, 1.18, 0.7, 12), 'straw', 0, -0.6, 0);
+    b.cyl(0.035, 0.04, 2.4, 'roughWood', 0, 0.4, 0, 0, 0, 0, 5);
+  } },
+  /** Carro del buhonero con toldo y mercancía. */
+  peddler_cart: { shape: { type: 'box', hx: 0.8, hy: 0.7, hz: 1.3 }, mass: 0, build: (b) => {
+    b.box(1.5, 0.08, 2.5, 'planks', 0, -0.2, 0);
+    for (const sx of [-1, 1]) {
+      b.box(0.06, 0.5, 2.5, 'planks', sx * 0.72, 0.05, 0);
+      b.add(new THREE.TorusGeometry(0.46, 0.055, 5, 14), 'darkWood', sx * 0.84, -0.44, 0.1, 0, Math.PI / 2);
+      for (let k = 0; k < 6; k++) b.box(0.03, 0.86, 0.03, 'darkWood', sx * 0.86, -0.44, 0.1, k * Math.PI / 6, 0, 0);
+      for (const sz of [-1, 1]) b.cyl(0.03, 0.03, 1.1, 'darkWood', sx * 0.7, 0.75, sz * 1.1, 0, 0, 0, 5);
+    }
+    b.add(new THREE.CylinderGeometry(0.85, 0.85, 2.4, 10, 1, true, -Math.PI / 2, Math.PI), 'cloth', 0, 1.2, 0, Math.PI / 2, 0, 0);
+    b.box(0.08, 0.08, 1.8, 'darkWood', 0.25, -0.25, 2.0).box(0.08, 0.08, 1.8, 'darkWood', -0.25, -0.25, 2.0);
+    b.box(0.5, 0.35, 0.4, 'straw', -0.3, 0.0, -0.6).box(0.45, 0.3, 0.45, 'planks', 0.3, -0.02, 0.4);
+    b.add(new THREE.CylinderGeometry(0.2, 0.18, 0.4, 10), 'planks', 0.35, 0.0, -0.5);
+    b.box(0.6, 0.12, 0.35, 'clothRed', -0.2, 0.0, 0.5);
+  } },
   stall: { shape: { type: 'box', hx: 1.2, hy: 0.45, hz: 0.6 }, mass: 0, build: (b) => { b.box(2.4, 0.08, 1.2, 'planks', 0, 0.45, 0); b.box(2.4, 0.9, 0.06, 'planks', 0, 0, 0.55); for (const sx of [-1, 1]) for (const sz of [-1, 1]) b.box(0.1, 2.4, 0.1, 'darkWood', sx * 1.15, 0.75, sz * 0.55); b.box(2.8, 0.04, 1.6, 'clothRed', 0, 1.95, 0, 0.15); } },
   well: { shape: { type: 'cyl', hh: 0.5, r: 1.0 }, mass: 0, build: (b) => {
     // Brocal con grosor: pared exterior, pared interior que baja 3 m (caras

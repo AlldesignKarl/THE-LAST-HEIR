@@ -87,7 +87,7 @@ await test('arranque: mundo, jugador en la choza y misión inicial', async () =>
     };
   });
   assert(s.stage === 'search_hut', `etapa inicial ${s.stage}`);
-  assert(s.npcs === 19, `19 habitantes (${s.npcs})`);
+  assert(s.npcs === 29, `29 habitantes (${s.npcs})`);
   assert(s.buildings >= 15, 'edificios');
   assert(s.inHut, 'el jugador empieza dentro de su choza');
   assert(s.trees > 500, `árboles ${s.trees}`);
@@ -434,7 +434,7 @@ await test('rutinas: los vecinos caminan a su trabajo según la hora y vuelven a
     const smithNight = __game.npc('bartolome');
     const pedro = __game.npc('pedro');
     const lit = [...g.fires.fires.values()].filter((f) => f.policy === 'night' && f.lit).length;
-    g.time.dayLengthSeconds = 2400;
+    g.time.dayLengthSeconds = 1800;
     return { smith0, dAnvil, anim, smithNight, pedro, lit, hour: g.time.hourFloat };
   });
   assert(r.dAnvil < 3, `el herrero llega al yunque (distancia ${r.dAnvil.toFixed(1)} m)`);

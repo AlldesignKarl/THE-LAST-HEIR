@@ -52,7 +52,7 @@ Rodrigo encontró las pistas, las repartió por el valle para que nadie pudiera 
 ## 4. Sistemas
 
 ### 4.1 Tiempo y día/noche
-- 1 día de juego = **40 min reales** (configurable). Reloj visible solo en el diario.
+- 1 día de juego = **30 min reales** (configurable). Reloj visible solo en el diario.
 - Día: NPCs trabajan, tiendas abiertas, patrullas, ciervos. Noche: casi todos en casa, guardia nocturna, lobos, más bandidos, oscuridad real fuera de las zonas iluminadas (antorchas, hogueras, ventanas).
 
 ### 4.2 Supervivencia (moderada)

@@ -192,7 +192,7 @@ export class Viewmodel {
         const axis = new THREE.Vector3(0, 1, 0).applyEuler(m.rotation);
         m.position.copy(axis.multiplyScalar(-GRIP.torch * 0.8));
         // Llama propia del viewmodel (se dibuja sobre la escena).
-        this.flame.position.set(0, 0.42, 0.01);
+        this.flame.position.set(0, 0.52, 0.01);
         m.add(this.flame);
       }
       else { m.rotation.set(0, Math.PI / 2, 0); m.position.set(0.05, 0.05, -0.1); }
@@ -306,9 +306,10 @@ export class Viewmodel {
     this.torchLight.position.set(-0.25, 0.25, -0.75);
     this.flame.visible = torchOn;
     const tt = performance.now() / 1000;
-    this.flame.scale.set(0.15 * fl, 0.22 * (0.9 + Math.random() * 0.2), 1);
+    // Llama alta y viva, como la de un trapo empapado en sebo.
+    this.flame.scale.set(0.2 * fl, 0.38 * (0.88 + Math.random() * 0.24), 1);
     this.flameCore.scale.set(0.45 + Math.sin(tt * 23) * 0.05, 0.45 + Math.sin(tt * 17) * 0.06, 1);
-    this.flameTip.position.x = Math.sin(tt * 7.3) * 0.12;
+    this.flameTip.position.x = Math.sin(tt * 7.3) * 0.14 + Math.sin(tt * 2.1) * 0.06;
     this.flameTip.scale.set(0.4 + Math.random() * 0.1, 0.6 + Math.sin(tt * 11) * 0.15 + Math.random() * 0.1, 1);
     // Dos fuegos más cercanos.
     const near = [...g.fires.fires.values()].filter((f) => f.lit && !f.hidden).map((f) => ({ f, d: f.pos.distanceTo(mainCam.position) })).sort((a, b) => a.d - b.d).slice(0, 2);

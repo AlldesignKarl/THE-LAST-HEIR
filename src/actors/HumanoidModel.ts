@@ -63,7 +63,8 @@ function shoeGeometry(): THREE.BufferGeometry {
 
 const G = {
   capsule: new THREE.CapsuleGeometry(1, 1, 4, 10),
-  sphere: new THREE.SphereGeometry(1, 16, 12),
+  capsuleLo: new THREE.CapsuleGeometry(1, 1, 2, 6),
+  sphere: new THREE.SphereGeometry(1, 14, 10),
   sphereLo: new THREE.SphereGeometry(1, 8, 6),
   box: new THREE.BoxGeometry(1, 1, 1),
   cyl: new THREE.CylinderGeometry(1, 1, 1, 12),
@@ -147,6 +148,8 @@ export class HumanoidModel {
     else sk.part(this.hips, G.frustum, tunic, 0.18 * b, 0.34, 0.14 * b, 0, -0.1);
     // Cadera (se ve por debajo del faldón al andar).
     sk.part(this.hips, G.sphereLo, pants, 0.16 * b, 0.1, 0.12 * b, 0, -0.02);
+    // Hombros: canesú que une el torso con los brazos (sin "bolas" sueltas).
+    sk.part(this.spine, G.sphere, tunic, 0.235 * b * sw, 0.085, 0.13 * b, 0, 0.5);
     // Cuello de la túnica.
     sk.part(this.spine, G.cyl, tunic, 0.075, 0.05, 0.07, 0, 0.6);
     sk.kind = SURF.leather;
@@ -169,19 +172,28 @@ export class HumanoidModel {
     // ----- Cabeza
     sk.kind = SURF.skin;
     sk.part(this.neck, G.cyl, skin, 0.052, 0.13, 0.05, 0, 0.03);
-    sk.part(this.head, G.sphere, skin, 0.098, 0.118, 0.108, 0, 0.03);
-    sk.part(this.head, G.sphere, skin, 0.08, 0.065, 0.085, 0, -0.03, 0.018); // mandíbula
-    sk.part(this.head, G.box, skin, 0.022, 0.048, 0.03, 0, 0.012, 0.108, -0.25); // nariz
-    sk.part(this.head, G.sphereLo, skin, 0.016, 0.014, 0.014, 0, -0.012, 0.118); // punta
+    const cheek = new THREE.Color(skin).lerp(new THREE.Color(0xb05a48), 0.18).getHex();
+    const shade = new THREE.Color(skin).multiplyScalar(0.9).getHex();
+    sk.part(this.head, G.sphere, skin, 0.092, 0.112, 0.102, 0, 0.03);
+    sk.part(this.head, G.sphere, skin, 0.075, 0.06, 0.08, 0, -0.028, 0.02); // mandíbula
+    sk.part(this.head, G.sphereLo, skin, 0.03, 0.022, 0.024, 0, -0.058, 0.07); // barbilla
+    sk.part(this.head, G.box, skin, 0.018, 0.05, 0.026, 0, 0.012, 0.1, -0.22); // tabique
+    sk.part(this.head, G.sphereLo, skin, 0.017, 0.014, 0.015, 0, -0.012, 0.11); // punta
+    sk.part(this.head, G.box, skin, 0.08, 0.014, 0.022, 0, 0.044, 0.092); // arco de las cejas
     for (const e of [-1, 1]) {
-      sk.part(this.head, G.sphereLo, skin, 0.012, 0.028, 0.02, e * 0.097, 0.018, -0.005); // oreja
-      sk.part(this.head, G.sphereLo, eyeW, 0.017, 0.011, 0.008, e * 0.036, 0.027, 0.097);
-      sk.part(this.head, G.sphereLo, iris, 0.008, 0.008, 0.005, e * 0.036, 0.027, 0.104);
+      sk.part(this.head, G.sphereLo, shade, 0.009, 0.006, 0.006, e * 0.009, -0.017, 0.113); // aleta de la nariz
+      sk.part(this.head, G.sphereLo, cheek, 0.026, 0.02, 0.014, e * 0.05, 0.0, 0.082); // mejilla
+      sk.part(this.head, G.sphereLo, skin, 0.011, 0.026, 0.018, e * 0.091, 0.016, -0.005); // oreja
+      sk.part(this.head, G.sphereLo, shade, 0.017, 0.01, 0.008, e * 0.034, 0.03, 0.091); // cuenca
+      sk.part(this.head, G.sphereLo, eyeW, 0.011, 0.007, 0.006, e * 0.034, 0.027, 0.095);
+      sk.part(this.head, G.sphereLo, iris, 0.0065, 0.0065, 0.004, e * 0.034, 0.026, 0.1);
+      sk.part(this.head, G.box, skin, 0.028, 0.007, 0.012, e * 0.034, 0.035, 0.096, 0.2); // párpado
       sk.kind = SURF.hair;
-      sk.part(this.head, G.box, hair, 0.038, 0.009, 0.012, e * 0.037, 0.047, 0.102, 0, 0, -e * 0.12); // ceja
+      sk.part(this.head, G.box, hair, 0.036, 0.008, 0.012, e * 0.035, 0.047, 0.1, 0, 0, -e * 0.14); // ceja
       sk.kind = SURF.skin;
     }
-    sk.part(this.head, G.box, lip, 0.034, 0.008, 0.01, 0, -0.045, 0.1);
+    sk.part(this.head, G.box, lip, 0.03, 0.006, 0.01, 0, -0.04, 0.097); // labio superior
+    sk.part(this.head, G.box, new THREE.Color(lip).multiplyScalar(1.08).getHex(), 0.026, 0.008, 0.011, 0, -0.049, 0.094); // labio inferior
     // ----- Pelo, barba y tocados
     sk.kind = SURF.hair;
     const covered = app.hood || app.helmet;
@@ -195,8 +207,14 @@ export class HumanoidModel {
         sk.part(this.head, G.box, hair, 0.16, 0.025, 0.02, 0, 0.075, 0.1);
       } else {
         const style = pick(3, 5);
-        sk.part(this.head, G.sphere, hair, 0.106, 0.075 + style * 0.01, 0.114, 0, 0.078, -0.012);
-        sk.part(this.head, G.sphereLo, hair, 0.1, 0.07, 0.06, 0, 0.02, -0.075); // nuca
+        const cut = pick(3, 9); // 0 corto, 1 media melena, 2 coronilla calva
+        if (cut === 2) {
+          sk.part(this.head, G.sphereLo, hair, 0.098, 0.05, 0.1, 0, 0.03, -0.03); // cerco de pelo
+        } else {
+          sk.part(this.head, G.sphere, hair, 0.1, 0.07 + style * 0.01, 0.108, 0, 0.078, -0.012);
+        }
+        sk.part(this.head, G.sphereLo, hair, 0.095, cut === 1 ? 0.11 : 0.065, 0.06, 0, cut === 1 ? -0.02 : 0.02, -0.07); // nuca / melena
+        if (cut === 1) for (const e of [-1, 1]) sk.part(this.head, G.sphereLo, hair, 0.03, 0.09, 0.05, e * 0.085, -0.01, -0.02); // pelo sobre las orejas
         if (style === 2) {
           // Gorro de fieltro.
           sk.kind = SURF.cloth;
@@ -229,8 +247,8 @@ export class HumanoidModel {
     // ----- Brazos
     for (const [sh, el, hand, e] of [[this.shL, this.elL, this.handL, -1], [this.shR, this.elR, this.handR, 1]] as const) {
       sk.kind = SURF.cloth;
-      sk.part(sh, G.sphereLo, tunic, 0.058, 0.06, 0.06, -0.02 * (sh === this.shL ? -1 : 1), -0.03); // hombro
-      sk.part(sh, G.capsule, tunic, 0.052, 0.14, 0.052, 0, -0.15);
+      sk.part(sh, G.capsule, tunic, 0.058, 0.17, 0.056, 0, -0.14); // manga (brazo)
+      sk.part(sh, G.sphere, tunic, 0.066, 0.07, 0.064, e * -0.012, -0.02); // deltoides que une con el canesú
       if (app.apron) {
         sk.kind = SURF.skin;
         sk.part(el, G.capsule, skin, 0.04, 0.13, 0.04, 0, -0.13); // mangas remangadas
@@ -241,8 +259,9 @@ export class HumanoidModel {
         sk.part(el, G.cyl, new THREE.Color(tunic).multiplyScalar(0.8).getHex(), 0.047, 0.03, 0.047, 0, -0.25); // puño
       }
       sk.kind = SURF.skin;
-      sk.part(hand, G.sphere, skin, 0.034, 0.052, 0.022, 0, -0.03);
-      sk.part(hand, G.capsule, skin, 0.011, 0.022, 0.011, e * -0.03, -0.015, 0.012, 0, 0, e * 0.6); // pulgar
+      sk.part(hand, G.sphere, skin, 0.032, 0.04, 0.019, 0, -0.022); // palma
+      for (let f = 0; f < 4; f++) sk.part(hand, G.capsuleLo, skin, 0.0075, 0.02, 0.0075, (f - 1.5) * 0.0145, -0.068 + Math.abs(f - 1.3) * 0.004, 0.004, 0.12); // dedos
+      sk.part(hand, G.capsuleLo, skin, 0.009, 0.018, 0.009, e * -0.03, -0.02, 0.013, 0.3, 0, e * 0.6); // pulgar
     }
     // ----- Piernas y calzado
     for (const [hp, kn] of [[this.hipL, this.knL], [this.hipR, this.knR]] as const) {
@@ -353,7 +372,7 @@ export class HumanoidModel {
     const s = this.state;
     // Poses objetivo (radianes).
     let headY = 0;
-    let hipsY = 0, spineX = 0, spineY = 0, headX = 0, shLx = 0, shRx = 0, shLz = 0.08, shRz = -0.08, elL = -0.15, elR = -0.15;
+    let hipsY = 0, spineX = 0, spineY = 0, headX = 0, shLx = 0, shRx = 0, shLz = 0.045, shRz = -0.045, elL = -0.18, elR = -0.18;
     let hipLx = 0, hipRx = 0, knL = 0, knR = 0, rootX = 0, hipsYaw = 0;
     const sw = Math.sin(this.phase);
     if (s === 'walk' || s === 'run') {

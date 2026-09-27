@@ -40,6 +40,15 @@ export const TRADERS: TraderDef[] = [
   { npcId: 'diego', village: 'robledo', coins: 90, buys: ['food'], stock: [
     { id: 'thatch', count: 30 }, { id: 'apple', count: 8 },
   ] },
+  { npcId: 'simon', village: 'robledo', coins: 60, buys: ['resource'], stock: [
+    { id: 'bucket', count: 2 }, { id: 'fishing_rod', count: 1 }, { id: 'firewood', count: 4 },
+  ] },
+  { npcId: 'catalina', village: 'robledo', coins: 110, buys: ['resource', 'armor'], stock: [
+    { id: 'gambeson', count: 1 }, { id: 'waterskin_empty', count: 2 }, { id: 'cheese', count: 2 },
+  ] },
+  { npcId: 'ramiro', village: 'robledo', coins: 180, buys: [], stock: [
+    { id: 'torch', count: 4 }, { id: 'herbs', count: 3 }, { id: 'knife', count: 1 }, { id: 'wine', count: 2 }, { id: 'arrow', count: 12 }, { id: 'apple', count: 5 },
+  ] },
   { npcId: 'gil', village: 'robledo', coins: 150, buys: ['resource', 'food', 'ammo'], stock: [
     { id: 'arrow', count: 25 }, { id: 'bow', count: 1 }, { id: 'meat_raw', count: 3 }, { id: 'knife', count: 1 },
   ] },

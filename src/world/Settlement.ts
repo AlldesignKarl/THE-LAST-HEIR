@@ -8,7 +8,7 @@ import * as THREE from 'three';
 import type { Game } from '../game/Game';
 import { BuildingInstance, type Door } from './Buildings';
 import {
-  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
+  BANDIT_CAMP, BRIDGES, BUILDINGS, CAVE, FIELDS, MARKET_STALLS, PALISADE, PASTURE, PEDDLER_CART, PIER, SEA, WATCHTOWER, WELL, WOLF_DEN,
 } from './WorldLayout';
 import { Cave } from './Cave';
 import { RAPIER, GROUP, groups, ALL } from '../engine/Physics';
@@ -519,6 +519,12 @@ export class Settlement {
       label: (game) => game.actions.waterLabel(),
       interact: (game) => game.actions.useWater('pozo'),
     });
+    // Carro del buhonero Ramiro en la plaza.
+    {
+      const c = PEDDLER_CART;
+      this.placeStatic('peddler_cart', c.x, this.ground(c.x, c.z) + 0.95, c.z, c.rot, 'stall');
+    }
+    this.buildPasture();
     // Puestos de mercado con mercancía (de Lucía).
     MARKET_STALLS.forEach((s, i) => {
       const y = this.ground(s.x, s.z);
@@ -1230,6 +1236,50 @@ export class Settlement {
     }
   }
 
+  /** Tramos de la cerca del prado (para la navegación): segmentos XZ. */
+  readonly fenceWalls: { ax: number; az: number; bx: number; bz: number }[] = [];
+
+  /** Prado cercado de Lope: cerca de palos con portillo, abrevadero y almiares. */
+  private buildPasture(): void {
+    const P = PASTURE;
+    const hw = P.w / 2, hd = P.d / 2;
+    const W = (lx: number, lz: number) => { const w = toWorldXZ(lx, lz, P.rot); return { x: P.x + w.x, z: P.z + w.z }; };
+    const run = (ax: number, az: number, bx: number, bz: number, gap = false) => {
+      const len = Math.hypot(bx - ax, bz - az);
+      const n = Math.round(len / 2.5);
+      for (let i = 0; i < n; i++) {
+        const t0 = i / n, t1 = (i + 1) / n;
+        const mx = ax + (bx - ax) * (t0 + t1) / 2, mz = az + (bz - az) * (t0 + t1) / 2;
+        if (gap && Math.abs(mx) < 1.6) continue; // portillo en el centro
+        const a = W(ax + (bx - ax) * t0, az + (bz - az) * t0), b = W(ax + (bx - ax) * t1, az + (bz - az) * t1);
+        const c = W(mx, mz);
+        const rot = -Math.atan2(b.z - a.z, b.x - a.x);
+        this.placeStatic('fence', c.x, this.ground(c.x, c.z) + 0.55, c.z, rot, 'fence');
+        this.fenceWalls.push({ ax: a.x, az: a.z, bx: b.x, bz: b.z });
+      }
+    };
+    run(-hw, -hd, hw, -hd, true); // norte, hacia el pueblo, con portillo
+    run(-hw, hd, hw, hd);
+    run(-hw, -hd, -hw, hd);
+    run(hw, -hd, hw, hd);
+    const tr = W(hw - 3, -hd + 2);
+    this.placeStatic('trough', tr.x, this.ground(tr.x, tr.z) + 0.22, tr.z, P.rot, 'static');
+    for (const [lx, lz] of [[-hw + 3, hd - 3], [-hw + 6.5, hd - 2.5]]) {
+      const h = W(lx, lz);
+      this.placeStatic('haystack', h.x, this.ground(h.x, h.z) + 0.9, h.z, lx, 'static');
+    }
+  }
+
+  /** Punto en la orilla este del arroyo a una z dada (para lavar, mimbre…). */
+  private streamBank(z: number): { x: number; z: number } {
+    const hf = this.g.hf;
+    for (let x = -70; x > -120; x -= 0.25) {
+      const st = hf.streamInfo(x, z);
+      if (st && st.dist < st.halfW + 1.1) return { x, z };
+    }
+    return { x: -88, z };
+  }
+
   // ------------------------------------------------------------ lugares (IA)
 
   private buildPlaces(): void {
@@ -1294,6 +1344,19 @@ export class Settlement {
     add('field_3', FIELDS[0].x + 12, FIELDS[0].z + 10, 2, 'farm');
     add('south_lane', -10, 64, 0);
     add('harbor_lane', 70, 12, 0);
+    // Lugares de los vecinos nuevos.
+    inB('tavern', -0.4, -1.1, 0, 'sell', 'tavern_serve');
+    const s1 = MARKET_STALLS[1];
+    const so1 = toWorldXZ(0, 1.3, s1.rot);
+    add('market_stall2', s1.x + so1.x, s1.z + so1.z, s1.rot + Math.PI, 'sell');
+    add('plaza_cart', PEDDLER_CART.x - 1.4, PEDDLER_CART.z + 0.6, -Math.PI / 2 + PEDDLER_CART.rot, 'sell');
+    // Lavadero y mimbreras en la orilla este del arroyo.
+    for (const [id, z] of [['washing_spot', 40], ['washing_spot2', 62]] as [string, number][]) {
+      const b = this.streamBank(z);
+      add(id, b.x, b.z, -Math.PI / 2, 'work');
+    }
+    add('woodcut_n', -79, -12, -Math.PI / 2, 'chop');
+    add('pasture', PASTURE.x, PASTURE.z - 2, 0.4);
   }
 
   // ------------------------------------------------------------ persistencia

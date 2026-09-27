@@ -41,7 +41,7 @@ export function installDebugAPI(g: Game): void {
         const m = new HumanoidModel(d.appearance, g.materials);
         const px = x + (i - (NPCS.length - 1) / 2) * spacing;
         m.root.position.set(px, g.hf.heightAt(px, z), z);
-        m.update(0.1, true);
+        for (let k = 0; k < 40; k++) m.update(0.05, true);
         g.renderer.scene.add(m.root);
       });
     },

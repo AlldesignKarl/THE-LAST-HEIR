@@ -5,7 +5,7 @@
  */
 import { NavGraph, type Wall } from './NavGraph';
 import type { Settlement } from './Settlement';
-import { PALISADE, ROADS, RAID_STAGING, BANDIT_CAMP, CAVE, DEER_MEADOW, GROVE_NE } from './WorldLayout';
+import { PALISADE, ROADS, RAID_STAGING, BANDIT_CAMP, CAVE, DEER_MEADOW, GROVE_NE, PASTURE } from './WorldLayout';
 import { toWorldXZ } from '../core/math';
 
 export function buildWorldNav(s: Settlement): NavGraph {
@@ -43,6 +43,8 @@ export function buildWorldNav(s: Settlement): NavGraph {
     else if (angDiff(mid, P.breachAngle) < (P.breachWidth / 2 + 2) / P.radius) walls.push({ ...seg, id: 'breach' });
     else walls.push(seg);
   }
+  // Cerca del prado (con portillo).
+  for (const w of s.fenceWalls) walls.push(w);
   const nav = new NavGraph([], walls);
   // Lugares.
   for (const p of s.places.values()) nav.addNode(p.x, p.z, p.id);
@@ -83,6 +85,12 @@ export function buildWorldNav(s: Settlement): NavGraph {
   nav.addNode(CAVE.mouth.x - 1, CAVE.mouth.z, 'cave_mouth');
   nav.addNode(DEER_MEADOW.x, DEER_MEADOW.z, 'meadow');
   nav.addNode(GROVE_NE.x, GROVE_NE.z + 25, 'grove');
+  {
+    // Portillo del prado: un nodo dentro y otro fuera.
+    const i = toWorldXZ(0, -PASTURE.d / 2 + 1.5, PASTURE.rot), o = toWorldXZ(0, -PASTURE.d / 2 - 2, PASTURE.rot);
+    nav.addNode(PASTURE.x + i.x, PASTURE.z + i.z, 'pasture_in');
+    nav.addNode(PASTURE.x + o.x, PASTURE.z + o.z, 'pasture_out');
+  }
   nav.build(90);
   nav.setWallEnabled('breach', s.palisadeRepaired);
   nav.setWallEnabled('gate', !s.gate.open);

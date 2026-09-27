@@ -28,7 +28,7 @@ export class DialogueSystem {
     npc.talking = true;
     g.bus.emit('npc:talked', { npcId: npc.def.id });
     const d = DIALOGUES[npc.def.id];
-    this.show(d ? d.greet({ g, npc }) : 'Dios os guarde.');
+    this.show(d ? d.greet({ g, npc }) : GREETS[(npc.def.id.length + g.time.day) % GREETS.length]);
   }
 
   private topics(): Topic[] {
@@ -36,7 +36,8 @@ export class DialogueSystem {
     const ctx = { g: this.g, npc };
     const d = DIALOGUES[npc.def.id];
     const list: Topic[] = [];
-    if (d) for (const t of d.topics) {
+    if (!d) return genericTopics(npc);
+    for (const t of d.topics) {
       if (t.once && this.used.has(`${npc.def.id}:${t.id}`)) continue;
       if (!t.cond || t.cond(ctx)) list.push(t);
     }
@@ -84,4 +85,17 @@ export class DialogueSystem {
   deserialize(d: { used: string[] }): void {
     this.used = new Set(d.used ?? []);
   }
+}
+
+const GREETS = ['Dios os guarde.', 'Buenas.', '¿Qué se os ofrece?', 'Hola, Martín. ¿Alguna novedad de tu padre?', 'Tengo faena, pero decid.'];
+
+/** Conversación básica para los vecinos sin diálogo propio: oficio, rumores y trato. */
+function genericTopics(npc: NPC): Topic[] {
+  const def = npc.def;
+  const list: Topic[] = [
+    { id: 'job', text: '¿A qué os dedicáis?', reply: `Soy ${def.role.toLowerCase()}. ${def.barks[0] ?? ''}` },
+    { id: 'news', text: '¿Qué se cuenta por el pueblo?', reply: () => def.barks[Math.floor(Math.random() * def.barks.length)] ?? 'Poca cosa.' },
+  ];
+  if (def.trader) list.push({ id: 'trade', text: 'Quiero comerciar.', reply: 'Mirad lo que tengo.', opensTrade: true });
+  return list;
 }

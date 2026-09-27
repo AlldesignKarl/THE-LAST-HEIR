@@ -126,7 +126,8 @@ export class NPCManager {
       const p = this.place(n.placeId);
       if (!p) continue;
       n.onTower = n.placeId === 'tower_top';
-      n.c.place(p.x + (Math.random() - 0.5) * 0.4, p.y, p.z + (Math.random() - 0.5) * 0.4, p.yaw);
+      const o = n.onTower ? { x: 0, z: 0 } : this.slotOffset(n, n.placeId, p);
+      n.c.place(p.x + o.x + (Math.random() - 0.5) * 0.2, p.y, p.z + o.z + (Math.random() - 0.5) * 0.2, p.yaw);
       n.c.stop();
       n.c.indoors = n.placeId.startsWith('in:');
       n.idleAnim = this.animFor(e, p);
@@ -153,7 +154,7 @@ export class NPCManager {
     if (p?.anim === 'hammer') return 'hammer';
     if (p?.anim === 'fish') return 'fish';
     switch (e.activity) {
-      case 'work': return p?.anim === 'work' ? 'work' : 'idle';
+      case 'work': return p?.anim === 'work' ? 'work' : p?.anim === 'chop' ? 'chop' : 'idle';
       case 'pray': return 'pray';
       case 'sell': return 'sell';
       case 'farm': return 'farm';
@@ -163,6 +164,27 @@ export class NPCManager {
       case 'social': return 'talk';
       default: return 'idle';
     }
+  }
+
+  /**
+   * Si otro vecino ya ocupa ese lugar, cada uno se pone a un lado (en corro),
+   * para que no se amontonen en el mismo punto.
+   */
+  private slotOffset(n: NPC, placeId: string, p: Place): { x: number; z: number } {
+    if (placeId.startsWith('in:')) return { x: 0, z: 0 };
+    let slot = 0;
+    for (const o of this.npcs.values()) {
+      if (o === n) break;
+      if (o.c.alive && o.placeId === placeId) slot++;
+    }
+    if (slot === 0) return { x: 0, z: 0 };
+    for (let k = 0; k < 6; k++) {
+      const a = p.yaw + Math.PI / 2 + (slot + k) * 2.1;
+      const r = 0.8 + Math.floor((slot - 1) / 5) * 0.6;
+      const x = Math.sin(a) * r, z = Math.cos(a) * r;
+      if (this.nav.clear(p.x, p.z, p.x + x, p.z + z)) return { x, z };
+    }
+    return { x: 0, z: 0 };
   }
 
   /** Ruta hacia un lugar (pasando por la puerta si está dentro de un edificio). */
@@ -180,6 +202,9 @@ export class NPCManager {
     if (placeId === 'tower_top') {
       const base = this.place('tower_base')!;
       tx = base.x; tz = base.z;
+    } else {
+      const o = this.slotOffset(n, placeId, p);
+      tx += o.x; tz += o.z;
     }
     const path = this.nav.findPath(c.pos.x, c.pos.z, tx, tz);
     c.setPath(path, speed);
