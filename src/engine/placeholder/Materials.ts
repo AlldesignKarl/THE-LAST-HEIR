@@ -40,7 +40,7 @@ const SPECS: Record<MatId, MatSpec> = {
   thatch: { tex: 'thatch', roughness: 1 },
   tiles: { tex: 'tiles', roughness: 0.8 },
   rock: { tex: 'rock', roughness: 0.95 },
-  caveRock: { tex: 'rock', color: 0x6e6a62, roughness: 0.92 },
+  caveRock: { tex: 'rock', color: 0x88827a, roughness: 0.92 },
   bark: { tex: 'bark', roughness: 0.95, normalScale: 1.2 },
   pineBark: { tex: 'pineBark', roughness: 0.95, normalScale: 1.2 },
   roughWood: { tex: 'roughWood', roughness: 0.9 },
