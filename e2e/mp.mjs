@@ -74,7 +74,7 @@ const acts = await A.evaluate(() => {
   return { tree: t.id, rock: rock.id, stones: rock.stones };
   function THREE_V(x, y, z) { return g.player.pos.clone().set(x, y, z); }
 });
-await B.waitForFunction((a) => window.__game.game.vegetation.felled.has(a.tree), acts, { timeout: 15000 }).catch(() => {});
+await B.waitForFunction((a) => { const g = window.__game.game; return g.vegetation.felled.has(a.tree) && g.resources.rocks.get(a.rock).stones === a.stones; }, acts, { timeout: 30000 }).catch(() => {});
 const seen = await B.evaluate((a) => {
   const g = window.__game.game;
   return { felled: g.vegetation.felled.has(a.tree), stones: g.resources.rocks.get(a.rock).stones };
